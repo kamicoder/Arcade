@@ -1,23 +1,29 @@
 // La course : la piste, les voitures, la caméra. Le tableau de bord (compteurs, commandes au doigt)
 // est une autre scène, lancée par-dessus : elle ne bouge pas avec la caméra.
+// À deux, l'écran est coupé en deux : une caméra par joueur, chacune avec sa moitié d'écran.
 
 import Phaser from "phaser";
 import { preparerCircuit, type Circuit, type ModeleDeCircuit } from "../circuits";
 import { Voiture, RAYON, type Pilote, type Piste, type Instant } from "../Voiture";
 import { texturePiste } from "../textures";
 import {
-  TOURS, JOUEUR, RIVAUX, AIDE_MOBILE, RETOUR_BIDON, VITESSE_NITRO, SAUVEGARDE, PROFONDEUR,
+  TOURS, JOUEUR, RIVAUX, JOUEURS_DUO, COMMANDES_SEUL, COMMANDES_DUO, AIDE_MOBILE, RETOUR_BIDON,
+  VITESSE_NITRO, SAUVEGARDE, PROFONDEUR, type Commandes,
 } from "../reglages";
+import { compterLesPoints, type GrandPrix } from "../grandPrix";
 import { estTactile } from "../../../socle/tactile";
 import { lire, ecrire } from "../../../socle/sauvegarde";
 import { surTouche } from "../../../socle/clavier";
+import { TouchesPhysiques } from "../../../socle/touchesPhysiques";
+import { LARGEUR, HAUTEUR } from "../../../socle/style";
 
-export type Mode = "chrono" | "course";
+export type Mode = "chrono" | "course" | "duo" | "grandprix";
 
 export interface DonneesDeCourse {
   modele: ModeleDeCircuit;
   mode: Mode;
   niveau: number;                          // le niveau des rivaux
+  grandPrix?: GrandPrix;                   // en Grand Prix : où on en est, et les points de chacun
 }
 
 export interface RecordDuCircuit {
@@ -29,13 +35,17 @@ export function lireLeRecord(modele: ModeleDeCircuit): RecordDuCircuit | null {
   return lire<RecordDuCircuit>(SAUVEGARDE + "/" + modele.id);
 }
 
+type Son = Phaser.Sound.WebAudioSound | Phaser.Sound.HTML5AudioSound | Phaser.Sound.NoAudioSound;
+
 export class Course extends Phaser.Scene implements Piste {
   circuit!: Circuit;
   mode!: Mode;
   voitures: Voiture[] = [];
-  joueur!: Voiture;
+  joueurs: Voiture[] = [];                 // celles qu'on conduit : une, ou deux à deux
+  joueur!: Voiture;                        // la première
   classement: Voiture[] = [];
   record: RecordDuCircuit | null = null;
+  grandPrix?: GrandPrix;
   enCourse = false;                        // faux pendant le compte à rebours et après l'arrivée
 
   // Les doigts sur les commandes : le tableau de bord les met à jour
@@ -49,8 +59,11 @@ export class Course extends Phaser.Scene implements Piste {
   private solAMettreAJour = false;
   private fumee!: Phaser.GameObjects.Particles.ParticleEmitter;
   private etincelles!: Phaser.GameObjects.Particles.ParticleEmitter;
-  private touches!: Record<"haut" | "bas" | "gauche" | "droite" | "nitro" | "echap", Phaser.Input.Keyboard.Key>;
-  private moteur!: Phaser.Sound.WebAudioSound | Phaser.Sound.HTML5AudioSound | Phaser.Sound.NoAudioSound;
+  private touches!: TouchesPhysiques;
+  private commandes: Commandes[] = [];     // les touches de chaque joueur
+  private camerasDesJoueurs: Phaser.Cameras.Scene2D.Camera[] = [];
+  private zoomDeBase = 1;
+  private moteurs: Son[] = [];             // un moteur par joueur : chacun entend le sien monter dans les aigus
 
   constructor() {
     // Cette scène a besoin de la physique Arcade : on la demande dans sa configuration
@@ -62,8 +75,11 @@ export class Course extends Phaser.Scene implements Piste {
     this.circuit = preparerCircuit(donnees.modele);
     this.mode = donnees.mode;
     this.niveau = donnees.niveau;
+    this.grandPrix = donnees.grandPrix;
     this.record = lireLeRecord(donnees.modele);
     this.voitures = [];
+    this.joueurs = [];
+    this.fantome = undefined;
     this.enCourse = false;
     this.fantomeIndex = 0;
     this.auDoigt = estTactile();
@@ -89,26 +105,46 @@ export class Course extends Phaser.Scene implements Piste {
     const peloton = this.add.group(this.voitures);
     this.physics.add.overlap(peloton, peloton, (a, b) => this.bousculer(a as Voiture, b as Voiture));
 
-    const camera = this.cameras.main;
-    camera.setBounds(0, 0, largeur, hauteur);
-    camera.startFollow(this.joueur, true, 0.12, 0.12);   // elle suit la voiture, avec un peu de retard
-    camera.fadeIn(300);
+    this.placerLesCameras();
 
-    const clavier = this.input.keyboard!;
-    this.touches = clavier.addKeys({
-      haut: "UP", bas: "DOWN", gauche: "LEFT", droite: "RIGHT", nitro: "SPACE", echap: "ESC",
-    }) as typeof this.touches;
+    // Les touches se lisent par leur place sur le clavier : à deux, Z Q S D sur un AZERTY,
+    // W A S D sur un QWERTY, c'est la même main gauche au même endroit
+    this.touches = new TouchesPhysiques(this);
+    this.commandes = this.joueurs.length === 2 ? COMMANDES_DUO : [COMMANDES_SEUL];
+    // Les flèches et Espace ne doivent pas faire défiler la page
+    this.input.keyboard!.addCapture("UP,DOWN,LEFT,RIGHT,SPACE");
     surTouche(this, "ESC", () => this.quitter());
 
-    this.moteur = this.sound.add(this.auDoigt ? "voiture-moteur-mobile" : "voiture-moteur", {
+    this.moteurs = this.joueurs.map(() => this.sound.add(this.auDoigt ? "voiture-moteur-mobile" : "voiture-moteur", {
       loop: true,
-      volume: this.auDoigt ? 0.6 : 0.25,
-    }) as typeof this.moteur;
+      volume: this.auDoigt ? 0.6 : 0.25 / this.joueurs.length,
+    }) as Son);
     // Le son n'est pas un objet de la scène : il faut le détruire nous-mêmes quand elle s'arrête
-    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.moteur.destroy());
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.moteurs.forEach((moteur) => moteur.destroy()));
 
     this.scene.launch("voiture-tableau");
     this.compterJusquAuDepart();
+  }
+
+  // Seul : la caméra principale suit la voiture. À deux : l'écran coupé en deux moitiés, une caméra
+  // par moitié (setViewport), chacune suit son joueur. Elles filment la même scène, chacune à sa place.
+  private placerLesCameras() {
+    const { largeur, hauteur } = this.circuit.modele;
+    const principale = this.cameras.main;
+    if (this.joueurs.length === 2) {
+      principale.setViewport(0, 0, LARGEUR / 2, HAUTEUR);
+      this.camerasDesJoueurs = [principale, this.cameras.add(LARGEUR / 2, 0, LARGEUR / 2, HAUTEUR)];
+      this.zoomDeBase = 0.8;               // une moitié d'écran, c'est étroit : on prend un peu de recul
+    } else {
+      this.camerasDesJoueurs = [principale];
+      this.zoomDeBase = 1;
+    }
+    this.camerasDesJoueurs.forEach((camera, i) => {
+      camera.setBounds(0, 0, largeur, hauteur);
+      camera.setZoom(this.zoomDeBase);
+      camera.startFollow(this.joueurs[i], true, 0.12, 0.12);   // elle suit la voiture, avec un peu de retard
+      camera.fadeIn(300);
+    });
   }
 
   private creerEffets() {
@@ -129,8 +165,10 @@ export class Course extends Phaser.Scene implements Piste {
   }
 
   private creerVoitures() {
-    const pilotes: Pilote[] = [{ ...JOUEUR, niveau: 1, joueur: true }];
-    if (this.mode === "course") {
+    const pilotes: Pilote[] = this.mode === "duo"
+      ? JOUEURS_DUO.map((j) => ({ ...j, niveau: 1, joueur: true }))
+      : [{ ...JOUEUR, niveau: 1, joueur: true }];
+    if (this.mode === "course" || this.mode === "grandprix") {
       const niveau = this.auDoigt ? this.niveau * AIDE_MOBILE.rivaux : this.niveau;
       for (const rival of RIVAUX) {
         pilotes.push({ ...rival, niveau, joueur: false });
@@ -141,8 +179,9 @@ export class Course extends Phaser.Scene implements Piste {
       const decalage = pilotes.length > 1 ? 35 * (2 * (i % 2) - 1) : 0;
       this.voitures.push(new Voiture(this, this, pilote, decalage, Math.floor(i / 2)));
     });
-    this.joueur = this.voitures[0];
-    this.joueur.aidee = this.auDoigt;
+    this.joueurs = this.voitures.filter((v) => v.joueur);
+    this.joueur = this.joueurs[0];
+    this.joueur.aidee = this.auDoigt && this.joueurs.length === 1;
     this.classement = this.voitures.slice();
 
     if (this.mode === "chrono" && this.record) {
@@ -200,7 +239,7 @@ export class Course extends Phaser.Scene implements Piste {
     let reste = 3;
     this.events.emit("compte", reste);
     this.sound.play("voiture-bip");
-    this.moteur.play();
+    this.moteurs.forEach((moteur) => moteur.play());
     this.time.addEvent({
       delay: 1000,
       repeat: 2,                           // 1 fois + 2 répétitions : 2, 1, 0
@@ -223,7 +262,7 @@ export class Course extends Phaser.Scene implements Piste {
 
     for (const voiture of this.voitures) {
       if (!voiture.ordinateur) {
-        this.lireLesEntrees(voiture);
+        this.lireLesEntrees(voiture, this.joueurs.indexOf(voiture));
       }
       voiture.conduire(duree);
       if (voiture.aFiniUnTour()) {
@@ -241,28 +280,32 @@ export class Course extends Phaser.Scene implements Piste {
       this.solAMettreAJour = false;
     }
 
-    // Le moteur monte dans les aigus avec la vitesse
-    this.moteur.setRate(0.6 + Math.abs(this.joueur.vitesse) / VITESSE_NITRO * 1.6);
+    this.joueurs.forEach((joueur, i) => {
+      // Le moteur monte dans les aigus avec la vitesse
+      this.moteurs[i].setRate(0.6 + Math.abs(joueur.vitesse) / VITESSE_NITRO * 1.6);
 
-    // La caméra regarde un peu devant la voiture, et recule quand elle va vite
-    const camera = this.cameras.main;
-    const v = this.joueur.body.velocity;
-    camera.followOffset.x = Phaser.Math.Linear(camera.followOffset.x, -v.x * 0.25, 0.05);
-    camera.followOffset.y = Phaser.Math.Linear(camera.followOffset.y, -v.y * 0.25, 0.05);
-    const zoom = 1 - 0.15 * Math.min(1, v.length() / VITESSE_NITRO);
-    camera.setZoom(Phaser.Math.Linear(camera.zoom, zoom, 0.03));
+      // La caméra regarde un peu devant la voiture, et recule quand elle va vite
+      const camera = this.camerasDesJoueurs[i];
+      const v = joueur.body.velocity;
+      camera.followOffset.x = Phaser.Math.Linear(camera.followOffset.x, -v.x * 0.25, 0.05);
+      camera.followOffset.y = Phaser.Math.Linear(camera.followOffset.y, -v.y * 0.25, 0.05);
+      const zoom = this.zoomDeBase * (1 - 0.15 * Math.min(1, v.length() / VITESSE_NITRO));
+      camera.setZoom(Phaser.Math.Linear(camera.zoom, zoom, 0.03));
+    });
   }
 
-  // Le clavier, la manette, et les doigts sur les commandes du tableau de bord
-  private lireLesEntrees(voiture: Voiture) {
+  // Le clavier, la manette, et les doigts sur les commandes du tableau de bord.
+  // n : le numéro du joueur. À deux, chacun ses touches et sa manette (la première, la deuxième).
+  private lireLesEntrees(voiture: Voiture, n: number) {
+    const c = this.commandes[n];
     const t = this.touches;
-    const manette = this.input.gamepad?.pad1;
+    const manette = n === 0 ? this.input.gamepad?.pad1 : this.input.gamepad?.pad2;
     const e = voiture.entrees;
-    e.avancer = t.haut.isDown;
-    e.reculer = t.bas.isDown;
-    e.gauche = t.gauche.isDown;
-    e.droite = t.droite.isDown;
-    e.nitro = t.nitro.isDown;
+    e.avancer = t.tenue(c.avancer);
+    e.reculer = t.tenue(c.reculer);
+    e.gauche = t.tenue(c.gauche);
+    e.droite = t.tenue(c.droite);
+    e.nitro = t.tenue(c.nitro);
     if (manette) {
       // A ou la gâchette droite : accélérer. B ou la gâchette gauche : freiner. X : la nitro.
       e.avancer ||= manette.A || manette.R2 > 0.2;
@@ -271,7 +314,7 @@ export class Course extends Phaser.Scene implements Piste {
       e.droite ||= manette.right || manette.leftStick.x > 0.3;
       e.nitro ||= manette.X || manette.R1 > 0;
     }
-    if (this.auDoigt) {
+    if (this.auDoigt && this.joueurs.length === 1) {
       // Au doigt, la voiture accélère toute seule tant qu'on ne freine pas
       e.gauche ||= this.tactile.gauche;
       e.droite ||= this.tactile.droite;
@@ -292,7 +335,9 @@ export class Course extends Phaser.Scene implements Piste {
     }
     if (voiture.tour === TOURS) {
       voiture.franchirLArrivee(this.voitures.filter((v) => v.fini).length + 1);
-      if (voiture.joueur) {
+      // La course s'arrête quand tous les joueurs sont arrivés. À deux, le premier arrivé fait
+      // un tour d'honneur (l'ordinateur le conduit) en attendant l'autre.
+      if (this.joueurs.every((j) => j.fini)) {
         this.arrivee();
       }
       return;
@@ -361,10 +406,22 @@ export class Course extends Phaser.Scene implements Piste {
 
   private arrivee() {
     this.enCourse = false;
-    this.moteur.stop();
+    this.moteurs.forEach((moteur) => moteur.stop());
     this.classer();
     this.physics.pause();
     this.scene.launch("voiture-arrivee");
+  }
+
+  // Après l'écran d'arrivée : le menu, ou en Grand Prix le classement avec les points de cette course
+  apresLArrivee() {
+    if (this.mode !== "grandprix" || !this.grandPrix) {
+      this.quitter();
+      return;
+    }
+    const grandPrix = compterLesPoints(this.grandPrix, this.classement.map((v) => v.nom));
+    this.scene.stop("voiture-tableau");
+    this.scene.stop("voiture-arrivee");
+    this.scene.start("voiture-grandprix", grandPrix);
   }
 
   quitter() {

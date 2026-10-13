@@ -42,6 +42,33 @@ export const RIVAUX = [
   { nom: "Bolide", couleur: 0x3ec46d },
 ];
 
+// Le Grand Prix : une course sur chaque circuit, des rivaux un peu plus forts à chaque fois
+export const NIVEAUX_GRAND_PRIX = [0.7, 0.75, 0.8];
+export const POINTS_GRAND_PRIX = [10, 7, 5, 3];   // les points du 1er, du 2e, du 3e et du 4e
+
+// À deux sur le même clavier
+export const JOUEURS_DUO = [
+  { nom: "Joueur 1", couleur: 0xff7a1a },
+  { nom: "Joueur 2", couleur: 0x7fd8e6 },
+];
+
+// Les touches, par leur place sur le clavier (event.code, voir socle/touchesPhysiques.ts).
+// Les noms sont ceux d'un clavier QWERTY : « KeyW KeyA KeyS KeyD », c'est Z Q S D sur un AZERTY.
+export interface Commandes {
+  avancer: string;
+  reculer: string;
+  gauche: string;
+  droite: string;
+  nitro: string;
+}
+export const COMMANDES_SEUL: Commandes = {
+  avancer: "ArrowUp", reculer: "ArrowDown", gauche: "ArrowLeft", droite: "ArrowRight", nitro: "Space",
+};
+export const COMMANDES_DUO: Commandes[] = [
+  { avancer: "ArrowUp", reculer: "ArrowDown", gauche: "ArrowLeft", droite: "ArrowRight", nitro: "ShiftRight" },
+  { avancer: "KeyW", reculer: "KeyS", gauche: "KeyA", droite: "KeyD", nitro: "Space" },
+];
+
 // Le début du nom des sauvegardes : le même que l'ancien jeu, les records d'avant sont gardés
 export const SAUVEGARDE = "course-de-pixy";
 

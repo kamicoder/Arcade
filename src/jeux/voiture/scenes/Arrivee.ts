@@ -3,6 +3,7 @@
 import Phaser from "phaser";
 import type { Course } from "./Course";
 import { chrono } from "../circuits";
+import { POINTS_GRAND_PRIX } from "../reglages";
 import { LARGEUR, HAUTEUR, POLICE } from "../../../socle/style";
 import { estTactile } from "../../../socle/tactile";
 import { surTouche } from "../../../socle/clavier";
@@ -30,11 +31,13 @@ export class Arrivee extends Phaser.Scene {
       lignes.push(texte(320, "Record du tour : " + chrono(course.record!.temps), 24, "#ffd479"));
     } else {
       const premier = course.classement[0];
-      const titre = premier === course.joueur ? "Tu gagnes !" : premier.nom + " gagne !";
+      // Seul, on te tutoie ; à deux, chacun a son nom
+      const titre = premier === course.joueur && course.joueurs.length === 1 ? "Tu gagnes !" : premier.nom + " gagne !";
       lignes.push(texte(120, titre, 54, enCouleur(premier.couleur)));
       course.classement.forEach((voiture, i) => {
         const temps = voiture.fini ? chrono(voiture.tempsTotal) : "en course";
-        lignes.push(texte(200 + i * 44, (i + 1) + ". " + voiture.nom + "   " + temps, 24, enCouleur(voiture.couleur)));
+        const points = course.mode === "grandprix" ? "   +" + POINTS_GRAND_PRIX[i] + " points" : "";
+        lignes.push(texte(200 + i * 44, (i + 1) + ". " + voiture.nom + "   " + temps + points, 24, enCouleur(voiture.couleur)));
       });
     }
 
@@ -44,8 +47,11 @@ export class Arrivee extends Phaser.Scene {
       this.tweens.add({ targets: ligne, alpha: 1, y: ligne.y - 30, duration: 350, delay: i * 120, ease: "Cubic.Out" });
     });
 
-    const suite = texte(470, estTactile() ? "Touche l'écran pour continuer" : "Entrée : continuer", 20, "#e9e4f0")
-      .setAlpha(0);
+    let consigne = estTactile() ? "Touche l'écran pour continuer" : "Entrée : continuer";
+    if (course.mode === "grandprix") {
+      consigne = (estTactile() ? "Touche l'écran" : "Entrée") + " : le classement du Grand Prix";
+    }
+    const suite = texte(470, consigne, 20, "#e9e4f0").setAlpha(0);
 
     // On attend un peu avant d'écouter : le pouce était peut-être encore sur les commandes
     this.time.delayedCall(1000, () => {
@@ -54,7 +60,7 @@ export class Arrivee extends Phaser.Scene {
       const continuer = () => {
         if (!fini) {
           fini = true;
-          course.quitter();
+          course.apresLArrivee();
         }
       };
       surTouche(this, "ENTER", continuer);

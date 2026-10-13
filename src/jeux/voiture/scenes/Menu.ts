@@ -1,22 +1,44 @@
 // Le menu de la course : le circuit à gauche (◀ ▶ pour en changer), les modes de jeu à droite.
 
 import Phaser from "phaser";
-import { CIRCUITS, LARGEUR_ROUTE, preparerCircuit, chrono } from "../circuits";
+import { LARGEUR_ROUTE, preparerCircuit, chrono } from "../circuits";
 import { lireLeRecord, type DonneesDeCourse, type Mode } from "./Course";
 import { textureDeVoiture } from "../textures";
 import { NIVEAU_COURSE, ORANGE } from "../reglages";
+import { nouveauGrandPrix, circuitDeLaCourse, niveauDeLaCourse } from "../grandPrix";
+import { tousLesCircuits, POINTS_MAX } from "../monCircuit";
 import { LARGEUR, POLICE } from "../../../socle/style";
 import { surTouche } from "../../../socle/clavier";
 import { estTactile } from "../../../socle/tactile";
 import { retourAuHub, fonduPuis } from "../../../socle/retour";
 
-const MODES: { id: Mode; nom: string; aide: string }[] = [
+type Choix = Mode | "editeur";
+
+const MODES: { id: Choix; nom: string; aide: string; aideAuDoigt?: string }[] = [
   { id: "chrono", nom: "Contre la montre", aide: "Seul, contre le chrono et ton fantôme" },
   { id: "course", nom: "Contre l'ordinateur", aide: "Trois rivaux, trois tours" },
+  { id: "duo", nom: "À deux", aide: "Sur le même clavier" },
+  { id: "grandprix", nom: "Le Grand Prix", aide: "Tous les circuits, l'un après l'autre" },
+  {
+    id: "editeur", nom: "Dessiner ton circuit", aide: "À la souris, " + POINTS_MAX + " points au plus",
+    aideAuDoigt: "Du bout du doigt, " + POINTS_MAX + " points au plus",
+  },
 ];
 
+// Les modes qu'on peut choisir : au doigt, pas de course à deux (il faudrait un clavier)
+function modesDuMenu() {
+  return estTactile() ? MODES.filter((mode) => mode.id !== "duo") : MODES;
+}
+
 const CARTE = { x: 40, y: 90, largeur: 420, hauteur: 380 };
-const BOUTON = { x: 500, y: 90, largeur: 420, hauteur: 84, ecart: 100 };
+// Au doigt, les boutons sont moins nombreux : on les fait plus grands
+const BOUTON = { x: 500, y: 90, largeur: 420, hauteur: 66, ecart: 79 };
+const BOUTON_AU_DOIGT = { ...BOUTON, hauteur: 84, ecart: 98 };
+
+// Ce qu'on peut passer au menu : le circuit à montrer (celui qu'on vient de dessiner)
+export interface DonneesDuMenu {
+  circuit?: string;
+}
 
 interface Bouton {
   fond: Phaser.GameObjects.Rectangle;
@@ -35,11 +57,20 @@ export class Menu extends Phaser.Scene {
   private boutons: Bouton[] = [];
   private parti = false;
 
+  private modes = MODES;
+
   constructor() {
     super("voiture-menu");
   }
 
+  init(donnees: DonneesDuMenu) {
+    if (donnees.circuit) {
+      this.numeroCircuit = Math.max(0, tousLesCircuits().findIndex((modele) => modele.id === donnees.circuit));
+    }
+  }
+
   create() {
+    this.modes = modesDuMenu();
     this.boutons = [];
     this.parti = false;
     this.cameras.main.setBackgroundColor("#1c1a25").fadeIn(250);
@@ -56,10 +87,20 @@ export class Menu extends Phaser.Scene {
     this.creerCarte();
     this.creerBoutons();
 
-    const aide = estTactile()
-      ? "Touche un mode pour jouer !"
-      : "↑ ↓ : choisir    ◀ ▶ : changer de circuit    Entrée : c'est parti !    Échap : l'Arcade";
-    this.add.text(LARGEUR / 2, 510, aide, { fontFamily: POLICE, fontSize: "16px", color: "#e9e4f0" }).setOrigin(0.5);
+    if (estTactile()) {
+      this.add.text(LARGEUR / 2, 510, "Touche un mode pour jouer !", {
+        fontFamily: POLICE, fontSize: "16px", color: "#e9e4f0",
+      }).setOrigin(0.5);
+    } else {
+      this.add.text(LARGEUR / 2, 500,
+        "↑ ↓ : choisir    ◀ ▶ : changer de circuit    Entrée : c'est parti !    Échap : l'Arcade", {
+          fontFamily: POLICE, fontSize: "16px", color: "#e9e4f0",
+        }).setOrigin(0.5);
+      this.add.text(LARGEUR / 2, 526,
+        "Seul : les flèches, et Espace pour la nitro.   À deux : Z Q S D et Espace, contre les flèches et Maj droite", {
+          fontFamily: POLICE, fontSize: "13px", color: "#a49cb4",
+        }).setOrigin(0.5);
+    }
 
     surTouche(this, "UP", () => this.choisir(this.choix - 1));
     surTouche(this, "DOWN", () => this.choisir(this.choix + 1));
@@ -105,14 +146,17 @@ export class Menu extends Phaser.Scene {
   }
 
   private creerBoutons() {
-    MODES.forEach((mode, i) => {
-      const y = BOUTON.y + i * BOUTON.ecart;
-      const cx = BOUTON.x + BOUTON.largeur / 2;
-      const fond = this.add.rectangle(BOUTON.x, y, BOUTON.largeur, BOUTON.hauteur, 0x2a2735)
+    const auDoigt = estTactile();
+    const b = auDoigt ? BOUTON_AU_DOIGT : BOUTON;
+    this.modes.forEach((mode, i) => {
+      const y = b.y + i * b.ecart;
+      const cx = b.x + b.largeur / 2;
+      const fond = this.add.rectangle(b.x, y, b.largeur, b.hauteur, 0x2a2735)
         .setOrigin(0).setRounded(12).setInteractive({ useHandCursor: true });
-      const nom = this.add.text(cx, y + 32, mode.nom, { fontFamily: POLICE, fontSize: "22px", fontStyle: "bold" })
+      const nom = this.add.text(cx, y + b.hauteur / 2 - 10, mode.nom, { fontFamily: POLICE, fontSize: "22px", fontStyle: "bold" })
         .setOrigin(0.5);
-      const aide = this.add.text(cx, y + 58, mode.aide, { fontFamily: POLICE, fontSize: "14px" }).setOrigin(0.5);
+      const texteAide = auDoigt && mode.aideAuDoigt ? mode.aideAuDoigt : mode.aide;
+      const aide = this.add.text(cx, y + b.hauteur / 2 + 16, texteAide, { fontFamily: POLICE, fontSize: "14px" }).setOrigin(0.5);
       fond.on("pointerover", () => this.choisir(i));
       fond.on("pointerup", () => {
         this.choisir(i);
@@ -123,7 +167,7 @@ export class Menu extends Phaser.Scene {
   }
 
   private choisir(i: number) {
-    this.choix = Phaser.Math.Wrap(i, 0, MODES.length);   // après le dernier, on revient au premier
+    this.choix = Phaser.Math.Wrap(i, 0, this.modes.length);   // après le dernier, on revient au premier
     this.boutons.forEach((bouton, j) => {
       const elu = j === this.choix;
       bouton.fond.setFillStyle(elu ? ORANGE : 0x2a2735);
@@ -134,8 +178,10 @@ export class Menu extends Phaser.Scene {
 
   // sens : -1 pour le circuit d'avant, 1 pour le suivant, 0 pour montrer celui-ci
   private changerDeCircuit(sens: number) {
-    this.numeroCircuit = Phaser.Math.Wrap(this.numeroCircuit + sens, 0, CIRCUITS.length);
-    const modele = CIRCUITS[this.numeroCircuit];
+    // Les circuits sont relus à chaque fois : le tien vient peut-être d'être dessiné
+    const circuits = tousLesCircuits();
+    this.numeroCircuit = Phaser.Math.Wrap(this.numeroCircuit + sens, 0, circuits.length);
+    const modele = circuits[this.numeroCircuit];
     const circuit = preparerCircuit(modele);
 
     // Le dessin du circuit en petit : un Graphics qu'on vide et qu'on redessine. On dessine
@@ -165,12 +211,23 @@ export class Menu extends Phaser.Scene {
       return;
     }
     this.parti = true;
-    const mode = MODES[this.choix].id;
-    const donnees: DonneesDeCourse = {
-      modele: CIRCUITS[this.numeroCircuit],
-      mode,
-      niveau: mode === "course" ? NIVEAU_COURSE : 1,
-    };
+    const mode = this.modes[this.choix].id;
+    if (mode === "editeur") {
+      fonduPuis(this, () => this.scene.start("voiture-editeur"));
+      return;
+    }
+    let donnees: DonneesDeCourse;
+    if (mode === "grandprix") {
+      // Le Grand Prix ne regarde pas le circuit choisi : il les fait tous, dans l'ordre
+      const grandPrix = nouveauGrandPrix();
+      donnees = { modele: circuitDeLaCourse(grandPrix), mode, niveau: niveauDeLaCourse(grandPrix), grandPrix };
+    } else {
+      donnees = {
+        modele: tousLesCircuits()[this.numeroCircuit],
+        mode,
+        niveau: mode === "course" ? NIVEAU_COURSE : 1,
+      };
+    }
     fonduPuis(this, () => this.scene.start("voiture-course", donnees));
   }
 }

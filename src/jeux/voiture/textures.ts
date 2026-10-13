@@ -60,8 +60,18 @@ export function textureDeVoiture(scene: Phaser.Scene, couleur: number): string {
 // La piste entière dans une seule grande image. Phaser n'a pas de pinceau pour les routes courbes,
 // épaisses et en pointillés : on prend le canvas 2D du navigateur (une CanvasTexture), on dessine
 // une fois, et pour Phaser ce n'est plus qu'une image comme une autre.
+const clePiste = (id: string) => "voiture-piste-" + id;
+
+// La piste d'un circuit qui a changé (le tien, redessiné) : on jette son image, la prochaine course
+// la refera. Sans ça, texturePiste rendrait l'ancienne, gardée sous le même nom.
+export function oublierLaPiste(scene: Phaser.Scene, id: string) {
+  if (scene.textures.exists(clePiste(id))) {
+    scene.textures.remove(clePiste(id));
+  }
+}
+
 export function texturePiste(scene: Phaser.Scene, c: Circuit): string {
-  const cle = "voiture-piste-" + c.modele.id;
+  const cle = clePiste(c.modele.id);
   if (scene.textures.exists(cle)) {
     return cle;
   }

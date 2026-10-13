@@ -41,6 +41,8 @@ Un nouveau jeu ou un nouveau mode vient avec ses tests dans `tests/`. Dans un te
 - `fonduPuis(scene, action)` au lieu de `camera.fadeOut()` : un `fadeOut` lancé pendant un autre fondu
   (le `fadeIn` d'arrivée) est ignoré, et la transition reste bloquée.
 - `retourAuHub(scene)` arrête toutes les scènes du jeu et revient au Hub.
+- `TouchesPhysiques` : les touches tenues d'après leur **place** (`event.code`, « KeyW » = le Z d'un AZERTY),
+  pour deux joueurs sur un même clavier ; Phaser, lui, reconnaît les touches à la lettre (`keyCode`).
 - `lire` / `ecrire` (sauvegardes protégées), `estTactile()`, `quandNouvelleVersion` (mise à jour au
   Hub seulement, jamais en pleine partie).
 
@@ -68,6 +70,5 @@ Même origine que l'Arcade : garder les mêmes noms de sauvegarde (`course-de-pi
 pour que les records d'avant suivent. Un défaut de jeu trouvé ici existe peut-être aussi là-bas :
 le signaler à l'utilisateur.
 
-Avancement : Hub et course de voitures (contre la montre, contre l'ordinateur) faits. Restent pour la
-voiture le Grand Prix, la course à deux et l'éditeur de circuit (leçon 3), puis Licorne, puis les jeux
-Python de PixelForge (démineur, baston de robots, platformer).
+Avancement : Hub et course de voitures complète (contre la montre, contre l'ordinateur, Grand Prix, à
+deux en écran partagé, éditeur de circuit). En cours : Licorne, démineur, baston de robots, platformer.

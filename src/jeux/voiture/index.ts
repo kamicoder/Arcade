@@ -7,6 +7,8 @@ import { Menu } from "./scenes/Menu";
 import { Course } from "./scenes/Course";
 import { Tableau } from "./scenes/Tableau";
 import { Arrivee } from "./scenes/Arrivee";
+import { GrandPrix } from "./scenes/GrandPrix";
+import { Editeur } from "./scenes/Editeur";
 
 const jeu: ModuleDeJeu = {
   premiere: "voiture-chargement",
@@ -14,6 +16,8 @@ const jeu: ModuleDeJeu = {
     "voiture-chargement": Chargement,
     "voiture-menu": Menu,
     "voiture-course": Course,
+    "voiture-grandprix": GrandPrix,
+    "voiture-editeur": Editeur,
     "voiture-tableau": Tableau,
     "voiture-arrivee": Arrivee,
   },

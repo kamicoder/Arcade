@@ -4,12 +4,21 @@
 
 import Phaser from "phaser";
 import type { Course } from "./Course";
+import type { Voiture } from "../Voiture";
 import { chrono, rang } from "../circuits";
 import { TOURS, NITRO_MAX } from "../reglages";
 import { LARGEUR, HAUTEUR, POLICE } from "../../../socle/style";
 import { estTactile } from "../../../socle/tactile";
 
 type Action = "gauche" | "droite" | "reculer" | "nitro";
+
+interface Compteur {
+  voiture: Voiture;
+  texte: Phaser.GameObjects.Text;
+  bidons: Phaser.GameObjects.Image[];
+}
+
+const enCouleur = (couleur: number) => "#" + couleur.toString(16).padStart(6, "0");
 
 // Les commandes au doigt : pas de bouton pour accélérer, la voiture accélère toute seule
 const COMMANDES: { action: Action; x: number; y: number; rayon: number; icone: string }[] = [
@@ -21,9 +30,8 @@ const COMMANDES: { action: Action; x: number; y: number; rayon: number; icone: s
 
 export class Tableau extends Phaser.Scene {
   private course!: Course;
-  private compteurs!: Phaser.GameObjects.Text;
+  private compteurs: Compteur[] = [];      // un par joueur : à deux, chacun au-dessus de sa moitié d'écran
   private recordTexte!: Phaser.GameObjects.Text;
-  private bidons: Phaser.GameObjects.Image[] = [];
   private grosTexte!: Phaser.GameObjects.Text;
   private nitroTexte?: Phaser.GameObjects.Text;
   private bidonTactile?: Phaser.GameObjects.Image;
@@ -36,17 +44,27 @@ export class Tableau extends Phaser.Scene {
   create() {
     // Une scène peut en retrouver une autre par son nom
     this.course = this.scene.get("voiture-course") as Course;
-    this.bidons = [];
+    this.compteurs = [];
     this.nitroTexte = undefined;
     this.bidonTactile = undefined;
     this.doigts.clear();
 
     this.add.rectangle(0, 0, LARGEUR, 40, 0x000000, 0.5).setOrigin(0);
     const style = { fontFamily: POLICE, fontSize: "18px", fontStyle: "bold" };
-    this.compteurs = this.add.text(16, 20, "", { ...style, color: "#ff7a1a" }).setOrigin(0, 0.5);
-    for (let k = 0; k < NITRO_MAX; k++) {
-      this.bidons.push(this.add.image(300 + k * 22, 20, "voiture-bidon").setScale(0.6));
+    const aDeux = this.course.joueurs.length === 2;
+    if (aDeux) {
+      // La frontière entre les deux moitiés d'écran
+      this.add.rectangle(LARGEUR / 2, HAUTEUR / 2, 4, HAUTEUR, 0x1c1a25);
     }
+    this.course.joueurs.forEach((voiture, i) => {
+      const x = i * LARGEUR / 2 + 16;
+      const texte = this.add.text(x, 20, "", { ...style, color: enCouleur(voiture.couleur) }).setOrigin(0, 0.5);
+      const bidons: Phaser.GameObjects.Image[] = [];
+      for (let k = 0; k < NITRO_MAX; k++) {
+        bidons.push(this.add.image(x + (aDeux ? 324 : 284) + k * 22, 20, "voiture-bidon").setScale(0.6));
+      }
+      this.compteurs.push({ voiture, texte, bidons });
+    });
     this.recordTexte = this.add.text(380, 20, "", { ...style, color: "#ffd479" }).setOrigin(0, 0.5);
     this.montrerLeRecord(this.course.record?.temps);
 
@@ -143,13 +161,19 @@ export class Tableau extends Phaser.Scene {
   }
 
   update() {
-    const joueur = this.course.joueur;
-    let texte = "Tour " + Math.min(joueur.tour, TOURS) + "/" + TOURS + "   " + chrono(joueur.tempsTour);
-    if (this.course.voitures.length > 1) {
-      texte += "   " + rang(this.course.classement.indexOf(joueur) + 1) + "/" + this.course.voitures.length;
-    }
-    this.compteurs.setText(texte);
-    this.bidons.forEach((bidon, k) => bidon.setAlpha(k < joueur.nitro ? 1 : 0.25));
+    const course = this.course;
+    this.compteurs.forEach(({ voiture, texte, bidons }, i) => {
+      let ligne = "Tour " + Math.min(voiture.tour, TOURS) + "/" + TOURS + "   " + chrono(voiture.tempsTour);
+      if (course.voitures.length > 1) {
+        ligne += "   " + rang(course.classement.indexOf(voiture) + 1) + "/" + course.voitures.length;
+      }
+      if (this.compteurs.length > 1) {
+        ligne = "J" + (i + 1) + "   " + ligne;
+      }
+      texte.setText(ligne);
+      bidons.forEach((bidon, k) => bidon.setAlpha(k < voiture.nitro ? 1 : 0.25));
+    });
+    const joueur = course.joueur;
     this.nitroTexte?.setText(String(joueur.nitro));
     this.bidonTactile?.setAlpha(joueur.nitro > 0 ? 1 : 0.35);
   }
