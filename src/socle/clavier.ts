@@ -17,3 +17,17 @@ export function surTouche(scene: Phaser.Scene, touche: string, action: () => voi
     action();
   });
 }
+
+// Réagir à toutes les touches, une seule fois par appui : le cousin de surTouche pour quand on a besoin de
+// l'événement du navigateur lui-même. Son code physique (e.code : KeyW est le Z d'un clavier français),
+// pour les touches de jeu ; sa lettre (e.key), pour écrire un nom.
+export function surChaqueTouche(scene: Phaser.Scene, action: (evenement: KeyboardEvent) => void) {
+  const dejaVus = new WeakSet<KeyboardEvent>();
+  scene.input.keyboard!.on("keydown", (evenement: KeyboardEvent) => {
+    if (dejaVus.has(evenement)) {
+      return;
+    }
+    dejaVus.add(evenement);
+    action(evenement);
+  });
+}

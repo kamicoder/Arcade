@@ -30,7 +30,7 @@ Les téléphones récupèrent la nouvelle version tout seuls, au retour dans le 
 | `src/scenes/` | Les scènes de l'Arcade : `Demarrage`, puis le `Hub` (le menu des jeux) |
 | `src/jeux/catalogue.ts` | La liste des jeux ; chacun vit dans `src/jeux/<cle>/` et n'est chargé qu'à son lancement |
 | `src/socle/` | Ce que tous les jeux partagent : style, clavier, transitions, sauvegardes, tactile, largeur, mise à jour |
-| `src/jeux/voiture/` | La course de voitures : circuits, voiture, et ses scènes (menu, course, tableau de bord, arrivée) |
+| `src/jeux/course/` | La course : un seul jeu (scènes, conduite, circuits, atelier, sauvegardes) et ses thèmes dans `themes/` (voitures, licornes) |
 | `tests/` | Les tests Playwright ; un test raté garde sa trace : `npx playwright show-trace <chemin>` |
 | `public/` | Copié tel quel : icônes, sons |
 | `docs/CARNET-PHASER.md` | Apprendre Phaser en suivant la construction de l'Arcade |

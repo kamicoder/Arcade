@@ -196,6 +196,6 @@ export class Hub extends Phaser.Scene {
         this.scene.add(nom, Scene);
       }
     }
-    fonduPuis(this, () => this.scene.start(jeu.premiere));
+    fonduPuis(this, () => this.scene.start(jeu.premiere, jeu.donnees));
   }
 }

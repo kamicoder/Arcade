@@ -122,7 +122,14 @@ Le serveur tourne (`npm run dev`), tu modifies, tu sauvegardes, tu regardes.
 
 ## Leçon 2 : la course de voitures
 
-Le code est dans `src/jeux/voiture/`. Commence par `index.ts` : c'est la liste des scènes du jeu.
+> **Depuis, la course a changé.** La course de voitures et la course des licornes sont devenues un seul
+> jeu, `src/jeux/course/`, avec un thème « voitures » et un thème « licornes » (voir `CLAUDE.md`). Les
+> véhicules n'utilisent plus la physique Arcade : leur conduite est calculée à la main (`Coureur.ts`),
+> comme la bousculade ci-dessous, ce qui évite le piège du sprite qui a un pas de retard sur son corps.
+> Cette leçon décrit la première version, qu'on retrouve dans l'historique git (`git show f937414`) :
+> elle reste une bonne visite de la physique Arcade, des caméras et des scènes en parallèle.
+
+Le code était dans `src/jeux/voiture/`. Commence par `index.ts` : c'est la liste des scènes du jeu.
 `Chargement` démarre, puis viennent `Menu`, `Course`, avec `Tableau` et `Arrivee` par-dessus.
 
 ### Ce qui n'est pas du Phaser

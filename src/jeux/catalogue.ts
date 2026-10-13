@@ -9,6 +9,7 @@ import type Phaser from "phaser";
 export interface ModuleDeJeu {
   scenes: Record<string, typeof Phaser.Scene>;   // nom de la scène → sa classe
   premiere: string;                              // la scène qui démarre le jeu
+  donnees?: object;                              // ce qu'elle reçoit au départ (le thème de la course, par exemple)
 }
 
 export interface FicheDeJeu {
@@ -19,14 +20,16 @@ export interface FicheDeJeu {
   charger?: () => Promise<ModuleDeJeu>;          // pas encore de « charger » : le jeu arrive bientôt
 }
 
+// Les deux premières cartes lancent le même jeu de course, chacune dans son thème (voir course/index.ts :
+// une seule carte, courseAuTheme() sans thème, ferait choisir le thème dans le menu)
 export const CATALOGUE: FicheDeJeu[] = [
   {
     cle: "voiture", titre: "Course de voitures", emoji: "🏎️", couleur: 0xe8453c,
-    charger: () => import("./voiture").then((module) => module.default),
+    charger: () => import("./course").then((module) => module.courseAuTheme("voitures")),
   },
   {
     cle: "licorne", titre: "Course des licornes", emoji: "🦄", couleur: 0xff8fd0,
-    charger: () => import("./licorne").then((module) => module.default),
+    charger: () => import("./course").then((module) => module.courseAuTheme("licornes")),
   },
   {
     cle: "demineur", titre: "Démineur", emoji: "💣", couleur: 0x4fb3ff,

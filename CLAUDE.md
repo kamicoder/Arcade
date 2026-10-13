@@ -46,7 +46,8 @@ Un nouveau jeu ou un nouveau mode vient avec ses tests dans `tests/`. Dans un te
 ## Le socle (`src/socle/`) : à utiliser plutôt que les appels Phaser directs
 
 - `surTouche(scene, "ENTER", action)` au lieu de `keyboard.on("keydown-...")` : Phaser 4.2 traite deux
-  fois un appui dont le relâchement tombe dans la même image.
+  fois un appui dont le relâchement tombe dans la même image. `surChaqueTouche(scene, action)`, son
+  cousin, reçoit l'événement du navigateur (sa place `code`, sa lettre `key`) pour toutes les touches.
 - `fonduPuis(scene, action)` au lieu de `camera.fadeOut()` : un `fadeOut` lancé pendant un autre fondu
   (le `fadeIn` d'arrivée) est ignoré, et la transition reste bloquée.
 - `retourAuHub(scene)` arrête toutes les scènes du jeu et revient au Hub (en 960 × 540).
@@ -66,9 +67,50 @@ Un nouveau jeu ou un nouveau mode vient avec ses tests dans `tests/`. Dans un te
 ## Ajouter un jeu
 
 Un dossier `src/jeux/<cle>/` dont `index.ts` exporte par défaut `{ scenes, premiere }` (type
-`ModuleDeJeu`), et sa fiche dans `src/jeux/catalogue.ts`. Les noms de scène commencent par la clé du
-jeu (`voiture-course`). L'ordre de `scenes` est l'ordre d'affichage : une scène lancée par-dessus
-(tableau de bord, arrivée) vient après. Ses sons et images vont dans `public/<cle>/`.
+`ModuleDeJeu`, avec des `donnees` de départ si besoin), et sa fiche dans `src/jeux/catalogue.ts`. Les
+noms de scène commencent par la clé du jeu (`course-piste`). L'ordre de `scenes` est l'ordre d'affichage :
+une scène lancée par-dessus (tableau de bord, arrivée) vient après. Ses sons et images vont dans
+`public/<cle>/`.
+
+## Le jeu de course et ses thèmes (`src/jeux/course/`)
+
+Un seul jeu de course, et des **thèmes** : « voitures » et « licornes ». Le jeu est écrit une fois : les
+scènes (`scenes/` : chargement, menu, choix du circuit, course, tableau de bord, arrivée, pause, Grand
+Prix et podium, atelier, éditeur), la conduite calculée à la main, le pilote de l'ordinateur, la barrière,
+le repêchage et la bousculade (`Coureur.ts`, sans physique Arcade), les circuits et leur trace
+(`circuits.ts`), les sauvegardes (`sauvegarde.ts`), le son et la musique (`son.ts`), les boutons et textes
+(`interface.ts`). Tous les modes sont communs : Grand Prix, contre l'ordinateur, à deux (avec ou sans
+rivaux), contre la montre et son fantôme, atelier, circuit dessiné, niveaux Facile / Normal / Expert.
+
+Un thème (`themes/<nom>/`, l'interface `Theme` de `theme.ts`, documentée champ par champ) n'apporte que
+des données et des dessins : son habillage (police, couleurs, fond des menus, fête), ses mots
+(« licorne » / « voiture », « 1re » / « 1er »...), ses réglages de conduite et ses niveaux (chaque thème se
+conduit comme avant), la largeur de sa route et sa barrière, ses circuits et son Grand Prix (la liste
+des courses et le niveau des rivaux), ses objets, ses sons, sa musique, et un `DecorDeCourse` qui
+dessine une course (la vue de chaque véhicule, les objets, les gerbes, les traces) et réagit à ses
+événements (`Evenement` : une foulée, la barrière, un objet touché...).
+
+- **Les objets** : chaque type déclare son effet, pris dans la liste du jeu (`Effet` : `reserve` pour un
+  turbo à garder, `turbo`, `glisse`, `etourdi`, `geant`), sa portée, s'il disparaît et revient (`retour`),
+  s'il attend avant de reservir (`attente`), ou s'il se pose tout seul le long du tour (`auto`). Les
+  circuits placent les autres par type : `objets: { bidons: [[place, decalage], ...] }`.
+- **L'atelier** est commun. Un thème déclare son équipe (`equipe` : les véhicules de départ, chacun une
+  `Apparence` avec au moins un `nom`), ses `rubriques` (un champ de l'apparence, son libellé, la liste de
+  ses choix, et comment les montrer : `"couleur"`, `"couleurs"`, ou une fonction qui donne un texte),
+  `completer` (ce qui se déduit, comme l'ombre d'une robe), `couleur` (sa couleur au tableau de bord), et
+  `vehicule.texture` qui dessine une apparence (une animation `<cle>-anim` si `anime`). Le joueur 1 et
+  le joueur 2 choisissent chacun un véhicule de l'équipe ; les rivaux sont les autres.
+- **Les sauvegardes**, toutes en JSON par `lire` / `ecrire`, sous une seule forme :
+  `course/<theme>/niveau`, `.../son`, `.../joueurs` ([j1, j2]), `.../rivaux`, `.../circuit` (le dernier
+  choisi), `.../circuit-dessine`, `.../record/<circuit>`, `.../perso/<numero>` (ce que l'atelier a changé à
+  ce véhicule de l'équipe), et `course/theme` (le dernier thème joué).
+- **Ajouter un thème** (des fusées, des escargots...) : un dossier `themes/<nom>/` dont l'`index.ts`
+  exporte un `Theme` (s'inspirer de `voitures/`, le plus court), une ligne dans `themes/index.ts`, et
+  une carte dans `catalogue.ts` : `import("./course").then((m) => m.courseAuTheme("<nom>"))`.
+- **Le Hub** a une carte par thème, qui lance le même jeu avec son thème. Pour une seule carte,
+  `courseAuTheme()` sans thème : le menu propose alors de changer de thème (touche T).
+
+Les tests sont dans `tests/course.spec.ts` ; les premiers jouent la même course dans chaque thème.
 
 ## Pièges de Phaser 4 déjà rencontrés
 
@@ -80,7 +122,8 @@ jeu (`voiture-course`). L'ordre de `scenes` est l'ordre d'affichage : une scène
 - Les corps Arcade ne tournent pas : un rond (`setCircle`) pour ce qui tourne.
 - Dans `update()`, `sprite.x` a **un pas de physique de retard** : Phaser avance le corps avant `update()`
   et ne recopie sa place sur l'image qu'après. Pour une décision qui dépend de la place exacte (une
-  barrière, une collision faite à la main), lire `body.center`. Une voiture restait coincée contre les pneus.
+  barrière, une collision faite à la main), lire `body.center`. Une voiture restait coincée contre les pneus
+  (c'est une des raisons pour lesquelles la course calcule maintenant sa conduite à la main).
 - Un appui bref (enfoncé et relâché dans la même image, ou une tape au doigt) n'est jamais vu « tenu » :
   pour un coup ou un saut, retenir l'appui jusqu'à l'image suivante (voir `baston/commandes.ts`).
 - Un `Rectangle` arrondi ne se redessine que par `setSize` (changer `.width` casse les coins).
@@ -107,12 +150,11 @@ jeu (`voiture-course`). L'ordre de `scenes` est l'ordre d'affichage : une scène
 
 Les jeux viennent des ateliers de PixelForge (`C:\Data\PixelForge\ateliers\`) et des anciennes versions
 en JavaScript pur (`C:\Data\Jeux\Voiture`, `C:\Data\Jeux\Licorne`, publiées sur kamicoder.github.io).
-Même origine que l'Arcade : garder les mêmes noms de sauvegarde (`course-de-pixy/...` pour la voiture)
-pour que les records d'avant suivent. Un défaut de jeu trouvé ici existe peut-être aussi là-bas :
-le signaler à l'utilisateur.
+Les anciens jeux ne servent plus que de **référence pour le comportement** : l'Arcade ne garde pas la
+compatibilité de leurs sauvegardes (elle range les siennes à sa façon, voir la course). Un défaut de
+jeu trouvé ici existe peut-être aussi là-bas : le signaler à l'utilisateur.
 
-Avancement : les cinq jeux sont là (course de voitures, course des licornes, démineur, baston de
-robots, platformer), chacun avec ses modes, le doigt, le clavier et la manette. Pistes ouvertes : un
-moteur de course commun à la voiture et à la licorne (aujourd'hui écrits deux fois), et les petits
-outils de socle que les agents ont réclamés (saisie de texte, couleurs, fondu de toutes les caméras,
-menus à boutons).
+Avancement : les jeux sont là (la course, avec ses thèmes voitures et licornes, le démineur, la baston de
+robots, le platformer), chacun avec ses modes, le doigt, le clavier et la manette. Pistes ouvertes : les
+petits outils de socle que les agents ont réclamés (saisie de texte, couleurs, fondu de toutes les
+caméras, menus à boutons).

@@ -4,7 +4,7 @@ import { ouvrir, appuyer, attendreScene } from "./outils";
 test("le Hub s'ouvre, et Entrée lance la course de voitures", async ({ page }) => {
   const { sansErreur } = await ouvrir(page);
   await appuyer(page, "Enter");
-  await attendreScene(page, "voiture-menu");
+  await attendreScene(page, "course-menu");
   sansErreur();
 });
 
