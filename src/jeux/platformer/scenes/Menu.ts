@@ -5,6 +5,7 @@ import Phaser from "phaser";
 import { chargerTous, liste } from "../niveaux";
 import { lancerLaMusique, quitterLePlatformer, basculerLeSon, sonAllume, toucheDuSon } from "../son";
 import { lireLeRecord, type DonneesDeNiveau } from "./Niveau";
+import { lettresDuJoueur1 } from "../commandes";
 import { texturePour, ECHELLE_TUILE } from "../textures";
 import { Genres } from "../genres";
 import { FOND, VERT, VIES } from "../reglages";
@@ -55,7 +56,7 @@ export class Menu extends Phaser.Scene {
     const auDoigt = estTactile();
     this.creerBouton("aventure", `Aventure (${liste().length} niveaux)`, `${VIES} vies, un boss au bout`, true);
     this.creerBouton("infini", "Infini", record > 0 ? `Record : ${record} m` : "Jusqu'où iras-tu ?", true);
-    this.creerBouton("duo", "2 joueurs", auDoigt ? "Au clavier ou à deux manettes" : "Q D Z contre les flèches : le premier à 15 points", !auDoigt);
+    this.creerBouton("duo", "2 joueurs", auDoigt ? "Au clavier ou à deux manettes" : `${lettresDuJoueur1()} contre les flèches : le premier à 15 points`, !auDoigt);
     this.creerBouton("editeur", "Éditeur de niveaux", "Dessine tes niveaux, joue-les tout de suite", true);
 
     this.alerte = this.add.text(LARGEUR / 2, 432, "", { fontFamily: POLICE, fontSize: "18px", color: "#f07878" }).setOrigin(0.5);

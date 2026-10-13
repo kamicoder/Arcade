@@ -3,7 +3,7 @@
 
 import Phaser from "phaser";
 import { creerAnimations, cleDePlanche } from "../textures";
-import { chargerLaDisposition } from "../commandes";
+import { chargerLaDisposition } from "../../../socle/touchesPhysiques";
 import { ORANGE } from "../reglages";
 import { LARGEUR, HAUTEUR } from "../../../socle/style";
 

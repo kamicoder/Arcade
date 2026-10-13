@@ -31,3 +31,26 @@ export class TouchesPhysiques {
     return this.tenues.has(code);
   }
 }
+
+// Ce qui est écrit sur une touche, pour l'afficher : « KeyW » s'écrit Z sur un AZERTY, W sur un QWERTY.
+// Par défaut, un clavier AZERTY (le nôtre) ; le navigateur peut nous dire la vraie disposition
+// (Chrome et Edge seulement : navigator.keyboard.getLayoutMap). Un jeu la demande une fois, à son
+// chargement (chargerLaDisposition) : elle arrive un instant plus tard, bien avant le premier menu.
+const SANS_LETTRE: Record<string, string> = {
+  ArrowLeft: "←", ArrowRight: "→", ArrowUp: "↑", ArrowDown: "↓", Space: "Espace",
+};
+const AZERTY: Record<string, string> = { KeyA: "Q", KeyQ: "A", KeyW: "Z", KeyZ: "W" };
+let disposition: Map<string, string> | null = null;
+
+export function chargerLaDisposition() {
+  type AvecClavier = { keyboard?: { getLayoutMap?: () => Promise<Map<string, string>> } };
+  (navigator as unknown as AvecClavier).keyboard?.getLayoutMap?.().then((carte) => {
+    disposition = carte;
+  }).catch(() => {
+    // pas permis (dans un cadre, par exemple) : on garde l'AZERTY
+  });
+}
+
+export function etiquette(code: string): string {
+  return SANS_LETTRE[code] ?? disposition?.get(code)?.toUpperCase() ?? AZERTY[code] ?? code.replace("Key", "");
+}

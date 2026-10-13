@@ -25,24 +25,7 @@ export const TOUCHES: Record<Cote, Record<Exclude<NomDeCommande, "special">, str
   droite: { gauche: "ArrowLeft", droite: "ArrowRight", saut: "ArrowUp", frapper: "KeyK", tirer: "KeyL" },
 };
 
-// Ce qui est écrit sur chaque touche. Par défaut, un clavier AZERTY ; le navigateur peut nous dire
-// la vraie disposition (Chrome et Edge seulement : navigator.keyboard.getLayoutMap).
-const FLECHES: Record<string, string> = { ArrowLeft: "←", ArrowRight: "→", ArrowUp: "↑" };
-const AZERTY: Record<string, string> = { KeyA: "Q", KeyW: "Z" };
-let disposition: Map<string, string> | null = null;
-
-export function chargerLaDisposition() {
-  type AvecClavier = { keyboard?: { getLayoutMap?: () => Promise<Map<string, string>> } };
-  (navigator as unknown as AvecClavier).keyboard?.getLayoutMap?.().then((carte) => {
-    disposition = carte;
-  }).catch(() => {
-    // pas permis (dans un cadre, par exemple) : on garde l'AZERTY
-  });
-}
-
-export function etiquette(code: string): string {
-  return FLECHES[code] ?? disposition?.get(code)?.toUpperCase() ?? AZERTY[code] ?? code.replace("Key", "");
-}
+// Ce qui est écrit sur ces touches, pour les afficher : etiquette(), dans le socle (touchesPhysiques.ts).
 
 // Le clavier d'une scène : les touches tenues (le socle), et celles enfoncées depuis la dernière
 // lecture. Phaser traite les touches une fois par image : un appui très bref (enfoncée puis relâchée

@@ -3,7 +3,8 @@
 import Phaser from "phaser";
 import { ListeDeBoutons, dessinerArene, enCouleur, type Choix } from "../decor";
 import { lireLeBilan } from "../partie";
-import { manettes, etiquette, TOUCHES, type Cote } from "../commandes";
+import { manettes, TOUCHES, type Cote } from "../commandes";
+import { etiquette } from "../../../socle/touchesPhysiques";
 import { cleDePlanche, cleDAnimation } from "../textures";
 import { SOL, ECHELLE, ORANGE } from "../reglages";
 import { POLICE } from "../../../socle/style";

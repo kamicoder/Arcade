@@ -56,6 +56,10 @@ Un nouveau jeu ou un nouveau mode vient avec ses tests dans `tests/`. Dans un te
   de forme.
 - `TouchesPhysiques` : les touches tenues d'après leur **place** (`event.code`, « KeyW » = le Z d'un AZERTY),
   pour deux joueurs sur un même clavier ; Phaser, lui, reconnaît les touches à la lettre (`keyCode`).
+  Une touche qui sert à jouer se reconnaît à sa place ; une touche qui sert à écrire, ou un raccourci
+  nommé par sa lettre (M pour le son, N pour nouveau), à sa lettre. `etiquette(code)` donne ce qui est
+  écrit sur la touche de ce clavier (« Z » pour « KeyW » en AZERTY), après `chargerLaDisposition()` au
+  chargement du jeu.
 - `lire` / `ecrire` (sauvegardes protégées), `estTactile()`, `quandNouvelleVersion` (mise à jour au
   Hub seulement, jamais en pleine partie).
 
@@ -109,6 +113,6 @@ le signaler à l'utilisateur.
 
 Avancement : les cinq jeux sont là (course de voitures, course des licornes, démineur, baston de
 robots, platformer), chacun avec ses modes, le doigt, le clavier et la manette. Pistes ouvertes : un
-moteur de course commun à la voiture et à la licorne (aujourd'hui écrits deux fois), le joueur 2 du
-platformer sur `TouchesPhysiques`, et les petits outils de socle que les agents ont réclamés (saisie de
-texte, couleurs, fondu de toutes les caméras, menus à boutons).
+moteur de course commun à la voiture et à la licorne (aujourd'hui écrits deux fois), et les petits
+outils de socle que les agents ont réclamés (saisie de texte, couleurs, fondu de toutes les caméras,
+menus à boutons).

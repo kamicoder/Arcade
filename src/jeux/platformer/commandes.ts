@@ -1,50 +1,61 @@
 // Qui commande le héros : le clavier, la manette et les doigts, réunis en trois questions
 // (gauche ? droite ? saut ?) à chaque image.
-//   - seul : les flèches ou Q/D (A/D en qwerty), saut Espace, Haut ou Z (W), la première manette, les doigts ;
-//   - à deux : le joueur 1 a Q/D/Z et la première manette, le joueur 2 les flèches et la deuxième.
+//   - seul : les flèches ou Q D Z, saut aussi sur Espace, la première manette, les doigts ;
+//   - à deux : le joueur 1 a Q D Z et la première manette, le joueur 2 les flèches et la deuxième.
+//
+// Les touches sont reconnues à leur PLACE sur le clavier (event.code, voir socle/touchesPhysiques.ts),
+// pas à la lettre écrite dessus : la main gauche se pose au même endroit en AZERTY comme en QWERTY.
+// « KeyA », « KeyD », « KeyW », c'est Q, D, Z sur un AZERTY (A, D, W sur un QWERTY).
 
 import Phaser from "phaser";
 import type { Entrees } from "./Heros";
+import { TouchesPhysiques, etiquette } from "../../socle/touchesPhysiques";
 
 export type Joueur = "seul" | "j1" | "j2";
 
-type Touches = Record<"gauche" | "droite" | "saut", Phaser.Input.Keyboard.Key[]>;
+type Touches = Record<"gauche" | "droite" | "saut", string[]>;
+
+const LETTRES: Touches = { gauche: ["KeyA"], droite: ["KeyD"], saut: ["KeyW"] };
+const FLECHES: Touches = { gauche: ["ArrowLeft"], droite: ["ArrowRight"], saut: ["ArrowUp"] };
+
+export const TOUCHES: Record<Joueur, Touches> = {
+  j1: LETTRES,
+  j2: FLECHES,
+  seul: {
+    gauche: [...LETTRES.gauche, ...FLECHES.gauche],
+    droite: [...LETTRES.droite, ...FLECHES.droite],
+    saut: [...LETTRES.saut, ...FLECHES.saut, "Space"],
+  },
+};
+
+// Les touches du joueur 1, comme elles sont écrites sur ce clavier : « Q D Z » sur un AZERTY
+export function lettresDuJoueur1(): string {
+  return [LETTRES.gauche[0], LETTRES.droite[0], LETTRES.saut[0]].map(etiquette).join(" ");
+}
 
 export class Commandes {
   // Les doigts sur les commandes : le tableau de bord les met à jour
   readonly tactile: Entrees = { gauche: false, droite: false, saut: false };
-  private touches: Touches;
+  private readonly touches: Touches;
+  private readonly tenues: TouchesPhysiques;
+  private appuiEnAttente = false;
 
   constructor(private scene: Phaser.Scene, private joueur: Joueur) {
-    const clavier = scene.input.keyboard!;
-    const k = (...noms: string[]) => noms.map((nom) => clavier.addKey(nom));
-    const lettres: Touches = { gauche: k("Q", "A"), droite: k("D"), saut: k("Z", "W") };
-    const fleches: Touches = { gauche: k("LEFT"), droite: k("RIGHT"), saut: k("UP") };
-    if (joueur === "j1") {
-      this.touches = lettres;
-    } else if (joueur === "j2") {
-      this.touches = fleches;
-    } else {
-      this.touches = {
-        gauche: [...lettres.gauche, ...fleches.gauche],
-        droite: [...lettres.droite, ...fleches.droite],
-        saut: [...lettres.saut, ...fleches.saut, ...k("SPACE")],
-      };
-    }
-    // Une frappe plus courte qu'une image (enfoncée et relâchée entre deux update) : isDown ne la voit
-    // jamais, et Phaser oublie son JustDown au relâchement. L'événement d'appui, lui, arrive toujours.
-    const codes = this.touches.saut.map((touche) => touche.keyCode);
-    clavier.on("keydown", (evenement: KeyboardEvent) => {
-      if (codes.includes(evenement.keyCode) && !evenement.repeat) {
+    this.touches = TOUCHES[joueur];
+    this.tenues = new TouchesPhysiques(scene);
+    // Les flèches et Espace sont pour le jeu : le navigateur ne fait pas défiler la page avec
+    scene.input.keyboard!.addCapture("UP,DOWN,LEFT,RIGHT,SPACE");
+    // Une frappe plus courte qu'une image (enfoncée et relâchée entre deux update) n'est jamais vue
+    // tenue. L'événement d'appui, lui, arrive toujours : on s'en souvient jusqu'à la lecture suivante.
+    scene.input.keyboard!.on(Phaser.Input.Keyboard.Events.ANY_KEY_DOWN, (evenement: KeyboardEvent) => {
+      if (this.touches.saut.includes(evenement.code) && !evenement.repeat) {
         this.appuiEnAttente = true;
       }
     });
   }
 
-  private appuiEnAttente = false;
-
   lire(): Entrees {
-    const tenue = (touches: Phaser.Input.Keyboard.Key[]) => touches.some((touche) => touche.isDown);
+    const tenue = (codes: string[]) => codes.some((code) => this.tenues.tenue(code));
     const e: Entrees = {
       gauche: tenue(this.touches.gauche),
       droite: tenue(this.touches.droite),

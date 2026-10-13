@@ -117,6 +117,50 @@ test("mourir : tomber coûte une vie, et la dernière, c'est la fin", async ({ p
   sansErreur();
 });
 
+test("mourir rend les pièces du niveau, et reprend le score et les vies qu'elles avaient rapportés", async ({ page }) => {
+  const { sansErreur } = await menuPlatformer(page);
+  await choisirLeMode(page, 0, "platformer-niveau");
+  // Le niveau commence avec 5 points et 8 pièces déjà prises : 2 pièces de plus font gagner une vie
+  await page.evaluate(() => {
+    const n = (window as any).jeu.scene.getScene("platformer-niveau");
+    n.scene.restart({ ...n.donnees, score: 5, pieces: 8 });
+  });
+  await attendreLeNiveau(page, "n.enJeu && n.donnees.score === 5");
+  // Les pièces encore à prendre dans le monde
+  const aPrendre = () => page.evaluate(() => (window as any).jeu.scene.getScene("platformer-niveau")
+    .monde.pieces.getChildren().filter((p: any) => p.body.enable).length as number);
+  // Le héros va sur la première pièce encore là (celles des deux premières plateformes, loin de l'ennemi)
+  const prendreUnePiece = async () => {
+    const score = (await niveau(page)).score;
+    await page.evaluate(() => {
+      const n = (window as any).jeu.scene.getScene("platformer-niveau");
+      const piece = n.monde.pieces.getChildren().find((p: any) => p.body.enable);
+      n.heros.body.reset(piece.x, piece.y);
+    });
+    await page.waitForFunction((score) => (window as any).jeu.scene.getScene("platformer-niveau").donnees.score === score + 1, score);
+  };
+  expect(await aPrendre()).toBe(5);
+
+  await prendreUnePiece();
+  await prendreUnePiece();
+  expect(await niveau(page)).toMatchObject({ score: 7, vies: 4 });   // la 10e pièce : une vie de plus
+  expect(await aPrendre()).toBe(3);
+
+  // Tombé : le niveau recommence tel qu'il avait commencé, avec une vie de moins (3 - 1 = 2 : la vie
+  // gagnée avec ces pièces s'en va avec elles)
+  await poserLeHeros(page, 300, 520);
+  await attendreLeNiveau(page, "n.enJeu && n.donnees.vies === 2");
+  expect(await niveau(page)).toMatchObject({ score: 5, vies: 2 });
+  expect(await page.evaluate(() => (window as any).jeu.scene.getScene("platformer-niveau").donnees.pieces)).toBe(8);
+  expect(await aPrendre()).toBe(5);
+
+  // Les reprendre rapporte les mêmes points et la même vie, une seule fois
+  await prendreUnePiece();
+  await prendreUnePiece();
+  expect(await niveau(page)).toMatchObject({ score: 7, vies: 3 });
+  sansErreur();
+});
+
 test("sauter sur un ennemi l'écrase et rapporte un point", async ({ page }) => {
   const { sansErreur } = await menuPlatformer(page);
   await choisirLeMode(page, 0, "platformer-niveau");
@@ -252,6 +296,64 @@ test("à deux : chacun ses touches, chacun son monde, le premier à 15 points ga
   await page.waitForTimeout(700);
   await appuyer(page, "Escape");
   await attendreScene(page, "platformer-menu");
+  sansErreur();
+});
+
+// Une touche telle qu'un clavier AZERTY l'envoie : sa place (code), sa lettre (key) et son keyCode.
+// Le protocole de Chromium les donne séparément ; Playwright, lui, les déduit l'un de l'autre.
+async function toucheAzerty(page: Page, type: "keyDown" | "keyUp", code: string, lettre: string, keyCode: number) {
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send("Input.dispatchKeyEvent", {
+    type, code, key: lettre, windowsVirtualKeyCode: keyCode, nativeVirtualKeyCode: keyCode,
+  });
+}
+
+test("à deux, le joueur 1 sur Q D Z d'un clavier AZERTY : la place de la touche compte, pas sa lettre", async ({ page }) => {
+  const { sansErreur } = await menuPlatformer(page);
+  // Le menu écrit les touches du joueur 1 comme elles sont sur ce clavier (Q D Z sur un AZERTY)
+  const attendu = await page.evaluate(async () => {
+    const carte: Map<string, string> | undefined = await (navigator as any).keyboard?.getLayoutMap?.().catch(() => undefined);
+    const azerty: Record<string, string> = { KeyA: "Q", KeyD: "D", KeyW: "Z" };
+    return ["KeyA", "KeyD", "KeyW"].map((code) => carte?.get(code)?.toUpperCase() ?? azerty[code]).join(" ");
+  });
+  const aide = await page.evaluate(() => (window as any).jeu.scene.getScene("platformer-menu").boutons[2].aide.text as string);
+  expect(aide).toBe(attendu + " contre les flèches : le premier à 15 points");
+
+  await choisirLeMode(page, 2, "platformer-duo");
+  const coureurs = () => page.evaluate(() => (window as any).jeu.scene.getScene("platformer-duo").coureurs
+    .map((c: any) => ({ x: c.heros.body.x, vy: c.heros.body.velocity.y })));
+  await page.waitForTimeout(400);
+  const depart = await coureurs();
+
+  // D (KeyD) : le joueur 1 court à droite
+  await toucheAzerty(page, "keyDown", "KeyD", "d", 68);
+  await page.waitForTimeout(400);
+  await toucheAzerty(page, "keyUp", "KeyD", "d", 68);
+  const loin = await coureurs();
+  expect(loin[0].x).toBeGreaterThan(depart[0].x + 60);
+  expect(loin[1].x).toBe(depart[1].x);
+
+  // La lettre « a » à la place du Q d'un QWERTY (le A d'un AZERTY) : pas une touche du joueur 1
+  await toucheAzerty(page, "keyDown", "KeyQ", "a", 65);
+  await page.waitForTimeout(250);
+  expect((await coureurs())[0].x).toBe(loin[0].x);
+  await toucheAzerty(page, "keyUp", "KeyQ", "a", 65);
+  // Le Q d'un AZERTY (KeyA, la lettre « q ») : il revient à gauche
+  await toucheAzerty(page, "keyDown", "KeyA", "q", 81);
+  await page.waitForTimeout(250);
+  await toucheAzerty(page, "keyUp", "KeyA", "q", 81);
+  expect((await coureurs())[0].x).toBeLessThan(loin[0].x - 30);
+
+  // La lettre « w » en bas à gauche (KeyZ) ne fait pas sauter ; le Z d'un AZERTY (KeyW, « z »), si
+  await page.waitForTimeout(300);
+  await toucheAzerty(page, "keyDown", "KeyZ", "w", 87);
+  await page.waitForTimeout(150);
+  expect((await coureurs())[0].vy).toBeGreaterThan(-50);
+  await toucheAzerty(page, "keyUp", "KeyZ", "w", 87);
+  await toucheAzerty(page, "keyDown", "KeyW", "z", 90);
+  await page.waitForFunction(() => (window as any).jeu.scene.getScene("platformer-duo").coureurs[0].heros.body.velocity.y < -200);
+  await toucheAzerty(page, "keyUp", "KeyW", "z", 90);
+  expect((await coureurs())[1].vy).toBeGreaterThan(-50);   // le joueur 2 n'a pas sauté
   sansErreur();
 });
 

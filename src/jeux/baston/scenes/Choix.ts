@@ -3,7 +3,8 @@
 
 import Phaser from "phaser";
 import { MODELES } from "../modeles";
-import { TOUCHES, Clavier, etiquette, manettes, type Cote } from "../commandes";
+import { TOUCHES, Clavier, manettes, type Cote } from "../commandes";
+import { etiquette } from "../../../socle/touchesPhysiques";
 import { lireLeChoix, ecrireLeChoix, type DonneesDeCombat } from "../partie";
 import { dessinerArene, enCouleur } from "../decor";
 import { cleDePlanche, cleDAnimation, type CouleurDeRobot } from "../textures";

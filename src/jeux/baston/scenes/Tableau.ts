@@ -6,7 +6,8 @@
 import Phaser from "phaser";
 import type { Combat, Phase } from "./Combat";
 import type { Robot } from "../Robot";
-import { TOUCHES, etiquette, manettes, type Cote, type NomDeCommande } from "../commandes";
+import { TOUCHES, manettes, type Cote, type NomDeCommande } from "../commandes";
+import { etiquette } from "../../../socle/touchesPhysiques";
 import { enCouleur } from "../decor";
 import { VIE, JAUGE, SOL, GRIS, JAUNE, MANCHES_GAGNANTES } from "../reglages";
 import { HAUTEUR, POLICE } from "../../../socle/style";

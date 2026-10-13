@@ -4,6 +4,7 @@
 //
 // Perdre une vie ou passer au niveau suivant, c'est relancer CETTE scène (this.scene.restart) avec le
 // score et les vies du moment : le monde repart tout neuf, les pièces et les plateformes fragiles reviennent.
+// Comme les pièces reviennent, ce qu'elles avaient rapporté s'en va avec la vie perdue (voir mourir).
 
 import Phaser from "phaser";
 import type { Niveau as DonneesDuNiveau } from "../elements";
@@ -53,6 +54,8 @@ export class Niveau extends Phaser.Scene {
   distance = 0;                            // l'Infini : le plus loin atteint, en mètres
   record = 0;
   private quitte = false;
+  private auDebut = { score: 0, pieces: 0 };   // le score et les pièces au début du niveau
+  private viesGagnees = 0;                 // les vies gagnées avec les pièces de ce niveau
   private generateur: Generateur | null = null;
   private genres!: Genres;
   private etincelles!: Phaser.GameObjects.Particles.ParticleEmitter;
@@ -66,6 +69,8 @@ export class Niveau extends Phaser.Scene {
 
   init(donnees: DonneesDeNiveau) {
     this.donnees = { ...donnees };
+    this.auDebut = { score: donnees.score, pieces: donnees.pieces };
+    this.viesGagnees = 0;
     this.enJeu = true;
     this.quitte = false;
     this.distance = 0;
@@ -175,6 +180,7 @@ export class Niveau extends Phaser.Scene {
     this.etincelles.explode(6, this.heros.x, this.heros.y - 10);
     if (this.donnees.pieces % PIECES_POUR_UNE_VIE === 0) {
       this.donnees.vies++;                 // une vie toutes les 10 pièces
+      this.viesGagnees++;
       this.sound.play("platformer-vie");
       this.events.emit("vie");
     }
@@ -212,17 +218,32 @@ export class Niveau extends Phaser.Scene {
 
     this.time.delayedCall(900, () => {
       const d = this.donnees;
-      if (d.mode === "test") {
-        this.scene.restart(d);             // en test, on recommence sans compter
+      if (d.mode === "infini") {
+        // L'Infini ne recommence pas le monde : les pièces prises ne reviennent pas, on garde ce qu'elles
+        // ont rapporté
+        d.vies--;
+        if (d.vies <= 0) {
+          this.finir("perdu");
+        } else {
+          this.deuxiemeChance();
+        }
         return;
       }
-      d.vies--;
+      // L'Aventure (et le test) : le niveau recommence et ses pièces reviennent. On le rejoue comme si
+      // on ne l'avait jamais commencé : le score et le compte des pièces reprennent leur valeur du début,
+      // et les vies gagnées avec ces pièces s'en vont (on les regagnera en les reprenant). Sinon, mourir
+      // exprès ferait gonfler le score, et les mêmes pièces donneraient des vies sans fin.
+      d.score = this.auDebut.score;
+      d.pieces = this.auDebut.pieces;
+      if (d.mode === "test") {
+        this.scene.restart(d);             // en test, on recommence sans compter les vies
+        return;
+      }
+      d.vies -= 1 + this.viesGagnees;
       if (d.vies <= 0) {
         this.finir("perdu");
-      } else if (d.mode === "infini") {
-        this.deuxiemeChance();
       } else {
-        this.scene.restart(d);             // l'Aventure : on recommence le niveau
+        this.scene.restart(d);
       }
     });
   }
