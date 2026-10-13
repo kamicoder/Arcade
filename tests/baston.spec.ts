@@ -323,11 +323,13 @@ test.describe("au doigt", () => {
     await doigt.lever();
     await page.waitForFunction(() => (window as any).jeu.scene.getScene("baston-combat").gauche.etat === "repos");
 
-    // ⚡ : un tir
+    // ⚡ : un tir (l'état « tir » ne dure qu'un instant : on attend le tir lui-même, ou ses dégâts)
+    const vieAvantLeTir = (await combat(page)).droite.vie;
     await toucher(page, largeur - 270, 480);
-    etat = await combat(page);
-    expect(etat.gauche.etat).toBe("tir");
-    expect(etat.gauche.tirs).toBe(1);
+    await page.waitForFunction((vie) => {
+      const c = (window as any).jeu.scene.getScene("baston-combat");
+      return c.gauche.listeDesTirs.length === 1 || c.droite.vie < vie;
+    }, vieAvantLeTir);
     await page.waitForFunction(() => (window as any).jeu.scene.getScene("baston-combat").gauche.etat === "repos");
 
     // ★ : éteint tant que la jauge n'est pas pleine (il ne fait rien), puis allumé
@@ -341,9 +343,7 @@ test.describe("au doigt", () => {
     });
     await page.waitForFunction(() => (window as any).jeu.scene.getScene("baston-tableau").specialPret === true);
     await toucher(page, largeur - 104, 272);
-    etat = await combat(page);
-    expect(etat.gauche.etat).toBe("special");
-    expect(etat.gauche.jauge).toBe(0);
+    await page.waitForFunction(() => (window as any).jeu.scene.getScene("baston-combat").gauche.jauge === 0);
     sansErreur();
   });
 
