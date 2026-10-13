@@ -8,6 +8,7 @@ import { LARGEUR, HAUTEUR, POLICE } from "../../../socle/style";
 import { surTouche } from "../../../socle/clavier";
 import { estTactile } from "../../../socle/tactile";
 import { retourAuHub, fonduPuis } from "../../../socle/retour";
+import { boutonArcade } from "../../../socle/boutonArcade";
 
 const CARTE_L = 270;
 const CARTE_H = 340;
@@ -82,9 +83,7 @@ export class Menu extends Phaser.Scene {
     const mine = this.add.image(titre.x - titre.width / 2 - 34, 54, "demineur-mine").setScale(2);
     this.tweens.add({ targets: mine, angle: 360, duration: 6000, repeat: -1 });
 
-    const retour = this.add.text(20, 20, "← Arcade", { fontFamily: POLICE, fontSize: "18px", color: "#a59fc0" })
-      .setPadding(8).setInteractive({ useHandCursor: true });
-    retour.on("pointerup", () => retourAuHub(this));
+    boutonArcade(this);
   }
 
   private creerCarte(niveau: Niveau, i: number) {

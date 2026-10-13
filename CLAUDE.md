@@ -63,6 +63,8 @@ Un nouveau jeu ou un nouveau mode vient avec ses tests dans `tests/`. Dans un te
   chargement du jeu.
 - `lire` / `ecrire` (sauvegardes protégées), `estTactile()`, `quandNouvelleVersion` (mise à jour au
   Hub seulement, jamais en pleine partie).
+- `boutonArcade(scene)` : le bouton « ← Arcade » du menu de chaque jeu, un vrai bouton (plus grand au doigt),
+  aux couleurs du jeu si on lui passe un style.
 - `correctifs.ts` : les défauts de Phaser réparés en attendant une version qui les corrige, branchés
   dans `main.ts`. Chacun dit comment savoir s'il sert encore : à relire à chaque mise à jour de Phaser.
 

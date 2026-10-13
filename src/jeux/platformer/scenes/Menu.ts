@@ -13,6 +13,7 @@ import { LARGEUR, HAUTEUR, POLICE } from "../../../socle/style";
 import { surTouche } from "../../../socle/clavier";
 import { estTactile } from "../../../socle/tactile";
 import { retourAuHub, fonduPuis } from "../../../socle/retour";
+import { boutonArcade } from "../../../socle/boutonArcade";
 
 type Choix = "aventure" | "infini" | "duo" | "editeur";
 
@@ -48,9 +49,7 @@ export class Menu extends Phaser.Scene {
       fontFamily: POLICE, fontSize: "50px", fontStyle: "bold", color: VERT, stroke: "#14121c", strokeThickness: 8,
     }).setOrigin(0.5);
 
-    const retour = this.add.text(20, 20, "← Arcade", { fontFamily: POLICE, fontSize: "18px", color: "#a49cb4" })
-      .setInteractive({ useHandCursor: true });
-    retour.on("pointerup", () => this.quitter());
+    boutonArcade(this, () => this.quitter());
 
     const record = lireLeRecord();
     const auDoigt = estTactile();

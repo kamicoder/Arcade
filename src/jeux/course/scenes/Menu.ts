@@ -16,6 +16,7 @@ import { surTouche, surChaqueTouche } from "../../../socle/clavier";
 import { estTactile } from "../../../socle/tactile";
 import { etiquette } from "../../../socle/touchesPhysiques";
 import { retourAuHub, fonduPuis } from "../../../socle/retour";
+import { boutonArcade } from "../../../socle/boutonArcade";
 
 export type IdMode = "grandprix" | "course" | "duo" | "chrono" | "atelier" | "editeur";
 
@@ -81,8 +82,9 @@ export class Menu extends Phaser.Scene {
     this.cameras.main.fadeIn(250);
     theme.habillage.fond(this);
     titre(this, 46, theme.titre, 50);
-    ecrire(this, 14, 14, "← Arcade", 16, c.texteDoux, { origine: [0, 0] })
-      .setInteractive({ useHandCursor: true }).on("pointerup", () => retourAuHub(this));
+    boutonArcade(this, () => retourAuHub(this), {
+      police: theme.habillage.police, texte: c.texte, fond: c.fondPanneau, fondAlpha: c.alphaPanneau,
+    });
     if (avecChoixDuTheme) {
       this.creerChoixDuTheme();
     }

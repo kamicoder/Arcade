@@ -12,6 +12,7 @@ import { surTouche } from "../../../socle/clavier";
 import { estTactile } from "../../../socle/tactile";
 import { retourAuHub, fonduPuis } from "../../../socle/retour";
 import { elargir, suivreLaLargeur } from "../../../socle/largeur";
+import { boutonArcade } from "../../../socle/boutonArcade";
 
 export class Titre extends Phaser.Scene {
   private parti = false;
@@ -55,9 +56,7 @@ export class Titre extends Phaser.Scene {
       },
     });
 
-    const retour = this.add.text(20, 20, "← Arcade", { fontFamily: POLICE, fontSize: "18px", color: "#a49cb4" })
-      .setInteractive({ useHandCursor: true });
-    retour.on("pointerup", () => retourAuHub(this));
+    boutonArcade(this);
 
     // À deux, il faut deux mains sur un clavier, ou deux manettes : au doigt seul, on ne le propose pas
     const choix: Choix[] = [
