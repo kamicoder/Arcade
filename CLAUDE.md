@@ -64,6 +64,13 @@ jeu (`voiture-course`). L'ordre de `scenes` est l'ordre d'affichage : une scène
 - Dans `update()`, `sprite.x` a **un pas de physique de retard** : Phaser avance le corps avant `update()`
   et ne recopie sa place sur l'image qu'après. Pour une décision qui dépend de la place exacte (une
   barrière, une collision faite à la main), lire `body.center`. Une voiture restait coincée contre les pneus.
+- Un appui bref (enfoncé et relâché dans la même image, ou une tape au doigt) n'est jamais vu « tenu » :
+  pour un coup ou un saut, retenir l'appui jusqu'à l'image suivante (voir `baston/commandes.ts`).
+- Un `Rectangle` arrondi ne se redessine que par `setSize` (changer `.width` casse les coins).
+- Les effets de caméra (`zoomTo`, `pan`) veulent une fonction d'ease (`Phaser.Math.Easing.Sine.Out`),
+  pas son nom en texte comme les tweens.
+- `scene.restart` garde le `timeScale` et la pause de la physique, de l'horloge et des tweens : les remettre
+  dans `create`. Et pour la physique, le ralenti est à l'envers : `world.timeScale = 3` ralentit.
 
 ## D'où viennent les jeux
 
@@ -74,4 +81,4 @@ pour que les records d'avant suivent. Un défaut de jeu trouvé ici existe peut-
 le signaler à l'utilisateur.
 
 Avancement : Hub et course de voitures complète (contre la montre, contre l'ordinateur, Grand Prix, à
-deux en écran partagé, éditeur de circuit). Démineur fait. En cours : Licorne, baston de robots, platformer.
+deux en écran partagé, éditeur de circuit). Démineur et baston de robots faits. En cours : Licorne, platformer.
