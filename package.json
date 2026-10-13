@@ -1,0 +1,23 @@
+{
+  "name": "arcade",
+  "version": "1.0.0",
+  "description": "Nos mini jeux, dans le navigateur et sur téléphone",
+  "scripts": {
+    "dev": "vite --host",
+    "build": "tsc && vite build",
+    "preview": "vite preview --host",
+    "check": "tsc",
+    "test": "playwright test"
+  },
+  "type": "module",
+  "dependencies": {
+    "phaser": "^4.2.1"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.64.0",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.4",
+    "vite-plugin-pwa": "^2.0.0"
+  },
+  "private": true
+}

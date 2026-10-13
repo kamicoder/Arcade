@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <title>L'Arcade</title>
+  <meta name="description" content="Nos mini jeux, à emporter partout.">
+  <meta name="theme-color" content="#14121c">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Arcade">
+  <link rel="icon" type="image/png" href="icones/icone-192.png">
+  <link rel="apple-touch-icon" href="icones/icone-180.png">
+  <style>
+    html, body { margin: 0; height: 100%; background: #14121c; overflow: hidden; }
+    /* Phaser met son canvas dans #jeu et l'agrandit lui-même (voir scale dans main.ts) */
+    #jeu { width: 100vw; height: 100vh; height: 100dvh; }
+    /* Un téléphone tenu debout : on demande de le tourner */
+    #tourne {
+      display: none; position: fixed; inset: 0; z-index: 10;
+      background: #14121c; color: #fff; font: 600 22px system-ui, sans-serif;
+      flex-direction: column; align-items: center; justify-content: center; gap: 16px; text-align: center;
+    }
+    #tourne .dessin { font-size: 64px; }
+    @media (orientation: portrait) and (pointer: coarse) {
+      #tourne { display: flex; }
+    }
+  </style>
+</head>
+<body>
+  <div id="jeu"></div>
+  <div id="tourne">
+    <div class="dessin">📱</div>
+    <div>Tourne ton téléphone pour jouer 🕹️</div>
+  </div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
