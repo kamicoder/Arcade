@@ -1,5 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
-import { ouvrir, appuyer, attendreScene, scenesActives, versLaPage, toucher } from "./outils";
+import { ouvrir, appuyer, attendreScene, scenesActives, versLaPage, toucher, tailleDuJeu } from "./outils";
 
 // Du Hub jusqu'au titre de la baston : la quatrième carte, sous la première
 async function titreBaston(page: Page) {
@@ -208,55 +208,164 @@ test("à deux sur le même clavier : chacun ses touches et son robot", async ({ 
 test.describe("au doigt", () => {
   test.use({ viewport: { width: 844, height: 390 }, hasTouch: true, isMobile: true });
 
-  test("seul contre l'ordinateur, avec les commandes tactiles", async ({ page }) => {
+  // Des doigts qu'on pose, qu'on glisse et qu'on lève quand on veut (Playwright ne sait que taper) :
+  // on passe par le protocole de Chromium. Les places sont en pixels du jeu.
+  async function doigts(page: Page) {
+    const cdp = await page.context().newCDPSession(page);
+    const enPage = async (points: { x: number; y: number; id: number }[]) =>
+      Promise.all(points.map(async ({ x, y, id }) => ({ ...(await versLaPage(page, x, y)), id })));
+    return {
+      poser: async (...points: { x: number; y: number; id: number }[]) =>
+        cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: await enPage(points) }),
+      glisser: async (...points: { x: number; y: number; id: number }[]) =>
+        cdp.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: await enPage(points) }),
+      lever: () => cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] }),
+    };
+  }
+
+  function stickVisible(page: Page) {
+    return page.evaluate(() => (window as any).jeu.scene.getScene("baston-tableau").baseDuStick.visible as boolean);
+  }
+
+  test("l'arène élargie, le joystick et les trois boutons", async ({ page }) => {
     const { sansErreur } = await ouvrir(page);
+    expect(await tailleDuJeu(page)).toEqual({ largeur: 960, hauteur: 540 });
     await toucher(page, 345, 400);         // la carte de la baston
     await attendreScene(page, "baston-titre");
-    await toucher(page, 480, 190);         // « Contre l'ordinateur » (le seul mode, au doigt)
+
+    // La baston prend la proportion du téléphone : plus de bandes noires sur les côtés
+    const { largeur } = await tailleDuJeu(page);
+    expect(largeur).toBe(Math.round(540 * 844 / 390));
+    expect((await page.locator("canvas").boundingBox())!.width).toBeCloseTo(844, 0);
+
+    await toucher(page, largeur / 2, 190); // « Contre l'ordinateur » (le seul mode, au doigt)
     await attendreScene(page, "baston-choix");
-    await toucher(page, 240, 430);         // « Touche ici pour valider »
+    await toucher(page, largeur / 4, 430); // « Touche ici pour valider »
     await attendreScene(page, "baston-combat");
-    await attendrePhase(page, "combat");
-    await placer(page, 300, 700);
 
-    // Un doigt posé sur ▶ et qui y reste : on passe par le protocole de Chromium pour le tenir
-    const cdp = await page.context().newCDPSession(page);
-    const droite = await versLaPage(page, 222, 466);
-    const avant = (await combat(page)).gauche.x;
-    await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x: droite.x, y: droite.y, id: 1 }] });
-    await page.waitForTimeout(400);
+    // L'arène, sa caméra et le tableau de bord ont toute la largeur ; les robots partent à 450
+    // pixels l'un de l'autre, de part et d'autre du milieu
+    const arene = await page.evaluate(() => {
+      const jeu = (window as any).jeu;
+      const c = jeu.scene.getScene("baston-combat");
+      return {
+        bords: c.physics.world.bounds.width,
+        camera: c.cameras.main.width,
+        tableau: jeu.scene.getScene("baston-tableau").cameras.main.width,
+      };
+    });
+    expect(arene).toEqual({ bords: largeur, camera: largeur, tableau: largeur });
     let etat = await combat(page);
-    expect(etat.tactile).toMatchObject({ droite: true, gauche: false });
-    expect(etat.gauche.x).toBeGreaterThan(avant + 50);
-    await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
-    await page.waitForTimeout(100);
-    expect((await combat(page)).tactile.droite).toBe(false);
+    expect(Math.abs(etat.gauche.x - (largeur / 2 - 225))).toBeLessThan(2);
+    expect(Math.abs(etat.droite.x - (largeur / 2 + 225))).toBeLessThan(2);
 
-    // Une tape brève sur 👊 : le coup part quand même
-    await toucher(page, 866, 462);
+    await attendrePhase(page, "combat");
+    await placer(page, 450, 1000);
+    const doigt = await doigts(page);
+
+    // Le joystick : le pouce se pose n'importe où à gauche, et glisse vers la droite
+    expect(await stickVisible(page)).toBe(false);
+    let avant = (await combat(page)).gauche.x;
+    await doigt.poser({ x: 250, y: 300, id: 1 });
+    await doigt.glisser({ x: 340, y: 300, id: 1 });
+    await page.waitForTimeout(400);
+    etat = await combat(page);
+    expect(await stickVisible(page)).toBe(true);
+    expect(etat.tactile).toMatchObject({ droite: true, gauche: false, saut: false });
+    expect(etat.gauche.x).toBeGreaterThan(avant + 50);
+
+    // Puis vers la gauche : la base a suivi le pouce, un petit geste suffit pour repartir
+    avant = (await combat(page)).gauche.x;
+    await doigt.glisser({ x: 200, y: 300, id: 1 });
+    await page.waitForTimeout(400);
+    etat = await combat(page);
+    expect(etat.tactile).toMatchObject({ droite: false, gauche: true });
+    expect(etat.gauche.x).toBeLessThan(avant - 50);
+
+    // Le pouce se lève : le joystick disparaît, le robot s'arrête
+    await doigt.lever();
+    await page.waitForTimeout(100);
+    expect((await combat(page)).tactile).toMatchObject({ droite: false, gauche: false });
+    expect(await stickVisible(page)).toBe(false);
+
+    // Sauter : une poussée vers le haut, un saut. Le pouce reste en haut : pas de rafale.
+    await doigt.poser({ x: 200, y: 330, id: 1 });
+    await doigt.glisser({ x: 205, y: 260, id: 1 });
+    await page.waitForTimeout(50);
+    expect((await combat(page)).gauche.etat).toBe("saut");
+    await page.waitForFunction(() => (window as any).jeu.scene.getScene("baston-combat").gauche.etat === "repos");
+    await page.waitForTimeout(300);
+    expect((await combat(page)).gauche.etat).toBe("repos");
+    // Redescendu au milieu, puis repoussé : un nouveau saut
+    await doigt.glisser({ x: 200, y: 330, id: 1 });
+    await doigt.glisser({ x: 200, y: 260, id: 1 });
+    await page.waitForTimeout(50);
+    expect((await combat(page)).gauche.etat).toBe("saut");
+    await doigt.lever();
+    await page.waitForFunction(() => (window as any).jeu.scene.getScene("baston-combat").gauche.etat === "repos");
+
+    // 👊 : une tape très brève (posée et levée d'un coup) frappe quand même
+    await placer(page, 450, 1000);
+    await doigt.poser({ x: largeur - 112, y: 438, id: 2 });
+    await doigt.lever();
+    await page.waitForTimeout(50);
     expect((await combat(page)).gauche.etat).toBe("attaque");
     await page.waitForFunction(() => (window as any).jeu.scene.getScene("baston-combat").gauche.etat === "repos");
 
+    // Les deux mains ensemble : marcher et frapper
+    await doigt.poser({ x: 200, y: 300, id: 1 });
+    await doigt.glisser({ x: 290, y: 300, id: 1 });
+    await doigt.poser({ x: 290, y: 300, id: 1 }, { x: largeur - 100, y: 450, id: 2 });
+    await page.waitForTimeout(50);
+    etat = await combat(page);
+    expect(etat.tactile).toMatchObject({ droite: true, frapper: true });
+    expect(etat.gauche.etat).toBe("attaque");
+    await doigt.lever();
+    await page.waitForFunction(() => (window as any).jeu.scene.getScene("baston-combat").gauche.etat === "repos");
+
     // ⚡ : un tir
-    await toucher(page, 770, 368);
+    await toucher(page, largeur - 270, 480);
     etat = await combat(page);
     expect(etat.gauche.etat).toBe("tir");
     expect(etat.gauche.tirs).toBe(1);
     await page.waitForFunction(() => (window as any).jeu.scene.getScene("baston-combat").gauche.etat === "repos");
 
-    // ★ : le coup spécial, quand la jauge est pleine
+    // ★ : éteint tant que la jauge n'est pas pleine (il ne fait rien), puis allumé
+    await page.evaluate(() => {
+      (window as any).jeu.scene.getScene("baston-combat").gauche.jauge = 0;
+    });
+    await toucher(page, largeur - 104, 272);
+    expect((await combat(page)).gauche.etat).toBe("repos");
     await page.evaluate(() => {
       (window as any).jeu.scene.getScene("baston-combat").gauche.jauge = 100;
     });
-    await toucher(page, 888, 322);
+    await page.waitForFunction(() => (window as any).jeu.scene.getScene("baston-tableau").specialPret === true);
+    await toucher(page, largeur - 104, 272);
     etat = await combat(page);
     expect(etat.gauche.etat).toBe("special");
     expect(etat.gauche.jauge).toBe(0);
-    await page.waitForFunction(() => (window as any).jeu.scene.getScene("baston-combat").gauche.etat === "repos");
+    sansErreur();
+  });
 
-    // ▲ : un saut
-    await toucher(page, 735, 488);
-    expect((await combat(page)).gauche.etat).toBe("saut");
+  test("de retour au Hub, puis dans un autre jeu : 960 × 540", async ({ page }) => {
+    const { sansErreur } = await ouvrir(page);
+    await toucher(page, 345, 400);
+    await attendreScene(page, "baston-titre");
+    expect((await tailleDuJeu(page)).largeur).toBe(Math.round(540 * 844 / 390));
+    // L'écran change de forme (un autre téléphone, le plein écran) : le titre suit
+    await page.setViewportSize({ width: 760, height: 390 });
+    await page.waitForFunction(() => (window as any).jeu.scale.width === Math.round(540 * 760 / 390));
+    await attendreScene(page, "baston-titre");
+    await toucher(page, 60, 30);           // « ← Arcade »
+    await attendreScene(page, "Hub");
+    expect(await tailleDuJeu(page)).toEqual({ largeur: 960, hauteur: 540 });
+    expect(await page.evaluate(() => (window as any).jeu.scene.getScene("Hub").cameras.main.width)).toBe(960);
+
+    await toucher(page, 750, 200);         // le démineur
+    await attendreScene(page, "demineur-menu");
+    expect(await tailleDuJeu(page)).toEqual({ largeur: 960, hauteur: 540 });
+    // Le démineur garde ses bandes noires : il n'a rien demandé
+    expect((await page.locator("canvas").boundingBox())!.width).toBeLessThan(800);
     sansErreur();
   });
 });

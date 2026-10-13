@@ -8,13 +8,13 @@ import { lireLeChoix, ecrireLeChoix, type DonneesDeCombat } from "../partie";
 import { dessinerArene, enCouleur } from "../decor";
 import { cleDePlanche, cleDAnimation, type CouleurDeRobot } from "../textures";
 import { BLEU, ORANGE, GRIS, JAUNE } from "../reglages";
-import { LARGEUR, POLICE } from "../../../socle/style";
+import { POLICE } from "../../../socle/style";
 import { surTouche } from "../../../socle/clavier";
 import { estTactile } from "../../../socle/tactile";
 import { fonduPuis } from "../../../socle/retour";
+import { elargir, suivreLaLargeur } from "../../../socle/largeur";
 
 const PANNEAU = { largeur: 420, hauteur: 400, y: 60 };
-const CENTRE: Record<Cote, number> = { gauche: LARGEUR / 4, droite: LARGEUR * 3 / 4 };
 const COULEUR: Record<Cote, CouleurDeRobot> = { gauche: "bleu", droite: "orange" };
 const TEINTE: Record<Cote, number> = { gauche: BLEU, droite: ORANGE };
 
@@ -55,9 +55,11 @@ export class Choix extends Phaser.Scene {
   }
 
   create() {
+    elargir(this);
+    suivreLaLargeur(this);
     dessinerArene(this);
     this.cameras.main.fadeIn(250);
-    this.add.text(LARGEUR / 2, 30, "Choisissez vos robots !", {
+    this.add.text(this.scale.width / 2, 30, "Choisissez vos robots !", {
       fontFamily: POLICE, fontSize: "30px", fontStyle: "bold", color: "#ffffff",
     }).setOrigin(0.5);
 
@@ -130,7 +132,8 @@ export class Choix extends Phaser.Scene {
   }
 
   private creerPanneau(cote: Cote): Panneau {
-    const cx = CENTRE[cote];
+    // Chaque panneau au milieu de sa moitié de l'écran
+    const cx = this.scale.width * (cote === "gauche" ? 1 / 4 : 3 / 4);
     const haut = PANNEAU.y;
     const ordinateur = this.solo && cote === "droite";
     this.add.rectangle(cx, haut + PANNEAU.hauteur / 2, PANNEAU.largeur, PANNEAU.hauteur, 0x1c1a25, 0.75)

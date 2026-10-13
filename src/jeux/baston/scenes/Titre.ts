@@ -6,10 +6,11 @@ import { lireLeBilan } from "../partie";
 import { manettes, etiquette, TOUCHES, type Cote } from "../commandes";
 import { cleDePlanche, cleDAnimation } from "../textures";
 import { SOL, ECHELLE, ORANGE } from "../reglages";
-import { LARGEUR, POLICE } from "../../../socle/style";
+import { POLICE } from "../../../socle/style";
 import { surTouche } from "../../../socle/clavier";
 import { estTactile } from "../../../socle/tactile";
 import { retourAuHub, fonduPuis } from "../../../socle/retour";
+import { elargir, suivreLaLargeur } from "../../../socle/largeur";
 
 export class Titre extends Phaser.Scene {
   private parti = false;
@@ -20,10 +21,14 @@ export class Titre extends Phaser.Scene {
 
   create() {
     this.parti = false;
+    // Au doigt, la baston prend toute la largeur du téléphone (voir socle/largeur.ts)
+    elargir(this);
+    suivreLaLargeur(this);
+    const milieu = this.scale.width / 2;   // la baston peut être plus large que 960 (au doigt)
     dessinerArene(this);
     this.cameras.main.fadeIn(250);
 
-    const titre = this.add.text(LARGEUR / 2, 70, "La baston de robots", {
+    const titre = this.add.text(milieu, 70, "La baston de robots", {
       fontFamily: POLICE, fontSize: "54px", fontStyle: "bold", color: "#ffffff",
       stroke: "#1c1a25", strokeThickness: 8,
     }).setOrigin(0.5);
@@ -34,7 +39,7 @@ export class Titre extends Phaser.Scene {
     // Les deux robots, chacun dans son coin, qui respirent (leur animation « repos »)
     const bleu = this.add.sprite(150, SOL, cleDePlanche("bleu")).setOrigin(0.5, 1).setScale(ECHELLE * 1.5);
     bleu.play(cleDAnimation("bleu", "repos"));
-    const orange = this.add.sprite(LARGEUR - 150, SOL, cleDePlanche("orange")).setOrigin(0.5, 1)
+    const orange = this.add.sprite(this.scale.width - 150, SOL, cleDePlanche("orange")).setOrigin(0.5, 1)
       .setScale(ECHELLE * 1.5).setFlipX(true);
     orange.play(cleDAnimation("orange", "repos"));
     // De temps en temps, l'un frappe dans le vide, puis reprend son souffle
@@ -60,24 +65,24 @@ export class Titre extends Phaser.Scene {
     if (!estTactile() || manettes(this).length >= 2) {
       choix.push({ nom: "À deux", aide: "D", action: () => this.lancer(false) });
     }
-    new ListeDeBoutons(this, choix, { x: LARGEUR / 2, y: 190, largeur: 380, hauteur: 70, ecart: 90 });
+    new ListeDeBoutons(this, choix, { x: milieu, y: 190, largeur: 380, hauteur: 70, ecart: 90 });
     surTouche(this, "O", () => this.lancer(true));
     surTouche(this, "D", () => this.lancer(false));
     surTouche(this, "ESC", () => retourAuHub(this));
 
     const bilan = lireLeBilan();
     if (bilan.victoires + bilan.defaites > 0) {
-      this.add.text(LARGEUR / 2, 380, `Contre l'ordinateur : ${bilan.victoires} gagné${bilan.victoires > 1 ? "s" : ""}, ${bilan.defaites} perdu${bilan.defaites > 1 ? "s" : ""}`, {
+      this.add.text(milieu, 380, `Contre l'ordinateur : ${bilan.victoires} gagné${bilan.victoires > 1 ? "s" : ""}, ${bilan.defaites} perdu${bilan.defaites > 1 ? "s" : ""}`, {
         fontFamily: POLICE, fontSize: "18px", fontStyle: "bold", color: "#ffd479",
       }).setOrigin(0.5);
     }
 
     const aide = estTactile()
-      ? "Touche un mode pour jouer !"
+      ? "Pouce gauche : glisse pour marcher et sauter.     Pouce droit : frappe, tire, et le coup spécial !"
       : "Bleu : " + touches("gauche") + "     Orange : " + touches("droite") + "     Manettes : A saute, X frappe, Y tire";
-    this.add.text(LARGEUR / 2, 470, aide, { fontFamily: POLICE, fontSize: "16px", color: "#e9e4f0" }).setOrigin(0.5);
+    this.add.text(milieu, 470, aide, { fontFamily: POLICE, fontSize: "16px", color: "#e9e4f0" }).setOrigin(0.5);
     if (!estTactile()) {
-      this.add.text(LARGEUR / 2, 496, "Tirer avec la jauge pleine : le coup spécial !", {
+      this.add.text(milieu, 496, "Tirer avec la jauge pleine : le coup spécial !", {
         fontFamily: POLICE, fontSize: "15px", color: enCouleur(ORANGE),
       }).setOrigin(0.5);
     }

@@ -12,13 +12,14 @@ import { aucuneCommande, lireManette, manettes, Clavier, type Commandes, type Co
 import { compterUnMatch, type DonneesDeCombat } from "../partie";
 import { dessinerArene } from "../decor";
 import {
-  SOL, GRAVITE, DEPART, MILIEU, BLEU, ORANGE, MANCHES_GAGNANTES, DUREE_ANNONCE, DUREE_KO,
+  SOL, GRAVITE, DEPART, BLEU, ORANGE, MANCHES_GAGNANTES, DUREE_ANNONCE, DUREE_KO,
   SECOUSSE, RALENTI, COULEUR_ETINCELLES, BOITES, AIDE_MOBILE, PROFONDEUR,
 } from "../reglages";
-import { LARGEUR, HAUTEUR, POLICE } from "../../../socle/style";
+import { HAUTEUR, POLICE } from "../../../socle/style";
 import { surTouche } from "../../../socle/clavier";
 import { estTactile } from "../../../socle/tactile";
 import { fonduPuis } from "../../../socle/retour";
+import { elargir } from "../../../socle/largeur";
 
 // « debut » : on annonce la manche, personne ne bouge. « ko » : on peut encore bouger, plus se battre.
 // « fini » : le match est joué, tout s'arrête.
@@ -76,6 +77,12 @@ export class Combat extends Phaser.Scene {
   }
 
   create() {
+    // Au doigt, l'arène prend toute la largeur du téléphone. Elle la garde jusqu'à la fin de la manche
+    // (on ne déplace pas les bords d'un combat en cours) : un téléphone qu'on tourne, ou le plein écran,
+    // comptent à la manche suivante.
+    elargir(this);
+    const largeur = this.scale.width;
+    const milieu = largeur / 2;
     dessinerArene(this);
     // Le monde de la physique, les minuteries et les tweens survivent à scene.restart : on remet
     // leur temps à la normale (le ralenti du K.O. d'avant) et on relance la physique (arrêtée à la fin d'un match)
@@ -84,11 +91,12 @@ export class Combat extends Phaser.Scene {
     this.time.timeScale = 1;
     this.tweens.timeScale = 1;
     // Le monde s'arrête au sol : les robots tombent dessus, et ne sortent pas par les côtés
-    this.physics.world.setBounds(0, 0, LARGEUR, SOL);
-    this.cameras.main.setBounds(0, 0, LARGEUR, HAUTEUR).fadeIn(250);
+    this.physics.world.setBounds(0, 0, largeur, SOL);
+    this.cameras.main.setBounds(0, 0, largeur, HAUTEUR).fadeIn(250);
 
-    this.gauche = new Robot(this, MILIEU - DEPART, "bleu", BLEU, MODELES[this.modeles.gauche]);
-    this.droite = new Robot(this, MILIEU + DEPART, "orange", ORANGE, MODELES[this.modeles.droite]);
+    // Le même écart entre eux, quelle que soit la largeur : de part et d'autre du milieu
+    this.gauche = new Robot(this, milieu - DEPART, "bleu", BLEU, MODELES[this.modeles.gauche]);
+    this.droite = new Robot(this, milieu + DEPART, "orange", ORANGE, MODELES[this.modeles.droite]);
     this.gauche.regarder(this.droite);
     this.droite.regarder(this.gauche);
     for (const robot of [this.gauche, this.droite]) {
@@ -157,7 +165,7 @@ export class Combat extends Phaser.Scene {
       if (this.ralenti <= 0) {
         this.changerDeVitesse(1);
         this.cameras.main.zoomTo(1, 400, Phaser.Math.Easing.Sine.InOut);
-        this.cameras.main.pan(LARGEUR / 2, HAUTEUR / 2, 400, Phaser.Math.Easing.Sine.InOut);
+        this.cameras.main.pan(this.scale.width / 2, HAUTEUR / 2, 400, Phaser.Math.Easing.Sine.InOut);
       }
     }
     // Les secondes de jeu de cette image : moins qu'en vrai pendant le ralenti, et jamais de grand bond
@@ -212,7 +220,7 @@ export class Combat extends Phaser.Scene {
       return;
     }
     // Plus le coup fait mal, plus l'écran tremble longtemps (un tour de 1/60 s par point de dégât)
-    this.cameras.main.shake(degats * 1000 / 60, SECOUSSE / LARGEUR);
+    this.cameras.main.shake(degats * 1000 / 60, SECOUSSE / this.scale.width);
     this.sound.play("baston-coup");
     this.etincelles.explode(degats * 2, cible.centreX, cible.body.y + 30);
     if (cible.etat === "ko") {

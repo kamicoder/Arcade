@@ -49,7 +49,11 @@ Un nouveau jeu ou un nouveau mode vient avec ses tests dans `tests/`. Dans un te
   fois un appui dont le relâchement tombe dans la même image.
 - `fonduPuis(scene, action)` au lieu de `camera.fadeOut()` : un `fadeOut` lancé pendant un autre fondu
   (le `fadeIn` d'arrivée) est ignoré, et la transition reste bloquée.
-- `retourAuHub(scene)` arrête toutes les scènes du jeu et revient au Hub.
+- `retourAuHub(scene)` arrête toutes les scènes du jeu et revient au Hub (en 960 × 540).
+- `elargir(scene)` (`largeur.ts`) : au doigt, le jeu prend la proportion du téléphone (hauteur 540, largeur
+  jusqu'à 1 296) au lieu des bandes noires du mode FIT. La baston s'en sert ; ses scènes se placent alors
+  d'après `this.scale.width`, pas `LARGEUR`. `suivreLaLargeur(scene)` relance un menu quand l'écran change
+  de forme.
 - `TouchesPhysiques` : les touches tenues d'après leur **place** (`event.code`, « KeyW » = le Z d'un AZERTY),
   pour deux joueurs sur un même clavier ; Phaser, lui, reconnaît les touches à la lettre (`keyCode`).
 - `lire` / `ecrire` (sauvegardes protégées), `estTactile()`, `quandNouvelleVersion` (mise à jour au
@@ -78,6 +82,9 @@ jeu (`voiture-course`). L'ordre de `scenes` est l'ordre d'affichage : une scène
 - Un `Rectangle` arrondi ne se redessine que par `setSize` (changer `.width` casse les coins).
 - Les effets de caméra (`zoomTo`, `pan`) veulent une fonction d'ease (`Phaser.Math.Easing.Sine.Out`),
   pas son nom en texte comme les tweens.
+- `scale.setGameSize` : seules les caméras placées en (0, 0) et à la taille d'avant suivent la nouvelle
+  taille (celles des scènes arrêtées aussi). Son événement `RESIZE` est le même que celui d'une fenêtre qui
+  change de forme : pour les distinguer, comparer `gameSize.width` à la largeur d'avant (4e argument).
 - `scene.restart` garde le `timeScale` et la pause de la physique, de l'horloge et des tweens : les remettre
   dans `create`. Et pour la physique, le ralenti est à l'envers : `world.timeScale = 3` ralentit.
 

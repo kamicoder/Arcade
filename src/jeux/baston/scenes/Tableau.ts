@@ -1,6 +1,7 @@
 // Le tableau de bord : une scène lancée par-dessus le combat (this.scene.launch).
 // Sa caméra ne tremble pas et ne zoome pas avec celle du combat : les barres de vie, les annonces
 // et les commandes au doigt restent nettes et à leur place.
+// Tout se place d'après la largeur du jeu (this.scale.width) : au doigt, elle dépasse 960.
 
 import Phaser from "phaser";
 import type { Combat, Phase } from "./Combat";
@@ -8,20 +9,32 @@ import type { Robot } from "../Robot";
 import { TOUCHES, etiquette, manettes, type Cote, type NomDeCommande } from "../commandes";
 import { enCouleur } from "../decor";
 import { VIE, JAUGE, SOL, GRIS, JAUNE, MANCHES_GAGNANTES } from "../reglages";
-import { LARGEUR, POLICE } from "../../../socle/style";
+import { HAUTEUR, POLICE } from "../../../socle/style";
 import { estTactile } from "../../../socle/tactile";
 
 const BARRE = { largeur: 300, marge: 20 };
 
-// Les commandes au doigt : se déplacer à gauche du téléphone, se battre à droite
-const COMMANDES: { action: NomDeCommande; x: number; y: number; rayon: number; icone: string }[] = [
-  { action: "gauche", x: 82, y: 466, rayon: 62, icone: "◀" },
-  { action: "droite", x: 222, y: 466, rayon: 62, icone: "▶" },
-  { action: "frapper", x: 866, y: 462, rayon: 62, icone: "👊" },
-  { action: "saut", x: 735, y: 488, rayon: 46, icone: "▲" },
-  { action: "tirer", x: 770, y: 368, rayon: 42, icone: "⚡" },
-  { action: "special", x: 888, y: 322, rayon: 44, icone: "★" },
+// Au doigt, la main gauche : un joystick qui apparaît là où le pouce se pose, n'importe où sur la
+// moitié gauche de l'écran, et disparaît quand il se lève. Les distances sont en pixels du jeu
+// (sur un téléphone en paysage, un pixel du jeu fait environ 0,7 pixel de l'écran).
+const STICK = {
+  rayon: 80,                               // jusqu'où le pouce pousse ; plus loin, la base le suit
+  pouce: 38,                               // le rond qui suit le pouce
+  zoneMorte: 22,                           // le pouce tremble un peu : en dessous, on ne marche pas
+  saut: 45,                                // poussé vers le haut de plus que ça : un saut...
+  rearmer: 25,                             // ... et un seul : il faut redescendre sous ça pour resauter
+};
+
+// La main droite : trois gros boutons dans le coin, placés depuis le bord droit (dx) pour suivre la
+// largeur de l'écran. Le coup de poing, le plus gros, juste sous le pouce ; le tir à sa gauche ;
+// le coup spécial au-dessus, éteint tant que la jauge n'est pas pleine.
+type Bouton = "frapper" | "tirer" | "special";
+const BOUTONS: { action: Bouton; dx: number; y: number; rayon: number; icone: string }[] = [
+  { action: "frapper", dx: 112, y: 438, rayon: 74, icone: "👊" },
+  { action: "tirer", dx: 270, y: 480, rayon: 50, icone: "⚡" },
+  { action: "special", dx: 104, y: 272, rayon: 52, icone: "★" },
 ];
+const SENSIBLE = 1.25;                     // la zone sensible déborde du rond : un pouce, ça déborde
 
 interface Barres {
   vie: Phaser.GameObjects.Rectangle;
@@ -31,14 +44,27 @@ interface Barres {
   vieAffichee: number;
 }
 
+interface Stick {
+  doigt: number;                           // le doigt qui le tient (Pointer.id)
+  sens: -1 | 0 | 1;                        // où il fait marcher
+  sautArme: boolean;                       // une poussée vers le haut fera-t-elle sauter ?
+}
+
 export class Tableau extends Phaser.Scene {
   private combat!: Combat;
   private barres = {} as Record<Cote, Barres>;
   private grosTexte!: Phaser.GameObjects.Text;
   private sousTitre!: Phaser.GameObjects.Text;
   private cases = {} as Record<Cote, Phaser.GameObjects.Rectangle[]>;
-  private boutonSpecial?: Phaser.GameObjects.Arc;
-  private doigts = new Map<number, NomDeCommande>();   // pour chaque doigt posé : la commande qu'il tient
+  // Au doigt
+  private ronds = new Map<Bouton, { rond: Phaser.GameObjects.Arc; icone: Phaser.GameObjects.Text }>();
+  private doigts = new Map<number, Bouton>();   // pour chaque doigt posé sur un bouton : ce qu'il tient
+  private stick?: Stick;
+  private zoneDuStick?: Phaser.GameObjects.Zone;
+  private baseDuStick!: Phaser.GameObjects.Arc;
+  private pouce!: Phaser.GameObjects.Arc;
+  private specialPret = false;
+  private pulsation?: Phaser.Tweens.Tween;
 
   constructor() {
     super("baston-tableau");
@@ -46,32 +72,38 @@ export class Tableau extends Phaser.Scene {
 
   create() {
     this.combat = this.scene.get("baston-combat") as Combat;
+    this.ronds.clear();
     this.doigts.clear();
-    this.boutonSpecial = undefined;
+    this.stick = undefined;
+    this.zoneDuStick = undefined;
+    this.specialPret = false;
+    this.pulsation = undefined;
+    const largeur = this.scale.width;
 
     this.barres.gauche = this.creerBarres("gauche", this.combat.gauche);
     this.barres.droite = this.creerBarres("droite", this.combat.droite);
 
-    this.grosTexte = this.add.text(LARGEUR / 2, 170, "", {
+    this.grosTexte = this.add.text(largeur / 2, 170, "", {
       fontFamily: POLICE, fontSize: "96px", fontStyle: "bold", color: "#ffffff",
       stroke: "#1c1a25", strokeThickness: 10,
     }).setOrigin(0.5).setAlpha(0);
-    this.sousTitre = this.add.text(LARGEUR / 2, 245, "", {
+    this.sousTitre = this.add.text(largeur / 2, 245, "", {
       fontFamily: POLICE, fontSize: "26px", fontStyle: "bold", color: "#ffffff",
       stroke: "#1c1a25", strokeThickness: 6,
     }).setOrigin(0.5).setAlpha(0);
-
-    // Le bouton pour revenir au titre, en haut au milieu (entre les deux barres de vie)
-    this.add.text(LARGEUR / 2, 30, "✕", { fontFamily: POLICE, fontSize: "28px", color: "#ffffff" })
-      .setOrigin(0.5).setPadding(10).setInteractive({ useHandCursor: true })
-      .on("pointerup", () => this.combat.quitter());
 
     if (estTactile()) {
       this.creerCommandes();
     } else {
       this.creerCases("gauche", BARRE.marge);
-      this.creerCases("droite", LARGEUR - 5 * 62 - BARRE.marge + 4);
+      this.creerCases("droite", largeur - 5 * 62 - BARRE.marge + 4);
     }
+
+    // Le bouton pour revenir au titre, en haut au milieu (entre les deux barres de vie). Créé après
+    // la zone du joystick, il passe dessus : un doigt posé sur le ✕ ne fait pas apparaître le joystick.
+    this.add.text(largeur / 2, 30, "✕", { fontFamily: POLICE, fontSize: "28px", color: "#ffffff" })
+      .setOrigin(0.5).setPadding(10).setInteractive({ useHandCursor: true })
+      .on("pointerup", () => this.combat.quitter());
 
     // On écoute le combat. Ses écouteurs ne disparaissent pas quand CETTE scène s'arrête : on les retire.
     this.combat.events.on("phase", this.montrerLaPhase, this);
@@ -86,7 +118,7 @@ export class Tableau extends Phaser.Scene {
   // La barre de vie, la jauge dessous, et les manches gagnées. Celles de l'orange partent de la droite.
   private creerBarres(cote: Cote, robot: Robot): Barres {
     const aDroite = cote === "droite";
-    const x = aDroite ? LARGEUR - BARRE.marge : BARRE.marge;
+    const x = aDroite ? this.scale.width - BARRE.marge : BARRE.marge;
     const origine = aDroite ? 1 : 0;
     const fond = (y: number, hauteur: number) =>
       this.add.rectangle(x, y, BARRE.largeur, hauteur, GRIS).setOrigin(origine, 0).setRounded(hauteur / 3);
@@ -127,54 +159,182 @@ export class Tableau extends Phaser.Scene {
     this.add.text(x, SOL + 70, texte, { fontFamily: POLICE, fontSize: "14px", color: "#b4b9c8" });
   }
 
+  // ===== Les commandes au doigt =====
+
   private creerCommandes() {
-    for (const commande of COMMANDES) {
-      const { x, y, rayon } = commande;
-      const rond = this.add.circle(x, y, rayon, 0xffffff, 0.18).setStrokeStyle(3, 0xffffff, 0.7);
-      // La zone sensible est un peu plus grande que le bouton (un pouce, ça déborde).
-      // Ses coordonnées se comptent depuis le coin haut gauche du rond.
-      rond.setInteractive(new Phaser.Geom.Circle(rayon, rayon, rayon * 1.25), Phaser.Geom.Circle.Contains);
-      rond.setData("action", commande.action);
+    const largeur = this.scale.width;
+
+    // La main gauche. La zone où le pouce se pose : toute la moitié gauche, invisible.
+    this.zoneDuStick = this.add.zone(0, 0, largeur / 2, HAUTEUR).setOrigin(0).setInteractive()
+      .on("pointerdown", (doigt: Phaser.Input.Pointer) => this.poserLeStick(doigt));
+    this.baseDuStick = this.add.circle(0, 0, STICK.rayon, 0xffffff, 0.08)
+      .setStrokeStyle(3, 0xffffff, 0.35).setVisible(false);
+    this.pouce = this.add.circle(0, 0, STICK.pouce, 0xffffff, 0.3)
+      .setStrokeStyle(2, 0xffffff, 0.6).setVisible(false);
+
+    // La main droite
+    for (const bouton of BOUTONS) {
+      const x = largeur - bouton.dx;
+      const { y, rayon, action } = bouton;
+      const rond = this.add.circle(x, y, rayon, 0xffffff, 0.15).setStrokeStyle(3, 0xffffff, 0.6);
+      // La zone sensible se compte depuis le coin haut gauche du rond
+      rond.setInteractive(new Phaser.Geom.Circle(rayon, rayon, rayon * SENSIBLE), Phaser.Geom.Circle.Contains);
       // Un doigt se pose sur le bouton, ou y glisse en restant appuyé : il le tient.
-      // Il le lâche en se levant, ou en glissant hors du bouton.
-      rond.on("pointerdown", (doigt: Phaser.Input.Pointer) => this.tenir(doigt, commande.action));
+      // Il le lâche en se levant, ou en glissant hors du bouton. Le pouce du joystick, lui, ne
+      // prend jamais un bouton en passant.
+      rond.on("pointerdown", (doigt: Phaser.Input.Pointer) => this.tenir(doigt, action));
       rond.on("pointerover", (doigt: Phaser.Input.Pointer) => {
-        if (doigt.isDown) {
-          this.tenir(doigt, commande.action);
+        if (doigt.isDown && doigt.id !== this.stick?.doigt) {
+          this.tenir(doigt, action);
         }
       });
       rond.on("pointerout", (doigt: Phaser.Input.Pointer) => this.lacher(doigt));
-      this.add.text(x, y, commande.icone, {
-        fontFamily: POLICE, fontSize: Math.round(rayon * 0.75) + "px", color: "#ffffff",
-      }).setOrigin(0.5).setAlpha(0.9);
-      if (commande.action === "special") {
-        this.boutonSpecial = rond;
-      }
+      const icone = this.add.text(x, y, bouton.icone, {
+        fontFamily: POLICE, fontSize: Math.round(rayon * 0.8) + "px", color: "#ffffff",
+      }).setOrigin(0.5);
+      this.ronds.set(action, { rond, icone });
     }
-    this.input.on("pointerup", (doigt: Phaser.Input.Pointer) => this.lacher(doigt));
+
+    // Les doigts bougent et se lèvent n'importe où, même hors du jeu
+    this.input.on("pointermove", (doigt: Phaser.Input.Pointer) => {
+      if (doigt.id === this.stick?.doigt) {
+        this.bougerLeStick(doigt);
+      }
+    });
+    const lever = (doigt: Phaser.Input.Pointer) => {
+      if (doigt.id === this.stick?.doigt) {
+        this.lacherLeStick();
+      } else {
+        this.lacher(doigt);
+      }
+    };
+    this.input.on("pointerup", lever);
+    this.input.on("pointerupoutside", lever);
+    this.peindreLesBoutons();
   }
 
-  private tenir(doigt: Phaser.Input.Pointer, action: NomDeCommande) {
+  // Le pouce se pose : la base du joystick apparaît dessous
+  private poserLeStick(doigt: Phaser.Input.Pointer) {
+    if (this.stick) {
+      return;                              // un seul joystick : un autre doigt à gauche ne compte pas
+    }
+    this.stick = { doigt: doigt.id, sens: 0, sautArme: true };
+    this.baseDuStick.setPosition(doigt.x, doigt.y).setVisible(true);
+    this.pouce.setPosition(doigt.x, doigt.y).setVisible(true);
+  }
+
+  private bougerLeStick(doigt: Phaser.Input.Pointer) {
+    const stick = this.stick!;
+    const base = this.baseDuStick;
+    let dx = doigt.x - base.x;
+    let dy = doigt.y - base.y;
+    // Trop loin : la base suit le pouce. Repartir dans l'autre sens ne demande alors qu'un petit geste.
+    const distance = Math.hypot(dx, dy);
+    if (distance > STICK.rayon) {
+      const exces = 1 - STICK.rayon / distance;
+      base.x += dx * exces;
+      base.y += dy * exces;
+      dx = doigt.x - base.x;
+      dy = doigt.y - base.y;
+    }
+    this.pouce.setPosition(doigt.x, doigt.y);
+
+    stick.sens = dx < -STICK.zoneMorte ? -1 : dx > STICK.zoneMorte ? 1 : 0;
+    // Le saut est un appui, pas une touche tenue : un saut par poussée vers le haut, pas une rafale.
+    // L'appui est retenu jusqu'à la prochaine image du combat (même une poussée très brève compte).
+    if (dy < -STICK.saut && stick.sautArme) {
+      stick.sautArme = false;
+      this.combat.appuis.add("saut");
+    } else if (dy > -STICK.rearmer) {
+      stick.sautArme = true;
+    }
+    this.mettreAJourLesCommandes();
+  }
+
+  private lacherLeStick() {
+    this.stick = undefined;
+    this.baseDuStick.setVisible(false);
+    this.pouce.setVisible(false);
+    this.mettreAJourLesCommandes();
+  }
+
+  private tenir(doigt: Phaser.Input.Pointer, action: Bouton) {
     this.doigts.set(doigt.id, action);
-    this.combat.appuis.add(action);
-    this.recompterLesDoigts();
+    this.combat.appuis.add(action);        // une tape posée et levée entre deux images compte aussi
+    this.mettreAJourLesCommandes();
   }
 
   private lacher(doigt: Phaser.Input.Pointer) {
-    this.doigts.delete(doigt.id);
-    this.recompterLesDoigts();
+    if (this.doigts.delete(doigt.id)) {
+      this.mettreAJourLesCommandes();
+    }
   }
 
-  private recompterLesDoigts() {
-    const tenues = new Set(this.doigts.values());
-    for (const commande of COMMANDES) {
-      this.combat.tactile[commande.action] = tenues.has(commande.action);
+  // Ce que les doigts tiennent, pour le combat : il le lit à chaque image
+  private mettreAJourLesCommandes() {
+    const tactile = this.combat.tactile;
+    const sens = this.stick?.sens ?? 0;
+    tactile.gauche = sens < 0;
+    tactile.droite = sens > 0;
+    const tenus = new Set(this.doigts.values());
+    for (const { action } of BOUTONS) {
+      tactile[action] = tenus.has(action);
     }
-    for (const objet of this.children.list) {
-      if (objet instanceof Phaser.GameObjects.Arc && objet.getData("action")) {
-        objet.setFillStyle(0xffffff, tenues.has(objet.getData("action")) ? 0.45 : 0.18);
+    this.peindreLesBoutons();
+  }
+
+  // Un bouton tenu s'éclaire. Le coup spécial reste éteint tant que la jauge n'est pas pleine,
+  // puis il s'allume en jaune et bat comme un cœur.
+  private peindreLesBoutons() {
+    const tenus = new Set(this.doigts.values());
+    for (const [action, { rond, icone }] of this.ronds) {
+      const tenu = tenus.has(action);
+      if (action === "special" && !this.specialPret) {
+        rond.setFillStyle(0xffffff, 0.05).setStrokeStyle(3, 0xffffff, 0.25);
+        icone.setAlpha(0.3);
+      } else if (action === "special") {
+        rond.setFillStyle(JAUNE, tenu ? 0.55 : 0.3).setStrokeStyle(5, JAUNE, 1);
+        icone.setAlpha(1);
+      } else {
+        rond.setFillStyle(0xffffff, tenu ? 0.4 : 0.15).setStrokeStyle(3, 0xffffff, 0.6);
+        icone.setAlpha(0.9);
       }
     }
+  }
+
+  private allumerLeSpecial(pret: boolean) {
+    this.specialPret = pret;
+    const special = this.ronds.get("special")!;
+    this.pulsation?.stop();
+    this.pulsation = undefined;
+    special.rond.setScale(1);
+    special.icone.setScale(1);
+    if (pret) {
+      this.pulsation = this.tweens.add({
+        targets: [special.rond, special.icone],
+        scale: 1.12,
+        duration: 380,
+        yoyo: true,
+        repeat: -1,
+        ease: "Sine.InOut",
+      });
+    }
+    this.peindreLesBoutons();
+  }
+
+  // Le match est fini : l'écran de fin passe par-dessus, les commandes s'effacent
+  private rangerLesCommandes() {
+    if (!this.zoneDuStick) {
+      return;
+    }
+    this.zoneDuStick.disableInteractive();
+    this.lacherLeStick();
+    this.doigts.clear();
+    for (const { rond, icone } of this.ronds.values()) {
+      rond.disableInteractive().setVisible(false);
+      icone.setVisible(false);
+    }
+    this.mettreAJourLesCommandes();
   }
 
   // Les annonces : « Manche 2 », « Combat ! », « K.O. ! »
@@ -202,6 +362,9 @@ export class Tableau extends Phaser.Scene {
     } else {
       this.grosTexte.setAlpha(0);
       this.sousTitre.setAlpha(0);
+    }
+    if (phase === "fini") {
+      this.rangerLesCommandes();
     }
   }
 
@@ -239,9 +402,9 @@ export class Tableau extends Phaser.Scene {
       this.allumerLesCases(cote);
     }
     // Au doigt, le bouton du coup spécial s'allume quand la jauge est pleine
-    if (this.boutonSpecial) {
-      const pret = this.combat.gauche.jauge >= JAUGE;
-      this.boutonSpecial.setStrokeStyle(pret ? 6 : 3, pret ? JAUNE : 0xffffff, pret ? 1 : 0.4);
+    const pret = this.combat.gauche.jauge >= JAUGE;
+    if (this.ronds.has("special") && pret !== this.specialPret) {
+      this.allumerLeSpecial(pret);
     }
   }
 

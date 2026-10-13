@@ -3,26 +3,28 @@
 
 import Phaser from "phaser";
 import { FOND, COULEUR_SOL, SOL, ORANGE, PROFONDEUR } from "./reglages";
-import { LARGEUR, HAUTEUR, POLICE } from "../../socle/style";
+import { HAUTEUR, POLICE } from "../../socle/style";
 import { surTouche } from "../../socle/clavier";
 
 export const enCouleur = (couleur: number) => "#" + couleur.toString(16).padStart(6, "0");
 
-// L'arène : un mur du fond, deux projecteurs, et le sol
+// L'arène : un mur du fond, deux projecteurs, et le sol. Toute la largeur du jeu : au doigt, elle
+// peut dépasser 960 (voir socle/largeur.ts).
 export function dessinerArene(scene: Phaser.Scene) {
+  const largeur = scene.scale.width;
   scene.cameras.main.setBackgroundColor(FOND);
   const g = scene.add.graphics().setDepth(PROFONDEUR.decor);
   // Des bandes un peu plus claires sur le mur du fond
-  for (let x = 0; x < LARGEUR; x += 120) {
+  for (let x = 0; x < largeur; x += 120) {
     g.fillStyle(0xffffff, 0.025).fillRect(x, 0, 60, SOL);
   }
   // Les projecteurs : des triangles de lumière, presque transparents
   g.fillStyle(0xfff3c4, 0.05);
-  g.fillTriangle(LARGEUR * 0.25, -10, LARGEUR * 0.05, SOL, LARGEUR * 0.45, SOL);
-  g.fillTriangle(LARGEUR * 0.75, -10, LARGEUR * 0.55, SOL, LARGEUR * 0.95, SOL);
+  g.fillTriangle(largeur * 0.25, -10, largeur * 0.05, SOL, largeur * 0.45, SOL);
+  g.fillTriangle(largeur * 0.75, -10, largeur * 0.55, SOL, largeur * 0.95, SOL);
   // Le sol, et son bord éclairé
-  g.fillStyle(COULEUR_SOL).fillRect(0, SOL, LARGEUR, HAUTEUR - SOL);
-  g.fillStyle(0x6a708a).fillRect(0, SOL, LARGEUR, 4);
+  g.fillStyle(COULEUR_SOL).fillRect(0, SOL, largeur, HAUTEUR - SOL);
+  g.fillStyle(0x6a708a).fillRect(0, SOL, largeur, 4);
   return g;
 }
 

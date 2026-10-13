@@ -34,10 +34,19 @@ export async function appuyer(page: Page, touche: string) {
   await page.waitForTimeout(80);
 }
 
-// Un point du jeu (960 × 540) en pixels de la page : le canvas est agrandi et centré
+// La taille du jeu : 960 × 540, ou plus large quand un jeu s'élargit au doigt (socle/largeur.ts)
+export function tailleDuJeu(page: Page): Promise<{ largeur: number; hauteur: number }> {
+  return page.evaluate(() => {
+    const scale = (window as any).jeu.scale;
+    return { largeur: scale.width as number, hauteur: scale.height as number };
+  });
+}
+
+// Un point du jeu en pixels de la page : le canvas est agrandi et centré
 export async function versLaPage(page: Page, x: number, y: number) {
   const cadre = (await page.locator("canvas").boundingBox())!;
-  return { x: cadre.x + x * cadre.width / 960, y: cadre.y + y * cadre.height / 540 };
+  const { largeur, hauteur } = await tailleDuJeu(page);
+  return { x: cadre.x + x * cadre.width / largeur, y: cadre.y + y * cadre.height / hauteur };
 }
 
 export async function toucher(page: Page, x: number, y: number) {

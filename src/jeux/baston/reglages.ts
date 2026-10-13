@@ -3,13 +3,12 @@
 // L'atelier comptait en « tours de boucle » (60 par seconde) : 5 pixels par tour, 20 tours d'attaque...
 // Phaser compte en secondes et en pixels par seconde. Chaque valeur garde son origine en commentaire.
 
-import { LARGEUR } from "../../socle/style";
-
 const TOUR = 1 / 60;                       // un tour de boucle de l'atelier, en secondes
 
 // L'arène
 export const SOL = 430;                    // le haut du sol : les pieds des robots s'y posent
-export const DEPART = 225;                 // chaque robot démarre à cette distance du milieu (450 pixels entre eux)
+export const DEPART = 225;                 // chaque robot démarre à cette distance du milieu (450 pixels entre eux),
+                                           // quelle que soit la largeur de l'arène (plus large au doigt)
 
 // Le robot (les valeurs du « classique » ; les autres modèles changent vitesse, saut et dégâts)
 export const ECHELLE = 2;                  // les cases de la planche sont dessinées en petit (56 × 32)
@@ -76,8 +75,6 @@ export const FOND = 0x282d3c;
 export const COULEUR_SOL = 0x464b5f;
 export const GRIS = 0x3c4155;              // les fonds de barres et les cases éteintes
 export const JAUNE = 0xfadc5a;
-
-export const MILIEU = LARGEUR / 2;
 
 // Le début du nom des sauvegardes
 export const SAUVEGARDE = "baston";

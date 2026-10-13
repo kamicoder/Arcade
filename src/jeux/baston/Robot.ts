@@ -15,7 +15,6 @@ import {
   SOL, ECHELLE, CORPS, VIE, JAUGE, TIRS, DUREE, ELAN, ACTIF, POING, RECUL, RECUL_FREIN,
   JAUGE_POING, JAUGE_TIR, JAUGE_ENCAISSE, PROFONDEUR,
 } from "./reglages";
-import { LARGEUR } from "../../socle/style";
 
 export type Etat = "repos" | "marche" | "saut" | "attaque" | "tir" | "special" | "touche" | "ko";
 
@@ -141,9 +140,10 @@ export class Robot extends Phaser.Physics.Arcade.Sprite implements VueDeRobot {
       this.recul = 0;                      // moins d'un pixel par tour : il s'arrête
     }
 
-    // Un tir sorti de l'arène disparaît
+    // Un tir sorti de l'arène (les bords du monde de la physique) disparaît
+    const arene = this.scene.physics.world.bounds;
     for (const tir of this.listeDesTirs.slice()) {
-      if (tir.x + tir.width / 2 < 0 || tir.x - tir.width / 2 > LARGEUR) {
+      if (tir.x + tir.width / 2 < arene.left || tir.x - tir.width / 2 > arene.right) {
         tir.destroy();
       }
     }

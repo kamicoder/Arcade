@@ -29,7 +29,7 @@ Les téléphones récupèrent la nouvelle version tout seuls, au retour dans le 
 | `src/main.ts` | Le jeu Phaser : taille, mise à l'échelle, entrées, scènes de départ |
 | `src/scenes/` | Les scènes de l'Arcade : `Demarrage`, puis le `Hub` (le menu des jeux) |
 | `src/jeux/catalogue.ts` | La liste des jeux ; chacun vit dans `src/jeux/<cle>/` et n'est chargé qu'à son lancement |
-| `src/socle/` | Ce que tous les jeux partagent : style, clavier, transitions, sauvegardes, tactile, mise à jour |
+| `src/socle/` | Ce que tous les jeux partagent : style, clavier, transitions, sauvegardes, tactile, largeur, mise à jour |
 | `src/jeux/voiture/` | La course de voitures : circuits, voiture, et ses scènes (menu, course, tableau de bord, arrivée) |
 | `tests/` | Les tests Playwright ; un test raté garde sa trace : `npx playwright show-trace <chemin>` |
 | `public/` | Copié tel quel : icônes, sons |
