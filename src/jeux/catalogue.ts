@@ -25,7 +25,10 @@ export const CATALOGUE: FicheDeJeu[] = [
     charger: () => import("./voiture").then((module) => module.default),
   },
   { cle: "licorne", titre: "Course des licornes", emoji: "🦄", couleur: 0xff8fd0 },
-  { cle: "demineur", titre: "Démineur", emoji: "💣", couleur: 0x4fb3ff },
+  {
+    cle: "demineur", titre: "Démineur", emoji: "💣", couleur: 0x4fb3ff,
+    charger: () => import("./demineur").then((module) => module.default),
+  },
   { cle: "baston", titre: "Baston de robots", emoji: "🤖", couleur: 0xff9f2e },
   { cle: "platformer", titre: "Platformer", emoji: "🍄", couleur: 0x5fd068 },
 ];

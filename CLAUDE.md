@@ -71,4 +71,4 @@ pour que les records d'avant suivent. Un défaut de jeu trouvé ici existe peut-
 le signaler à l'utilisateur.
 
 Avancement : Hub et course de voitures complète (contre la montre, contre l'ordinateur, Grand Prix, à
-deux en écran partagé, éditeur de circuit). En cours : Licorne, démineur, baston de robots, platformer.
+deux en écran partagé, éditeur de circuit). Démineur fait. En cours : Licorne, baston de robots, platformer.
