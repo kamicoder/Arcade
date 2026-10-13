@@ -63,6 +63,8 @@ Un nouveau jeu ou un nouveau mode vient avec ses tests dans `tests/`. Dans un te
   chargement du jeu.
 - `lire` / `ecrire` (sauvegardes protégées), `estTactile()`, `quandNouvelleVersion` (mise à jour au
   Hub seulement, jamais en pleine partie).
+- `correctifs.ts` : les défauts de Phaser réparés en attendant une version qui les corrige, branchés
+  dans `main.ts`. Chacun dit comment savoir s'il sert encore : à relire à chaque mise à jour de Phaser.
 
 ## Ajouter un jeu
 
@@ -114,6 +116,10 @@ Les tests sont dans `tests/course.spec.ts` ; les premiers jouent la même course
 
 ## Pièges de Phaser 4 déjà rencontrés
 
+- **Ce qui marche sur l'ordinateur peut casser sur un téléphone** : des sommets NaN (un segment de
+  contour de longueur nulle, dans Phaser 4.2.1) sont ignorés par une carte graphique d'ordinateur, mais
+  dessinés en traits vers le coin de l'écran sur un Pixel 7. Corrigé dans `socle/correctifs.ts`, et
+  surveillé par un test du Hub qui compte les sommets NaN.
 - La teinte « pleine » : `setTint(c).setTintMode(Phaser.TintModes.FILL)` (plus de `setTintFill`).
 - Une `RenderTexture` n'affiche ses tampons qu'après `render()`.
 - `Graphics.strokePoints` / `fillPoints` veulent des `Phaser.Math.Vector2` (les types refusent `{ x, y }`).

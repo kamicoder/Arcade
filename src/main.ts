@@ -6,6 +6,7 @@ import { Demarrage } from "./scenes/Demarrage";
 import { Hub } from "./scenes/Hub";
 import { LARGEUR, HAUTEUR, COULEURS } from "./socle/style";
 import { demarrerMiseAJour } from "./socle/miseAJour";
+import { corrigerLesSegmentsNuls } from "./socle/correctifs";
 
 const jeu = new Phaser.Game({
   type: Phaser.AUTO,                       // WebGL si possible, sinon canvas 2D
@@ -24,6 +25,9 @@ const jeu = new Phaser.Game({
   // Les scènes connues dès le départ ; la première de la liste démarre toute seule
   scene: [Demarrage, Hub],
 });
+
+// Le moteur de rendu n'existe qu'une fois le jeu prêt, avant sa première image
+jeu.events.once(Phaser.Core.Events.READY, () => corrigerLesSegmentsNuls(jeu));
 
 demarrerMiseAJour();
 
