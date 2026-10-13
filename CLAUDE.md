@@ -61,6 +61,9 @@ jeu (`voiture-course`). L'ordre de `scenes` est l'ordre d'affichage : une scène
 - Les sons ne sont pas des objets de la scène : les détruire à son `SHUTDOWN`. Idem pour les écouteurs
   posés sur une **autre** scène.
 - Les corps Arcade ne tournent pas : un rond (`setCircle`) pour ce qui tourne.
+- Dans `update()`, `sprite.x` a **un pas de physique de retard** : Phaser avance le corps avant `update()`
+  et ne recopie sa place sur l'image qu'après. Pour une décision qui dépend de la place exacte (une
+  barrière, une collision faite à la main), lire `body.center`. Une voiture restait coincée contre les pneus.
 
 ## D'où viennent les jeux
 

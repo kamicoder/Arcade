@@ -256,10 +256,14 @@ export class Voiture extends Phaser.Physics.Arcade.Sprite {
   // le plus proche, et un tour tombe pile sur la ligne.
   private suivreLaTrace() {
     const c = this.piste.circuit;
-    const i = plusProche(c, this.x, this.y, this.indice);
+    // Le corps, pas l'image : dans update(), Phaser a déjà avancé le corps de ce pas de physique, mais
+    // n'a pas encore recopié sa place sur l'image (this.x a un pas de retard). Avec this.x, une voiture
+    // qui recule loin des pneus serait vue encore contre eux, et remise contre eux à chaque image.
+    const ici = this.body.center;
+    const i = plusProche(c, ici.x, ici.y, this.indice);
     const p = c.trace[i];
-    const dx = this.x - p.x;
-    const dy = this.y - p.y;
+    const dx = ici.x - p.x;
+    const dy = ici.y - p.y;
     const loin = Math.hypot(dx, dy);
     const bord = LIMITE - RAYON;           // son corps s'arrête contre les pneus
     if (loin > bord) {

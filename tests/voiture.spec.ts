@@ -88,6 +88,40 @@ test("contre la montre : le record est gardé, et le fantôme apparaît", async 
   sansErreur();
 });
 
+test("le nez contre les pneus, la marche arrière fait repartir", async ({ page }) => {
+  const { sansErreur } = await menuVoiture(page);
+  await appuyer(page, "Enter");
+  await attendreScene(page, "voiture-course");
+  await page.waitForFunction(() => (window as any).jeu.scene.getScene("voiture-course").enCourse);
+
+  // La voiture dans l'herbe, tournée vers les pneus ; elle fonce dedans
+  await page.evaluate(() => {
+    const c = (window as any).jeu.scene.getScene("voiture-course");
+    const v = c.joueur;
+    const t = c.circuit.trace[200];
+    const cote = { x: -Math.sin(t.angle), y: Math.cos(t.angle) };
+    v.body.reset(t.x + cote.x * 110, t.y + cote.y * 110);
+    v.setRotation(Math.atan2(cote.y, cote.x));
+    v.indice = 200;
+  });
+  const ecart = () => page.evaluate(() => {
+    const c = (window as any).jeu.scene.getScene("voiture-course");
+    const v = c.joueur;
+    const t = c.circuit.trace[v.indice];
+    return Math.hypot(v.x - t.x, v.y - t.y);
+  });
+  await page.keyboard.down("ArrowUp");
+  await page.waitForTimeout(1000);
+  await page.keyboard.up("ArrowUp");
+  expect(await ecart()).toBeGreaterThan(125);   // contre les pneus
+
+  await page.keyboard.down("ArrowDown");
+  await page.waitForTimeout(800);
+  await page.keyboard.up("ArrowDown");
+  expect(await ecart()).toBeLessThan(100);      // repartie vers la route
+  sansErreur();
+});
+
 test("dans l'herbe aussi, le tour compte pile sur la ligne", async ({ page }) => {
   const { sansErreur } = await menuVoiture(page);
   await appuyer(page, "Enter");
