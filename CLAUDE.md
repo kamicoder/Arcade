@@ -22,6 +22,15 @@ pour choisir, et chaque jeu chargé seulement quand on le lance. Publié sur Git
   le site et tous les téléphones.
 - Les dernières versions des paquets npm sont les bienvenues.
 
+## Git
+
+- Une histoire **linéaire**, sans commit de fusion : un commit par changement qui a un sens (un jeu, un
+  mode, une correction), messages en français. Ce qui accompagne le changement (tests, `CLAUDE.md`,
+  une retouche) va **dans le même commit**, pas dans une suite de petits commits.
+- Le travail d'un agent dans une autre copie (worktree) s'intègre en le rejouant sur `main`
+  (`git rebase --onto main <sa base> <sa branche>`), écrasé en un commit, après relecture et tests.
+- Ne réécrire que ce qui n'est pas encore publié : un push sur `main` met le site à jour.
+
 ## Vérifier
 
 ```sh
