@@ -49,3 +49,30 @@ test("les contours ne donnent jamais de sommets NaN (traits fantômes sur télé
   expect(nan).toBe(0);
   sansErreur();
 });
+
+// Phaser 4.2.1 rognait le haut des emojis sur Android (le 🍄 du Platformer) : un texte avec des emojis
+// mesure maintenant sa hauteur avec eux (voir socle/correctifs.ts)
+test("les emojis des cartes sont mesurés avec leur texte, pour ne pas être coupés", async ({ page }) => {
+  const { sansErreur } = await ouvrir(page);
+  const mesures = await page.evaluate(() => {
+    const hub = (window as any).jeu.scene.getScene("Hub");
+    return hub.cartes.map((carte: any) => {
+      const emoji = carte.boite.list.find((objet: any) => objet.text === carte.fiche.emoji);
+      return { emoji: carte.fiche.emoji, reference: emoji.style.testString, hauteur: emoji.height };
+    });
+  });
+  for (const { emoji, reference, hauteur } of mesures) {
+    expect(reference).toContain([...emoji][0]);
+    expect(hauteur).toBeGreaterThan(0);
+  }
+  // Un texte sans emoji garde la référence de Phaser, sans rien de plus
+  const references = await page.evaluate(() => {
+    const carte = (window as any).jeu.scene.getScene("Hub").cartes[0];
+    const titre = carte.boite.list.find((objet: any) => objet.text === "Course de voitures");
+    const emoji = carte.boite.list.find((objet: any) => objet.text === carte.fiche.emoji);
+    return { titre: titre.style.testString as string, emoji: emoji.style.testString as string };
+  });
+  expect(references.emoji.startsWith(references.titre)).toBe(true);
+  expect(references.emoji.length).toBeGreaterThan(references.titre.length);
+  sansErreur();
+});

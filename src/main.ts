@@ -6,7 +6,10 @@ import { Demarrage } from "./scenes/Demarrage";
 import { Hub } from "./scenes/Hub";
 import { LARGEUR, HAUTEUR, COULEURS } from "./socle/style";
 import { demarrerMiseAJour } from "./socle/miseAJour";
-import { corrigerLesSegmentsNuls } from "./socle/correctifs";
+import { corrigerLesSegmentsNuls, corrigerLesEmojisCoupes } from "./socle/correctifs";
+
+// Avant de créer le moindre texte
+corrigerLesEmojisCoupes();
 
 const jeu = new Phaser.Game({
   type: Phaser.AUTO,                       // WebGL si possible, sinon canvas 2D

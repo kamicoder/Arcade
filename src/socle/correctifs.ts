@@ -35,3 +35,39 @@ export function corrigerLesSegmentsNuls(jeu: Phaser.Game) {
     tracer(contexte, matrice, ax, ay, bx, by, ...reste);
   };
 }
+
+// Phaser 4.2.1 : sur un téléphone Android, le haut des emojis est coupé (le 🍄 de la carte du Platformer).
+//
+// Phaser mesure la hauteur d'un texte en dessinant une chaîne de référence, testString (« |MÉqgy »,
+// d'ailleurs mal encodée dans Phaser : « |MÃ‰qgy »), et rogne ce qui dépasse. Les emojis d'Android
+// (police Noto Color Emoji) montent plus haut que ces lettres ; ceux de Windows, non : sur l'ordinateur,
+// rien ne se voyait.
+//
+// Le correctif : un texte qui contient des emojis les ajoute à sa chaîne de référence d'origine. Sa
+// hauteur est mesurée avec eux ; les textes sans emoji ne sont pas touchés. Il sert tant que les emojis
+// ne sont pas dans la testString par défaut de TextStyle.js.
+const EMOJIS = /\p{Extended_Pictographic}/gu;
+const ORIGINE = Symbol("la chaîne de référence d'origine");
+
+export function corrigerLesEmojisCoupes() {
+  const prototype = Phaser.GameObjects.Text.prototype as unknown as {
+    setText(valeur: string | string[]): Phaser.GameObjects.Text;
+  };
+  const changerLeTexte = prototype.setText;
+  prototype.setText = function (this: Phaser.GameObjects.Text, valeur: string | string[]) {
+    const resultat = changerLeTexte.call(this, valeur);
+    const style = this.style as Phaser.GameObjects.TextStyle & { [ORIGINE]?: string };
+    if (!style) {
+      return resultat;
+    }
+    const texte = Array.isArray(valeur) ? valeur.join(" ") : String(valeur ?? "");
+    const emojis = [...new Set(texte.match(EMOJIS) ?? [])].join("");
+    const origine = style[ORIGINE] ?? style.testString;
+    const voulue = origine + emojis;
+    if (style.testString !== voulue) {
+      style[ORIGINE] = origine;
+      style.setTestString(voulue);
+    }
+    return resultat;
+  };
+}
