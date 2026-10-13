@@ -24,7 +24,10 @@ export const CATALOGUE: FicheDeJeu[] = [
     cle: "voiture", titre: "Course de voitures", emoji: "🏎️", couleur: 0xe8453c,
     charger: () => import("./voiture").then((module) => module.default),
   },
-  { cle: "licorne", titre: "Course des licornes", emoji: "🦄", couleur: 0xff8fd0 },
+  {
+    cle: "licorne", titre: "Course des licornes", emoji: "🦄", couleur: 0xff8fd0,
+    charger: () => import("./licorne").then((module) => module.default),
+  },
   {
     cle: "demineur", titre: "Démineur", emoji: "💣", couleur: 0x4fb3ff,
     charger: () => import("./demineur").then((module) => module.default),
