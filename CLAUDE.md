@@ -87,6 +87,17 @@ jeu (`voiture-course`). L'ordre de `scenes` est l'ordre d'affichage : une scène
   change de forme : pour les distinguer, comparer `gameSize.width` à la largeur d'avant (4e argument).
 - `scene.restart` garde le `timeScale` et la pause de la physique, de l'horloge et des tweens : les remettre
   dans `create`. Et pour la physique, le ralenti est à l'envers : `world.timeScale = 3` ralentit.
+- `physics.add.group()` remet à zéro la vitesse et la gravité de chaque objet qu'on y ajoute : pour des
+  objets déjà réglés, un groupe simple (`add.group()`).
+- Avec plusieurs pas de physique par image, un `overlap` peut revenir au pas suivant même après
+  `body.enable = false` : protéger ce qui ne doit compter qu'une fois (une pièce, un ennemi écrasé).
+- Plusieurs caméras (écran partagé, éditeur) : chaque objet doit être ignoré par les caméras qui ne
+  doivent pas le montrer (`camera.ignore`), sinon il s'affiche et répond aux clics deux fois. Et
+  `fonduPuis` n'assombrit que la caméra principale.
+- Une scène en pause n'entend plus le clavier : une touche lâchée pendant la pause reste « tenue ».
+- Retirer une texture encore affichée casse l'affichage. Une `TileSprite` dont la texture se répète
+  « bave » d'un bord sur l'autre : une marge transparente règle le problème.
+- `document.fonts.check(...)` répond vrai pour une police inconnue : chercher dans `document.fonts`.
 
 ## D'où viennent les jeux
 
@@ -96,5 +107,8 @@ Même origine que l'Arcade : garder les mêmes noms de sauvegarde (`course-de-pi
 pour que les records d'avant suivent. Un défaut de jeu trouvé ici existe peut-être aussi là-bas :
 le signaler à l'utilisateur.
 
-Avancement : Hub et course de voitures complète (contre la montre, contre l'ordinateur, Grand Prix, à
-deux en écran partagé, éditeur de circuit). Démineur et baston de robots faits. En cours : Licorne, platformer.
+Avancement : les cinq jeux sont là (course de voitures, course des licornes, démineur, baston de
+robots, platformer), chacun avec ses modes, le doigt, le clavier et la manette. Pistes ouvertes : un
+moteur de course commun à la voiture et à la licorne (aujourd'hui écrits deux fois), le joueur 2 du
+platformer sur `TouchesPhysiques`, et les petits outils de socle que les agents ont réclamés (saisie de
+texte, couleurs, fondu de toutes les caméras, menus à boutons).

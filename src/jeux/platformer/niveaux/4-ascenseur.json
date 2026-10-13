@@ -1,0 +1,25 @@
+{
+  "nom": "Ascenseur",
+  "largeur": 1800,
+  "elements": [
+    {"sorte": "plateforme", "x": 0, "y": 440, "w": 400, "h": 40, "genre": "normale", "force": 2, "sens": 1},
+    {"sorte": "plateforme", "x": 520, "y": 440, "w": 420, "h": 40, "genre": "normale", "force": 2, "sens": 1},
+    {"sorte": "plateforme", "x": 1060, "y": 440, "w": 740, "h": 40, "genre": "normale", "force": 2, "sens": 1},
+    {"sorte": "plateforme", "x": 250, "y": 350, "w": 110, "h": 20, "genre": "normale", "force": 2, "sens": 1},
+    {"sorte": "plateforme", "x": 820, "y": 280, "w": 110, "h": 20, "genre": "normale", "force": 2, "sens": 1},
+    {"sorte": "plateforme", "x": 1120, "y": 340, "w": 120, "h": 20, "genre": "normale", "force": 2, "sens": 1},
+    {"sorte": "plateforme", "x": 1350, "y": 290, "w": 120, "h": 20, "genre": "normale", "force": 2, "sens": 1},
+    {"sorte": "plateforme", "x": 1600, "y": 250, "w": 150, "h": 20, "genre": "normale", "force": 2, "sens": 1},
+    {"sorte": "mobile", "x": 600, "y": 330, "w": 110, "h": 20, "axe": "y", "dist": 110, "v": 2},
+    {"sorte": "piece", "x": 290, "y": 320},
+    {"sorte": "piece", "x": 640, "y": 300},
+    {"sorte": "piece", "x": 860, "y": 250},
+    {"sorte": "piece", "x": 1160, "y": 310},
+    {"sorte": "piece", "x": 1390, "y": 260},
+    {"sorte": "piece", "x": 1650, "y": 220},
+    {"sorte": "ennemi", "type": "marcheur", "x": 1150, "y": 410, "xmin": 1060, "xmax": 1400},
+    {"sorte": "ennemi", "type": "volant", "x": 900, "y": 240, "xmin": 820, "xmax": 1050, "ymin": 180, "ymax": 330},
+    {"sorte": "drapeau", "x": 1720, "y": 210},
+    {"sorte": "depart", "x": 60, "y": 380}
+  ]
+}

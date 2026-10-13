@@ -1,0 +1,19 @@
+{
+  "nom": "Premiers pas",
+  "largeur": 1200,
+  "elements": [
+    {"sorte": "plateforme", "x": 0, "y": 440, "w": 1200, "h": 40, "genre": "normale", "force": 2, "sens": 1},
+    {"sorte": "plateforme", "x": 200, "y": 350, "w": 120, "h": 20, "genre": "normale", "force": 2, "sens": 1},
+    {"sorte": "plateforme", "x": 430, "y": 320, "w": 120, "h": 20, "genre": "normale", "force": 2, "sens": 1},
+    {"sorte": "plateforme", "x": 700, "y": 340, "w": 120, "h": 20, "genre": "normale", "force": 2, "sens": 1},
+    {"sorte": "plateforme", "x": 950, "y": 300, "w": 120, "h": 20, "genre": "normale", "force": 2, "sens": 1},
+    {"sorte": "piece", "x": 250, "y": 320},
+    {"sorte": "piece", "x": 470, "y": 290},
+    {"sorte": "piece", "x": 740, "y": 310},
+    {"sorte": "piece", "x": 990, "y": 270},
+    {"sorte": "piece", "x": 600, "y": 410},
+    {"sorte": "ennemi", "type": "marcheur", "x": 550, "y": 410, "xmin": 450, "xmax": 820},
+    {"sorte": "drapeau", "x": 1140, "y": 400},
+    {"sorte": "depart", "x": 60, "y": 380}
+  ]
+}

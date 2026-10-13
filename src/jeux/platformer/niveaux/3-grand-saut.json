@@ -1,0 +1,27 @@
+{
+  "nom": "Grand saut",
+  "largeur": 2000,
+  "elements": [
+    {"sorte": "plateforme", "x": 0, "y": 440, "w": 360, "h": 40, "genre": "normale", "force": 2, "sens": 1},
+    {"sorte": "plateforme", "x": 480, "y": 440, "w": 300, "h": 40, "genre": "normale", "force": 2, "sens": 1},
+    {"sorte": "plateforme", "x": 900, "y": 440, "w": 1100, "h": 40, "genre": "normale", "force": 2, "sens": 1},
+    {"sorte": "plateforme", "x": 200, "y": 350, "w": 110, "h": 20, "genre": "normale", "force": 2, "sens": 1},
+    {"sorte": "plateforme", "x": 520, "y": 360, "w": 110, "h": 20, "genre": "normale", "force": 2, "sens": 1},
+    {"sorte": "plateforme", "x": 700, "y": 300, "w": 110, "h": 20, "genre": "normale", "force": 2, "sens": 1},
+    {"sorte": "plateforme", "x": 1000, "y": 340, "w": 120, "h": 20, "genre": "normale", "force": 2, "sens": 1},
+    {"sorte": "plateforme", "x": 1250, "y": 290, "w": 120, "h": 20, "genre": "normale", "force": 2, "sens": 1},
+    {"sorte": "plateforme", "x": 1500, "y": 330, "w": 120, "h": 20, "genre": "normale", "force": 2, "sens": 1},
+    {"sorte": "plateforme", "x": 1750, "y": 270, "w": 160, "h": 20, "genre": "normale", "force": 2, "sens": 1},
+    {"sorte": "piece", "x": 230, "y": 320},
+    {"sorte": "piece", "x": 550, "y": 330},
+    {"sorte": "piece", "x": 730, "y": 270},
+    {"sorte": "piece", "x": 1040, "y": 310},
+    {"sorte": "piece", "x": 1290, "y": 260},
+    {"sorte": "piece", "x": 1540, "y": 300},
+    {"sorte": "piece", "x": 1800, "y": 240},
+    {"sorte": "ennemi", "type": "marcheur", "x": 1000, "y": 410, "xmin": 900, "xmax": 1200},
+    {"sorte": "ennemi", "type": "volant", "x": 620, "y": 250, "xmin": 500, "xmax": 800, "ymin": 180, "ymax": 330},
+    {"sorte": "drapeau", "x": 1880, "y": 230},
+    {"sorte": "depart", "x": 60, "y": 380}
+  ]
+}

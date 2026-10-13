@@ -1,0 +1,24 @@
+{
+  "nom": "Plateforme mobile",
+  "largeur": 1600,
+  "elements": [
+    {"sorte": "plateforme", "x": 0, "y": 440, "w": 520, "h": 40, "genre": "normale", "force": 2, "sens": 1},
+    {"sorte": "plateforme", "x": 620, "y": 440, "w": 980, "h": 40, "genre": "normale", "force": 2, "sens": 1},
+    {"sorte": "plateforme", "x": 200, "y": 350, "w": 120, "h": 20, "genre": "normale", "force": 2, "sens": 1},
+    {"sorte": "plateforme", "x": 700, "y": 330, "w": 120, "h": 20, "genre": "normale", "force": 2, "sens": 1},
+    {"sorte": "plateforme", "x": 920, "y": 270, "w": 120, "h": 20, "genre": "normale", "force": 2, "sens": 1},
+    {"sorte": "plateforme", "x": 1180, "y": 320, "w": 120, "h": 20, "genre": "normale", "force": 2, "sens": 1},
+    {"sorte": "plateforme", "x": 1380, "y": 260, "w": 150, "h": 20, "genre": "normale", "force": 2, "sens": 1},
+    {"sorte": "mobile", "x": 360, "y": 300, "w": 110, "h": 20, "axe": "x", "dist": 140, "v": 2},
+    {"sorte": "piece", "x": 230, "y": 320},
+    {"sorte": "piece", "x": 390, "y": 250},
+    {"sorte": "piece", "x": 740, "y": 300},
+    {"sorte": "piece", "x": 960, "y": 240},
+    {"sorte": "piece", "x": 1220, "y": 290},
+    {"sorte": "piece", "x": 1420, "y": 230},
+    {"sorte": "ennemi", "type": "marcheur", "x": 720, "y": 410, "xmin": 630, "xmax": 980},
+    {"sorte": "ennemi", "type": "marcheur", "x": 1210, "y": 290, "xmin": 1180, "xmax": 1300},
+    {"sorte": "drapeau", "x": 1500, "y": 220},
+    {"sorte": "depart", "x": 60, "y": 380}
+  ]
+}

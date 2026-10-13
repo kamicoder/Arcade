@@ -1,0 +1,13 @@
+{
+  "nom": "Le boss",
+  "largeur": 1400,
+  "elements": [
+    {"sorte": "plateforme", "x": 0, "y": 440, "w": 1400, "h": 40, "genre": "normale", "force": 2, "sens": 1},
+    {"sorte": "plateforme", "x": 150, "y": 340, "w": 120, "h": 20, "genre": "normale", "force": 2, "sens": 1},
+    {"sorte": "plateforme", "x": 1130, "y": 340, "w": 120, "h": 20, "genre": "normale", "force": 2, "sens": 1},
+    {"sorte": "piece", "x": 200, "y": 310},
+    {"sorte": "piece", "x": 1180, "y": 310},
+    {"sorte": "boss", "x": 640, "y": 376, "xmin": 300, "xmax": 1100, "hp": 3},
+    {"sorte": "depart", "x": 60, "y": 380}
+  ]
+}

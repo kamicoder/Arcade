@@ -1,0 +1,21 @@
+{
+  "largeur": 30,
+  "hauteur": 40,
+  "animations": [
+    {
+      "nom": "attente",
+      "images": 2,
+      "vitesse": 2
+    },
+    {
+      "nom": "marche",
+      "images": 4,
+      "vitesse": 8
+    },
+    {
+      "nom": "saut",
+      "images": 1,
+      "vitesse": 8
+    }
+  ]
+}

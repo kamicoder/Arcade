@@ -36,5 +36,8 @@ export const CATALOGUE: FicheDeJeu[] = [
     cle: "baston", titre: "Baston de robots", emoji: "🤖", couleur: 0xff9f2e,
     charger: () => import("./baston").then((module) => module.default),
   },
-  { cle: "platformer", titre: "Platformer", emoji: "🍄", couleur: 0x5fd068 },
+  {
+    cle: "platformer", titre: "Platformer", emoji: "🍄", couleur: 0x5fd068,
+    charger: () => import("./platformer").then((module) => module.default),
+  },
 ];
