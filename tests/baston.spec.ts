@@ -117,8 +117,9 @@ test("le tir, puis le coup spécial quand la jauge est pleine", async ({ page })
   await placer(page, 200, 600);
 
   await appuyer(page, "g");
+  // L'appui est vu à la prochaine image : quand tous les tests tournent ensemble, elle peut tarder
+  await page.waitForFunction(() => (window as any).jeu.scene.getScene("baston-combat").gauche.etat === "tir");
   let etat = await combat(page);
-  expect(etat.gauche.etat).toBe("tir");
   expect(etat.gauche.tirs).toBe(1);
   // Il file jusqu'à l'orange, le touche, et disparaît
   await page.waitForFunction(() => (window as any).jeu.scene.getScene("baston-combat").droite.vie < 100);
@@ -133,8 +134,8 @@ test("le tir, puis le coup spécial quand la jauge est pleine", async ({ page })
     (window as any).jeu.scene.getScene("baston-combat").gauche.jauge = 100;
   });
   await appuyer(page, "g");
+  await page.waitForFunction(() => (window as any).jeu.scene.getScene("baston-combat").gauche.etat === "special");
   etat = await combat(page);
-  expect(etat.gauche.etat).toBe("special");
   expect(etat.gauche.jauge).toBe(0);
   await page.waitForFunction(() => (window as any).jeu.scene.getScene("baston-combat").droite.vie < 94);
   expect((await combat(page)).droite.vie).toBe(94 - 25);

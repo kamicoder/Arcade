@@ -9,6 +9,9 @@ const port = Number(process.env.PORT_TESTS ?? 5174);
 
 export default defineConfig({
   testDir: "tests",
+  // Les tests d'un même fichier se répartissent aussi entre les navigateurs : sans ça, un fichier joue
+  // ses tests à la suite, et toute la suite attend le plus long (la course)
+  fullyParallel: true,
   timeout: 60_000,
   reporter: [["list"], ["html", { open: "never" }]],
   use: {

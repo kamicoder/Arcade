@@ -42,7 +42,9 @@ npm run build
 Les tests lisent l'état du jeu à travers `window.jeu`, qui n'existe qu'en développement (`main.ts`).
 Un nouveau jeu ou un nouveau mode vient avec ses tests dans `tests/`. Dans un test, passer par
 `appuyer()` (de `tests/outils.ts`) plutôt que `keyboard.press` enchaînés, et pour ouvrir un jeu au doigt,
-`toucherLaCarte(page, cle)` (les cartes du Hub changent de place quand un jeu arrive).
+`toucherLaCarte(page, cle)` (les cartes du Hub changent de place quand un jeu arrive). Les tests tournent
+en parallèle un par un (`fullyParallel`) : après une action, attendre l'état voulu (`waitForFunction`)
+plutôt que le lire tout de suite, une image peut tarder quand dix navigateurs jouent en même temps.
 
 ## Le socle (`src/socle/`) : à utiliser plutôt que les appels Phaser directs
 
