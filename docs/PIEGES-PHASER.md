@@ -24,6 +24,20 @@ bugs de Phaser : c'est sa façon de faire, logique une fois qu'on la connaît, m
   `body.enable = false` : protéger ce qui ne doit compter qu'une fois (une pièce, un ennemi écrasé).
 - Pour le ralenti, `world.timeScale` est à l'envers : `world.timeScale = 3` ralentit.
 
+**La physique Matter** (la catapulte)
+
+- Changer l'échelle d'une image Matter (`setScale`, un tween sur `scale`) change aussi son **corps** : un
+  corps ramené à l'échelle 0 ne s'en remet pas, et un dandinement par tween le déforme à chaque image.
+  Faire apparaître en fondu (`alpha`), et ne jamais animer l'échelle d'un objet qui a un corps.
+- Un corps créé immobile (`isStatic: true` dans ses options) n'a pas encore de masse : le libérer ensuite
+  (`setStatic(false)`) lui donne une masse `NaN`, et sa position devient `NaN` au premier pas. Le créer
+  mobile, puis `setStatic(true)`.
+- Avec `enableSleeping`, un corps immobile une seconde s'endort, **même immobile parce que statique** (le
+  boulet qui attend dans la fronde). Libéré puis lancé, il ne bouge pas : le réveiller (`setAwake()`).
+  Un test qui tire tout de suite ne le voit pas : attendre comme un joueur.
+- Un corps **retiré** du monde ne réveille pas ceux qui reposaient sur lui : endormis, ils restent en l'air
+  (une poutre dont les piliers ont éclaté). Réveiller les corps (`setAwake()`) quand on en retire un.
+
 **Les scènes**
 
 - `scene.restart` garde le `timeScale` et la pause de la physique, de l'horloge et des tweens : les

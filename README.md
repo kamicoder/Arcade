@@ -34,6 +34,8 @@ Les téléphones récupèrent la nouvelle version tout seuls, au retour dans le 
 | `tests/` | Les tests Playwright ; un test raté garde sa trace : `npx playwright show-trace <chemin>` |
 | `public/` | Copié tel quel : icônes, sons |
 | `src/jeux/tamago/` | Le Tamago : un animal virtuel qui vit pendant qu'on joue ; ses règles dans `REGLES.md` |
+| `src/jeux/catapulte/` | La catapulte : le château contre les slimes, en physique Matter ; les calculs du tir dans `tir.ts`, les niveaux dans `niveaux.ts` |
+| `outils/catapulte/` | L'atelier des images et des sons de la catapulte : `node outils/catapulte/dessiner.mjs planche` les redessine dans `public/catapulte/` |
 | `docs/CARNET-PHASER.md` | Apprendre Phaser en suivant la construction de l'Arcade |
 | `docs/PIEGES-PHASER.md` | Les pièges de Phaser 4 rencontrés en route, et les défauts de la 4.2 contournés |
 
