@@ -11,6 +11,7 @@ import { estTactile } from "../../../socle/tactile";
 import { retourAuHub, fonduPuis } from "../../../socle/retour";
 import { boutonArcade } from "../../../socle/boutonArcade";
 import { appliquerLeSon, boutonDuSon } from "../../../socle/son";
+import { etiquette } from "../../../socle/touchesPhysiques";
 
 export class Menu extends Phaser.Scene {
   private parti = false;
@@ -52,9 +53,11 @@ export class Menu extends Phaser.Scene {
     this.tweens.add({ targets: [fond, jouer], scale: 1.05, duration: 700, yoyo: true, repeat: -1, ease: "Sine.InOut" });
     fond.on("pointerup", () => this.lancer());
 
+    // Les lettres de pilotage, reconnues à leur place : Z Q S D sur un AZERTY, W A S D sur un QWERTY
+    const lettres = ["KeyW", "KeyA", "KeyS", "KeyD"].map(etiquette).join(" ");
     const aide = estTactile()
       ? `Glisse le doigt pour piloter : ton vaisseau tire tout seul.  ${VIES} vies.`
-      : `Souris, flèches ou Z Q S D : piloter (il tire tout seul)    M : le son    Échap : l'Arcade`;
+      : `Souris, flèches ou ${lettres} : piloter (il tire tout seul)    M : le son    Échap : l'Arcade`;
     this.add.text(LARGEUR / 2, 490, aide, { fontFamily: POLICE, fontSize: "16px", color: "#e9e4f0" }).setOrigin(0.5);
     this.add.text(LARGEUR / 2, 515, "Bonus :  orange = plus de tirs    bleu = bouclier    rouge = une vie", {
       fontFamily: POLICE, fontSize: "14px", color: "#a59fc0",

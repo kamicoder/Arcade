@@ -223,7 +223,7 @@ test("le drapeau à la souris : clic droit, sans le menu du navigateur", async (
   sansErreur();
 });
 
-test("au clavier : le curseur, Espace pour creuser, F pour le drapeau", async ({ page }) => {
+test("au clavier : le curseur (flèches ou main gauche à sa place), Espace pour creuser, F pour le drapeau", async ({ page }) => {
   const { sansErreur } = await menuDemineur(page);
   await partieFacile(page);
   // Le curseur part du milieu (4, 4) ; le premier appui le montre seulement
@@ -241,6 +241,16 @@ test("au clavier : le curseur, Espace pour creuser, F pour le drapeau", async ({
   await appuyer(page, "ArrowRight");
   await appuyer(page, "f");                // (3, 2) : une mine
   expect((await partie(page)).etats[3][2]).toBe("drapeau");
+
+  // La main gauche, reconnue à la place des touches : KeyA (le Q d'un AZERTY) va à gauche, KeyQ (son A) ne
+  // fait rien, KeyW (son Z) monte
+  const curseur = () => page.evaluate(() => ({ ...(window as any).jeu.scene.getScene("demineur-partie").posCurseur }));
+  await appuyer(page, "KeyA");
+  expect(await curseur()).toEqual({ r: 3, c: 1 });
+  await appuyer(page, "KeyQ");
+  expect(await curseur()).toEqual({ r: 3, c: 1 });
+  await appuyer(page, "KeyW");
+  expect(await curseur()).toEqual({ r: 2, c: 1 });
   await appuyer(page, "Escape");
   await attendreScene(page, "demineur-menu");
   await appuyer(page, "Escape");

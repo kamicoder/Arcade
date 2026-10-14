@@ -12,7 +12,7 @@ import { NIVEAUX, estUnRecord, type Niveau } from "../niveaux";
 import { Tuile } from "../Tuile";
 import { TAILLE, COULEURS } from "../textures";
 import { LARGEUR, HAUTEUR } from "../../../socle/style";
-import { surTouche } from "../../../socle/clavier";
+import { surTouche, surChaqueTouche } from "../../../socle/clavier";
 import { surManette, MANETTE } from "../../../socle/manette";
 import { estTactile } from "../../../socle/tactile";
 import { fonduPuis } from "../../../socle/retour";
@@ -520,15 +520,20 @@ export class Partie extends Phaser.Scene {
         faire();
       }
     };
-    const deplacements: [string[], number, number][] = [
-      [["LEFT", "Q", "A"], 0, -1],
-      [["RIGHT", "D"], 0, 1],
-      [["UP", "Z", "W"], -1, 0],
-      [["DOWN", "S"], 1, 0],
-    ];
-    for (const [touches, dr, dc] of deplacements) {
-      touches.forEach((touche) => surTouche(this, touche, action(() => this.deplacerLeCurseur(dr, dc))));
-    }
+    // Le curseur : les flèches, ou les touches de la main gauche reconnues à leur place (KeyW, KeyA...,
+    // Z Q S D sur un AZERTY, W A S D sur un QWERTY : socle/touchesPhysiques.ts)
+    const deplacements: Record<string, [number, number]> = {
+      ArrowLeft: [0, -1], KeyA: [0, -1],
+      ArrowRight: [0, 1], KeyD: [0, 1],
+      ArrowUp: [-1, 0], KeyW: [-1, 0],
+      ArrowDown: [1, 0], KeyS: [1, 0],
+    };
+    surChaqueTouche(this, (evenement) => {
+      const deplacement = deplacements[evenement.code];
+      if (deplacement) {
+        action(() => this.deplacerLeCurseur(deplacement[0], deplacement[1]))();
+      }
+    });
     surTouche(this, "SPACE", action(() => this.agirAuCurseur(false)));
     surTouche(this, "ENTER", action(() => this.agirAuCurseur(false)));
     surTouche(this, "F", action(() => this.agirAuCurseur(true)));
