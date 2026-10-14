@@ -1,6 +1,7 @@
 // Le jeu du vrai Tamagotchi : 5 manches, il va regarder à gauche ou à droite, devine de quel côté.
 // Trois manches gagnées lui rendent un cœur de Moral (Ecran.finDuJeu). Il se joue sur l'écran de la
-// console, par-dessus l'écran du Tamago (qui est en pause pendant ce temps).
+// console, par-dessus l'écran du Tamago (qui est en pause pendant ce temps). Échap, B ou ✕ l'arrêtent
+// en route, sans rien gagner ni perdre (comme sur le vrai).
 
 import Phaser from "phaser";
 import type { Ecran } from "./Ecran";
@@ -13,7 +14,8 @@ const MANCHES = 5;
 export class Jeu extends Phaser.Scene {
   manche = 0;
   gagnees = 0;
-  private attend = false;                  // on attend ta réponse
+  attend = false;                          // on attend ta réponse
+  private fini = false;
   private creature!: Phaser.GameObjects.Text;
   private titre!: Phaser.GameObjects.Text;
   private score!: Phaser.GameObjects.Text;
@@ -27,6 +29,7 @@ export class Jeu extends Phaser.Scene {
     this.manche = 0;
     this.gagnees = 0;
     this.attend = false;
+    this.fini = false;
 
     // Un fond qui recouvre l'écran de la console
     this.add.rectangle(ECRAN.x + 3, ECRAN.y + 3, ECRAN.largeur - 6, ECRAN.hauteur - 6, h.ecran.fond).setOrigin(0);
@@ -46,11 +49,16 @@ export class Jeu extends Phaser.Scene {
       }).setOrigin(0.5).setPadding(16).setInteractive({ useHandCursor: true });
       fleche.on("pointerup", () => this.deviner(cote));
     }
+    this.add.text(ECRAN.x + ECRAN.largeur - 24, ECRAN.y + 20, "✕", { fontFamily: h.police, fontSize: "20px", color: h.ecran.texte })
+      .setOrigin(0.5).setPadding(10).setInteractive({ useHandCursor: true })
+      .on("pointerup", () => this.arreter());
     surTouche(this, "LEFT", () => this.deviner("gauche"));
     surTouche(this, "RIGHT", () => this.deviner("droite"));
+    surTouche(this, "ESC", () => this.arreter());
     this.input.gamepad?.on("down", (_m: Phaser.Input.Gamepad.Gamepad, b: Phaser.Input.Gamepad.Button) => {
       if (b.index === 14) this.deviner("gauche");
       if (b.index === 15) this.deviner("droite");
+      if (b.index === 1) this.arreter();
     });
     this.mancheSuivante();
   }
@@ -90,11 +98,23 @@ export class Jeu extends Phaser.Scene {
   }
 
   private finir() {
+    this.fini = true;
     this.titre.setText(this.gagnees >= 3 ? `BRAVO ! ${this.gagnees}/${MANCHES}` : `PERDU... ${this.gagnees}/${MANCHES}`);
     this.time.delayedCall(900, () => {
       const ecran = this.scene.get("tamago-ecran") as Ecran;
       this.scene.stop();
       ecran.finDuJeu(this.gagnees);
     });
+  }
+
+  // Arrêté en route : la partie ne compte pas
+  private arreter() {
+    if (this.fini) {
+      return;
+    }
+    this.fini = true;
+    const ecran = this.scene.get("tamago-ecran") as Ecran;
+    this.scene.stop();
+    ecran.jeuArrete();
   }
 }

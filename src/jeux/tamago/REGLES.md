@@ -9,7 +9,7 @@ parlent, les événements absurdes. Les chiffres sont dans `reglages.ts`, à ré
 
 - **Il ne vit que quand son écran est affiché.** Le jeu fermé, un autre jeu de l'Arcade, un autre
   onglet, le téléphone verrouillé : tout est en pause, rien ne baisse, rien ne se perd.
-- **Partir, c'est le coucher** : il s'endort (un petit « bonne nuit ») et se réveille à ton retour, reposé.
+- **Partir, c'est le coucher** : il dort pendant ton absence, et te dit bonjour à ton retour.
 - **Il grandit en temps de jeu** : 1 an pour 15 minutes passées avec lui.
 
 ## 2. Ce qu'on surveille
@@ -26,7 +26,7 @@ parlent, les événements absurdes. Les chiffres sont dans `reglages.ts`, à ré
 |---|---|
 | 🍙 Repas | +1 cœur de Ventre, +1 g. Il refuse quand il est plein |
 | 🍬 Friandise | +1 cœur de Moral, +2 g. Il ne refuse jamais (attention au poids) |
-| 🎮 Jouer | Un petit jeu de 5 manches (deviner gauche ou droite). 3 manches gagnées donnent +1 cœur de Moral ; une partie fait toujours perdre 1 g |
+| 🎮 Jouer | Un petit jeu de 5 manches (deviner gauche ou droite). 3 manches gagnées donnent +1 cœur de Moral ; une partie finie fait toujours perdre 1 g. Arrêtée en route (Échap, ✕), elle ne compte pas |
 | 🧽 Nettoyer | Enlève toutes les crottes |
 | 💊 Soigner | Une dose de médicament ; il en faut 1 à 3 selon la maladie |
 | 📢 Gronder | Pendant un caprice : +25 % de discipline. Hors caprice : il est vexé, −1 cœur de Moral |
@@ -40,6 +40,8 @@ bien, et il faut le gronder.
 - Un appel ignoré **1 minute** devient un **oubli**. Comme le jeu est en pause quand tu n'es pas là, un
   oubli veut toujours dire « je l'ai vu, et je n'ai rien fait ».
 - **Un caprice ignoré** ne fait pas d'oubli, mais sa discipline reste basse, et ça se verra.
+- **Les caprices** : 3 quand il est enfant, 2 quand il est ado. Chacun grondé vaut 25 % de discipline, jusqu'à
+  100 % : l'ado a un caprice de plus qu'il n'en faut, pour rattraper un caprice manqué enfant.
 
 ## 5. La maladie
 

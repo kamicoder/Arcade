@@ -302,6 +302,7 @@ export class Ecran extends Phaser.Scene {
     while (this.crottes.length > e.crottes.length) {
       const crotte = this.crottes.pop()!;
       this.etincelles.explode(8, crotte.x, crotte.y - 14);
+      this.tweens.killTweensOf(crotte);    // son dandinement ne s'arrête jamais tout seul
       crotte.destroy();
     }
     if (e.roiCaca !== null && !this.roi) {
@@ -313,6 +314,7 @@ export class Ecran extends Phaser.Scene {
       this.tweens.add({ targets: this.roi, angle: { from: -6, to: 6 }, duration: 400, yoyo: true, repeat: -1 });
     } else if (e.roiCaca === null && this.roi) {
       this.etincelles.explode(40, this.roi.x, this.roi.y - 30);
+      this.tweens.killTweensOf(this.roi);
       this.roi.destroy();
       this.roi = null;
     }
@@ -510,6 +512,12 @@ export class Ecran extends Phaser.Scene {
     this.sauver();
   }
 
+  // Le jeu arrêté en route : rien ne change
+  jeuArrete() {
+    this.scene.resume();
+    this.dire("Déjà ? On jouera plus tard, alors.");
+  }
+
   // —— Ce qui arrive dans sa vie ——
 
   private reagir(ev: Evenement) {
@@ -601,7 +609,7 @@ export class Ecran extends Phaser.Scene {
         targets: soucoupe,
         tweens: [
           { y: SOL - 150, duration: 1200, ease: "Sine.Out" },
-          { y: ECRAN.y - 60, duration: 1500, delay: 600, ease: "Sine.In" },
+          { y: ECRAN.y - 60, duration: 1500, delay: 600, ease: "Sine.In", onComplete: () => soucoupe.destroy() },
         ],
       });
       this.tweens.add({ targets: this.creature, y: SOL - 110, scale: 0.4, alpha: 0, duration: 1500, delay: 1300 });

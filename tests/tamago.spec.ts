@@ -159,11 +159,19 @@ test("le caprice : le gronder fait monter la discipline ; le gronder pour rien l
   sansErreur();
 });
 
-test("le jeu de gauche-droite : trois manches gagnées rendent un cœur de Moral, et le jeu fait maigrir", async ({ page }) => {
+test("le jeu de gauche-droite : arrêté en route, rien ne change ; trois manches gagnées rendent un cœur de Moral", async ({ page }) => {
   const { sansErreur } = await ouvrirLeTamago(page);
   await naitre(page);
   await regler(page, { ventre: 4, moral: 2, poids: 8, caprices: [] });
   await hasard(page, 0.1);                 // il regardera toujours à gauche
+
+  // Échap en pleine partie : on revient, sans rien gagner ni perdre
+  await appuyer(page, "3");
+  await attendreScene(page, "tamago-jeu");
+  await appuyer(page, "Escape");
+  await page.waitForFunction(() => (window as any).jeu.scene.isActive("tamago-ecran"));
+  expect(await etat(page)).toMatchObject({ moral: 2, poids: 8 });
+
   await appuyer(page, "3");
   await attendreScene(page, "tamago-jeu");
   for (let manche = 1; manche <= 5; manche++) {
@@ -192,6 +200,17 @@ test("la fin : de vieillesse, il repart sur sa planète, l'album le garde, et un
   // Le nouvel œuf est sauvé tout de suite, et arrive après le départ
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem("tamago/etat")!).stade)).toBe("oeuf");
   await page.waitForFunction(() => (window as any).jeu.scene.getScene("tamago-ecran").etat.stade === "oeuf", undefined, { timeout: 8000 });
+
+  // Une sauvegarde d'un Tamago déjà parti (abîmée, d'une version d'avant...) : un œuf neuf, pas un Tamago figé
+  await page.evaluate(() => {
+    const e = JSON.parse(localStorage.getItem("tamago/etat")!);
+    localStorage.setItem("tamago/etat", JSON.stringify({ ...e, stade: "adulte", lignee: "propre", variante: "gentil", fin: "faim" }));
+  });
+  await appuyer(page, "Escape");
+  await attendreScene(page, "Hub");
+  await ouvrirLaCarte(page, "tamago");
+  await attendreScene(page, "tamago-ecran");
+  expect(await etat(page)).toMatchObject({ stade: "oeuf", fin: null });
   sansErreur();
 });
 

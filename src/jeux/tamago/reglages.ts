@@ -39,9 +39,9 @@ export const VIE_MAX = 5 * 60 * MINUTE;    // il repart sur sa planète à cet �
 export const VIE_MIN = 3 * 60 * MINUTE;    // ... moins 15 minutes par oubli, jamais avant celui-ci
 export const OUBLI_RACCOURCIT = 15 * MINUTE;
 
-// La discipline : en quarts (0 à 4, soit 0 à 100 %). Les caprices de chaque stade, juste assez pour
-// atteindre 100 % si on les gronde tous
-export const CAPRICES = { bebe: 0, enfant: 3, ado: 1, adulte: 0 };
+// La discipline : en quarts (0 à 4, soit 0 à 100 %). Les caprices de chaque stade : 3 pour l'enfant (75 %),
+// et 2 pour l'ado, un de plus qu'il n'en faut pour 100 % : un caprice manqué enfant se rattrape
+export const CAPRICES = { bebe: 0, enfant: 3, ado: 2, adulte: 0 };
 export const DISCIPLINE_GENTIL = { bebe: 0, enfant: 3, ado: 4 };   // pour la variante gentille, en fin de stade
 export const OUBLIS_GENTIL = 2;           // au plus, pendant le stade
 

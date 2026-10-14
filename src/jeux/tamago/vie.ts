@@ -446,13 +446,14 @@ export function caresser(e: Etat): Reponse {
 
 // —— La sauvegarde ——
 
-// Une sauvegarde d'une autre forme (abîmée, ou d'une version future) est remplacée par un œuf neuf
+// Une sauvegarde d'une autre forme (abîmée, ou d'une version future) est remplacée par un œuf neuf ;
+// un Tamago déjà parti aussi (sinon il resterait là, figé, à ne plus rien vouloir)
 export function relire(sauvegarde: unknown): Etat | null {
   if (!sauvegarde || typeof sauvegarde !== "object") {
     return null;
   }
   const e = sauvegarde as Partial<Etat>;
-  if (e.version !== 1 || typeof e.stade !== "string" || !Array.isArray(e.crottes) || !e.points) {
+  if (e.version !== 1 || typeof e.stade !== "string" || !Array.isArray(e.crottes) || !e.points || e.fin) {
     return null;
   }
   for (const lignee of LIGNEES) {
