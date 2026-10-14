@@ -1,6 +1,6 @@
 // Le jeu de course et ses deux thèmes : les voitures (la première carte du Hub) et les licornes (la deuxième).
-// Chaque scénario de l'ancienne course de voitures et de l'ancienne course des licornes est ici, dans son
-// thème ; plus ceux qui prouvent qu'un thème se branche simplement sur le même jeu.
+// Le code est le même pour les deux thèmes : chaque scénario n'est joué qu'une fois, dans l'un ou l'autre.
+// Seul le premier test passe par les deux, pour faire tourner le décor, les dessins et le pilote de chacun.
 import { test, expect, type Page } from "@playwright/test";
 import { ouvrir, appuyer, attendreScene, scenesActives, versLaPage, toucher, toucherLaCarte } from "./outils";
 
@@ -142,6 +142,7 @@ test("chaque carte du Hub ouvre la course dans son thème, et Échap y ramène, 
       .some((o: any) => typeof o.text === "string" && o.text.includes("⇄")))).toBe(false);
     await appuyer(page, "Escape");
     await attendreScene(page, "Hub");
+    expect(await scenesActives(page)).toEqual(["Hub"]);   // la musique des licornes s'arrête aussi
     expect(await carteChoisie()).toBe(CARTE[theme]);
   }
   sansErreur();
@@ -168,64 +169,6 @@ test("une seule carte de course : le menu change de thème (T)", async ({ page }
 // ===== Les voitures =====
 
 test.describe("les voitures", () => {
-  test("contre l'ordinateur : quatre voitures, le départ, l'arrivée, le retour", async ({ page }) => {
-    const { sansErreur } = await menu(page, "voitures");
-    await mode(page, "course");
-    await attendreScene(page, "course-circuits");
-    await appuyer(page, "ArrowRight");     // le circuit suivant
-    await appuyer(page, "Enter");
-    await attendreScene(page, "course-piste");
-    expect(await scenesActives(page)).toEqual(["course-piste", "course-tableau"]);
-    expect(await course(page)).toMatchObject({ mode: "course", nomCircuit: "La Grande Boucle", coureurs: 4, enCourse: false });
-
-    // 3, 2, 1 : la course commence, et la voiture avance
-    await attendreLeDepart(page);
-    await page.keyboard.down("ArrowUp");
-    await page.waitForTimeout(1000);
-    expect((await course(page)).vitesse).toBeGreaterThan(200);
-    await page.keyboard.up("ArrowUp");
-
-    await finirLaCourse(page);
-    await attendreScene(page, "course-arrivee");
-    await page.waitForTimeout(1100);       // l'arrivée attend un peu avant d'écouter
-    await appuyer(page, "Enter");
-    await attendreScene(page, "course-menu");
-    expect(await scenesActives(page)).toEqual(["course-menu"]);
-
-    await appuyer(page, "Escape");
-    await attendreScene(page, "Hub");
-    sansErreur();
-  });
-
-  test("contre la montre : le record est gardé, et le fantôme apparaît", async ({ page }) => {
-    const { sansErreur } = await menu(page, "voitures");
-    await mode(page, "chrono");
-    await attendreScene(page, "course-circuits");
-    await appuyer(page, "Enter");
-    await attendreLeDepart(page);
-    await page.keyboard.down("ArrowUp");
-    await page.waitForTimeout(2000);
-    await page.keyboard.up("ArrowUp");
-    await finirLaCourse(page);
-    await attendreScene(page, "course-arrivee");
-
-    const record = await sauvegarde(page, "course/voitures/record/vallon");
-    expect(record.temps).toBeGreaterThan(1);
-    expect(record.fantome.length).toBeGreaterThan(50);
-
-    // Une nouvelle course sur le même circuit : le fantôme est là
-    await page.waitForTimeout(1100);
-    await appuyer(page, "Enter");
-    await attendreScene(page, "course-menu");
-    await appuyer(page, "Enter");          // le menu se souvient du mode : contre la montre
-    await attendreScene(page, "course-circuits");
-    await appuyer(page, "Enter");
-    await attendreLeDepart(page);
-    await page.waitForTimeout(300);
-    expect(await page.evaluate(() => (window as any).jeu.scene.getScene("course-piste").ombre.objet.visible)).toBe(true);
-    sansErreur();
-  });
-
   test("le nez contre les pneus, la marche arrière fait repartir", async ({ page }) => {
     const { sansErreur } = await menu(page, "voitures");
     await mode(page, "chrono");
@@ -302,21 +245,36 @@ test.describe("les voitures", () => {
     sansErreur();
   });
 
-  test("le Grand Prix : les trois circuits, des rivaux de plus en plus forts, des points, un vainqueur", async ({ page }) => {
+  test("le Grand Prix : des rivaux de plus en plus forts, les points qui s'additionnent, le podium", async ({ page }) => {
     const { sansErreur } = await menu(page, "voitures");
     await mode(page, "grandprix");
 
-    const circuits = ["Le Vallon", "La Grande Boucle", "Le Huit"];
-    const niveaux = [0.7, 0.75, 0.8];
-    for (let n = 0; n < 3; n++) {
+    // Deux courses pour de vrai ; la troisième est sautée (le même chemin que la deuxième)
+    const circuits = ["Le Vallon", "La Grande Boucle"];
+    const niveaux = [0.7, 0.75];
+    for (let n = 0; n < 2; n++) {
       await attendreScene(page, "course-piste");
       expect(await course(page)).toMatchObject({ mode: "grandprix", nomCircuit: circuits[n], coureurs: 4 });
       const niveauDesRivaux = await page.evaluate(() =>
         (window as any).jeu.scene.getScene("course-piste").coureurs.slice(1).map((v: any) => v.niveau));
       expect(niveauDesRivaux).toEqual([niveaux[n], niveaux[n], niveaux[n]]);
+      await attendreLeDepart(page);
+      if (n === 0) {
+        // Les rivaux courent tout seuls
+        await page.waitForTimeout(1000);
+        const vitesses = await page.evaluate(() =>
+          (window as any).jeu.scene.getScene("course-piste").coureurs.slice(1).map((v: any) => v.vitesse));
+        for (const vitesse of vitesses) {
+          expect(vitesse).toBeGreaterThan(100);
+        }
+      } else {
+        // La deuxième course devient la dernière du Grand Prix
+        await page.evaluate(() => {
+          (window as any).jeu.scene.getScene("course-piste").donnees.grandPrix.etape = 2;
+        });
+      }
 
       // Le joueur gagne : 10 points à chaque course, et les rivaux se partagent 7, 5 et 3
-      await attendreLeDepart(page);
       await finirLaCourse(page);
       await attendreScene(page, "course-arrivee");
       await page.waitForTimeout(1100);
@@ -325,7 +283,6 @@ test.describe("les voitures", () => {
       expect(await scenesActives(page)).toEqual(["course-grand-prix"]);
       const gp = await page.evaluate(() =>
         (window as any).jeu.scene.getScene("course-grand-prix").scene.settings.data.grandPrix);
-      expect(gp.etape).toBe(n);
       expect(gp.points[0]).toBe(10 * (n + 1));   // la voiture n° 1, celle du joueur
       const rivaux = Object.entries(gp.points).filter(([numero]) => numero !== "0").map(([, points]) => points as number);
       expect(rivaux.reduce((a, b) => a + b)).toBe((7 + 5 + 3) * (n + 1));
@@ -353,10 +310,14 @@ test.describe("les voitures", () => {
   const cameras = (page: Page) => page.evaluate(() =>
     (window as any).jeu.scene.getScene("course-piste").cameras.cameras.map((c: any) => [c.x, c.width]));
 
-  test("à deux : l'écran coupé en deux, et le joueur 2 sur Z Q S D d'un clavier AZERTY", async ({ page }) => {
+  test("à deux : l'écran coupé en deux, le joueur 2 sur Z Q S D d'un clavier AZERTY, les rivaux en option", async ({ page }) => {
     const { sansErreur } = await menu(page, "voitures");
     await mode(page, "duo");
     await attendreScene(page, "course-circuits");
+    await appuyer(page, "r");              // deux rivaux...
+    expect(await sauvegarde(page, "course/voitures/rivaux")).toBe(2);
+    await appuyer(page, "r");              // ... ou aucun : juste nous deux
+    expect(await sauvegarde(page, "course/voitures/rivaux")).toBe(0);
     await appuyer(page, "Enter");
     await attendreScene(page, "course-piste");
     expect(await course(page)).toMatchObject({ mode: "duo", coureurs: 2, joueurs: 2 });
@@ -395,7 +356,10 @@ test.describe("les voitures", () => {
     const rangs = await page.evaluate(() => (window as any).jeu.scene.getScene("course-piste").joueurs.map((j: any) => j.rang));
     expect(rangs).toEqual([2, 1]);
     await page.waitForTimeout(1100);
-    await appuyer(page, "Enter");
+    await appuyer(page, "r");              // rejouer, toujours à deux
+    await attendreLeDepart(page);
+    expect(await course(page)).toMatchObject({ mode: "duo", joueurs: 2 });
+    await appuyer(page, "Escape");
     await attendreScene(page, "course-menu");
 
     // Seul de nouveau : une seule caméra, sur tout l'écran
@@ -413,15 +377,23 @@ test.describe("les voitures", () => {
     const { sansErreur } = await menu(page, "voitures");
     await mode(page, "atelier");
     await attendreScene(page, "course-atelier");
-    // Les lignes : la voiture, son nom (choisi d'entrée), la carrosserie, la décalco, sa couleur, la pièce en plus
+    // Les lignes : la voiture, son nom (choisi d'entrée), la carrosserie, la décalco, sa couleur, la pièce en plus.
+    // Le nom : on efface celui de départ, on tape « Zou »
+    for (let i = 0; i < 20; i++) {
+      await appuyer(page, "Backspace");
+    }
+    for (const lettre of "Zou") {
+      await appuyer(page, lettre);
+    }
     for (const _rubrique of ["carrosserie", "decalco", "couleurDecalco", "piece"]) {
       await appuyer(page, "ArrowDown");
       await appuyer(page, "ArrowRight");
     }
     const perso = await sauvegarde(page, "course/voitures/perso/0");
-    expect(perso).toEqual({ carrosserie: "#e8453c", decalco: "flammes", couleurDecalco: "#1c1a25", piece: "aileron" });
+    expect(perso).toEqual({ nom: "Zou", carrosserie: "#e8453c", decalco: "flammes", couleurDecalco: "#1c1a25", piece: "aileron" });
     await appuyer(page, "Escape");
     await attendreScene(page, "course-menu");
+    expect(await page.evaluate(() => (window as any).jeu.scene.getScene("course-menu").cartes[0].nom.text)).toBe("Zou");
     const auMenu = await page.evaluate(() => (window as any).jeu.scene.getScene("course-menu").cartes[0].vehicule.texture.key);
 
     // En course : la même voiture (la même image, dessinée d'après la même apparence)
@@ -469,6 +441,19 @@ test.describe("les voitures", () => {
     const { sansErreur } = await menu(page, "voitures");
     await mode(page, "editeur");
     await attendreScene(page, "course-editeur");
+
+    // Avec moins de 4 points, Entrée ne fait rien, et Échap revient sans rien garder
+    await cliquer(page, 500, 400);
+    await cliquer(page, 2100, 400);
+    await appuyer(page, "Enter");
+    await page.waitForTimeout(300);
+    expect(await page.evaluate(() => (window as any).jeu.scene.isActive("course-editeur"))).toBe(true);
+    await appuyer(page, "Escape");
+    await attendreScene(page, "course-menu");
+    expect(await sauvegarde(page, "course/voitures/circuit-dessine")).toBeNull();
+    await appuyer(page, "Enter");          // le menu est resté sur « Dessiner un circuit »
+    await attendreScene(page, "course-editeur");
+    expect(await pointsDeLEditeur(page)).toHaveLength(0);
 
     for (const [x, y] of QUATRE_POINTS) {
       await cliquer(page, x, y);
@@ -528,50 +513,12 @@ test.describe("les voitures", () => {
     sansErreur();
   });
 
-  test("l'éditeur : avec moins de 4 points, rien n'est enregistré", async ({ page }) => {
-    const { sansErreur } = await menu(page, "voitures");
-    await mode(page, "editeur");
-    await attendreScene(page, "course-editeur");
-    await cliquer(page, 500, 400);
-    await cliquer(page, 2100, 400);
-    await appuyer(page, "Enter");          // trop tôt : il faut 4 points, on reste
-    await page.waitForTimeout(300);
-    expect(await page.evaluate(() => (window as any).jeu.scene.isActive("course-editeur"))).toBe(true);
-    await appuyer(page, "Escape");         // on revient sans rien garder
-    await attendreScene(page, "course-menu");
-    expect(await sauvegarde(page, "course/voitures/circuit-dessine")).toBeNull();
-    sansErreur();
-  });
-
   test.describe("au doigt", () => {
     test.use({ viewport: { width: 844, height: 390 }, hasTouch: true, isMobile: true });
 
-    test("on choisit au doigt, la voiture accélère seule, et ◀ ▶ tournent", async ({ page }) => {
-      const { sansErreur } = await ouvrir(page);
-      await toucherLaCarte(page, "voiture");
-      await attendreScene(page, "course-menu");
-      await toucher(page, 610, 227);       // « Contre la montre »
-      await attendreScene(page, "course-circuits");
-      await toucher(page, 480, 514);       // « Partir ! »
-      await attendreLeDepart(page);
-      await page.waitForTimeout(800);
-      expect((await course(page)).vitesse).toBeGreaterThan(100);
-
-      // Un doigt posé sur ▶ et qui y reste : on passe par le protocole de Chromium pour le tenir
-      const cdp = await page.context().newCDPSession(page);
-      const droite = await versLaPage(page, 238, 448);
-      await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x: droite.x, y: droite.y, id: 1 }] });
-      await page.waitForTimeout(200);
-      expect((await course(page)).tactile).toMatchObject({ droite: true, gauche: false });
-      await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
-      await page.waitForTimeout(200);
-      expect((await course(page)).tactile.droite).toBe(false);
-      sansErreur();
-    });
-
     test("pas de course à deux au doigt ; toucher pose un point, toucher un point l'enlève, ✓ enregistre", async ({ page }) => {
       const { sansErreur } = await ouvrir(page);
-      await toucher(page, 225, 225);
+      await toucherLaCarte(page, "voiture");
       await attendreScene(page, "course-menu");
       const modes = await page.evaluate(() => (window as any).jeu.scene.getScene("course-menu").modes.map((m: any) => m.id));
       expect(modes).toEqual(["grandprix", "course", "chrono", "atelier", "editeur"]);
@@ -620,107 +567,6 @@ test.describe("les voitures", () => {
 // ===== Les licornes =====
 
 test.describe("les licornes", () => {
-  test("le Hub ouvre les licornes, et Échap y revient", async ({ page }) => {
-    const { sansErreur } = await menu(page, "licornes");
-    expect(await scenesActives(page)).toEqual(["course-musique", "course-menu"]);
-    await appuyer(page, "Escape");
-    await attendreScene(page, "Hub");
-    expect(await scenesActives(page)).toEqual(["Hub"]);
-    sansErreur();
-  });
-
-  test("Grand Prix : quatre licornes, le départ, l'arrivée, les points, la course suivante, le podium", async ({ page }) => {
-    const { sansErreur } = await menu(page, "licornes");
-    await appuyer(page, "Enter");          // Grand Prix, le premier mode
-    await attendreScene(page, "course-piste");
-    expect(await scenesActives(page)).toEqual(["course-musique", "course-piste", "course-tableau"]);
-    expect(await course(page)).toMatchObject({ mode: "grandprix", circuit: "coeur", coureurs: 4, joueurs: 1, cameras: 1, enCourse: false });
-
-    // 3, 2, 1 : la course commence, et la licorne galope
-    await attendreLeDepart(page);
-    await page.keyboard.down("ArrowUp");
-    await page.waitForTimeout(1200);
-    expect((await course(page)).vitesse).toBeGreaterThan(200);
-    await page.keyboard.up("ArrowUp");
-
-    // Les rivales courent toutes seules
-    const rivales = await page.evaluate(() =>
-      (window as any).jeu.scene.getScene("course-piste").coureurs.slice(1).map((l: any) => l.vitesse));
-    for (const vitesse of rivales) {
-      expect(vitesse).toBeGreaterThan(100);
-    }
-
-    await finirLaCourse(page);
-    await attendreScene(page, "course-arrivee");
-    await page.waitForTimeout(1100);       // l'arrivée attend un peu avant d'écouter
-    await appuyer(page, "Enter");
-    await attendreScene(page, "course-grand-prix");
-    const points = await page.evaluate(() =>
-      (window as any).jeu.scene.getScene("course-grand-prix").scene.settings.data.grandPrix.points);
-    expect(Object.values(points).sort()).toEqual([10, 3, 5, 7]);
-
-    // La course suivante : le Vallon des Nuages
-    await page.waitForTimeout(700);
-    await appuyer(page, "Enter");
-    await attendreScene(page, "course-piste");
-    expect((await course(page)).circuit).toBe("vallon");
-
-    // On saute à la fin du Grand Prix : le podium, puis le menu
-    await page.evaluate(() => {
-      (window as any).jeu.scene.getScene("course-piste").donnees.grandPrix.etape = 4;
-    });
-    await attendreLeDepart(page);
-    await finirLaCourse(page);
-    await attendreScene(page, "course-arrivee");
-    await page.waitForTimeout(1100);
-    await appuyer(page, "Enter");
-    await attendreScene(page, "course-grand-prix");
-    await page.waitForTimeout(700);
-    await appuyer(page, "Enter");
-    await attendreScene(page, "course-podium");
-    await page.waitForTimeout(1100);
-    await appuyer(page, "Enter");
-    await attendreScene(page, "course-menu");
-    sansErreur();
-  });
-
-  test("course à deux : l'écran partagé, ZQSD pour la deuxième, et les rivales en option", async ({ page }) => {
-    const { sansErreur } = await menu(page, "licornes");
-    await mode(page, "duo");
-    await attendreScene(page, "course-circuits");
-    await appuyer(page, "r");              // deux rivales...
-    expect(await sauvegarde(page, "course/licornes/rivaux")).toBe(2);
-    await appuyer(page, "r");              // ... ou aucune : juste nous deux
-    expect(await sauvegarde(page, "course/licornes/rivaux")).toBe(0);
-    await appuyer(page, "ArrowRight");     // le Vallon des Nuages
-    await appuyer(page, "Enter");
-    await attendreScene(page, "course-piste");
-    expect(await course(page)).toMatchObject({ mode: "duo", circuit: "vallon", coureurs: 2, joueurs: 2, cameras: 2 });
-    expect(await sauvegarde(page, "course/licornes/circuit")).toBe("vallon");
-
-    // La deuxième joueuse galope avec Z (KeyW, la même place sur tous les claviers) ; la première ne bouge pas
-    await attendreLeDepart(page);
-    await page.keyboard.down("KeyW");
-    await page.waitForTimeout(1000);
-    const etat = await course(page);
-    await page.keyboard.up("KeyW");
-    expect(etat.vitesseJ2).toBeGreaterThan(200);
-    expect(etat.vitesse).toBeLessThan(10);
-
-    // Les deux joueuses doivent finir pour voir l'arrivée
-    await finirLaCourse(page, 0);
-    await finirLaCourse(page, 1);
-    await attendreScene(page, "course-arrivee");
-    await page.waitForTimeout(1100);
-    await appuyer(page, "r");              // rejouer
-    await attendreLeDepart(page);
-    expect(await course(page)).toMatchObject({ mode: "duo", circuit: "vallon", joueurs: 2 });
-    await appuyer(page, "Escape");
-    await attendreScene(page, "course-menu");
-    expect(await scenesActives(page)).toEqual(["course-musique", "course-menu"]);
-    sansErreur();
-  });
-
   test("contre la montre : le record est gardé, et le fantôme apparaît", async ({ page }) => {
     const { sansErreur } = await menu(page, "licornes");
     await mode(page, "chrono");
@@ -738,9 +584,13 @@ test.describe("les licornes", () => {
     expect(record.temps).toBeGreaterThan(1);
     expect(record.fantome.length).toBeGreaterThan(50);
 
-    // Rejouer : le fantôme galope devant
+    // Une nouvelle course sur le même circuit, par le menu (qui se souvient du mode) : le fantôme galope devant
     await page.waitForTimeout(1100);
-    await appuyer(page, "r");
+    await appuyer(page, "Enter");
+    await attendreScene(page, "course-menu");
+    await appuyer(page, "Enter");
+    await attendreScene(page, "course-circuits");
+    await appuyer(page, "Enter");
     await attendreLeDepart(page);
     await page.waitForTimeout(300);
     expect(await page.evaluate(() => (window as any).jeu.scene.getScene("course-piste").ombre.objet.visible)).toBe(true);
@@ -817,56 +667,6 @@ test.describe("les licornes", () => {
     await appuyer(page, "Escape");
     await attendreScene(page, "course-menu");
     expect(await scenesActives(page)).toEqual(["course-musique", "course-menu"]);
-    sansErreur();
-  });
-
-  test("l'atelier : le nom tapé au clavier et la robe sont gardés", async ({ page }) => {
-    const { sansErreur } = await menu(page, "licornes");
-    await mode(page, "atelier");
-    await attendreScene(page, "course-atelier");
-    // La ligne du nom est choisie d'entrée : on efface « Paillette », on tape « Zou »
-    for (let i = 0; i < 9; i++) {
-      await appuyer(page, "Backspace");
-    }
-    for (const lettre of "Zou") {
-      await appuyer(page, lettre);
-    }
-    await appuyer(page, "ArrowDown");      // sa robe
-    await appuyer(page, "ArrowRight");
-    const perso = await sauvegarde(page, "course/licornes/perso/0");
-    expect(perso.nom).toBe("Zou");
-    expect(perso.corps).toBe("#ffd9ec");   // la couleur d'après la sienne
-    await appuyer(page, "Escape");
-    await attendreScene(page, "course-menu");
-    expect(await page.evaluate(() => (window as any).jeu.scene.getScene("course-menu").cartes[0].nom.text)).toBe("Zou");
-    sansErreur();
-  });
-
-  test("l'éditeur : quatre points à la souris, et le circuit rejoint la liste", async ({ page }) => {
-    const { sansErreur } = await menu(page, "licornes");
-    await mode(page, "editeur");
-    await attendreScene(page, "course-editeur");
-    await appuyer(page, "Enter");          // trop tôt : il faut 4 points
-    await attendreScene(page, "course-editeur");
-    for (const [x, y] of [[250, 150], [700, 140], [760, 450], [260, 470]]) {
-      const p = await versLaPage(page, x, y);
-      await page.mouse.click(p.x, p.y);
-      await page.waitForTimeout(80);
-    }
-    expect(await page.evaluate(() => (window as any).jeu.scene.getScene("course-editeur").points.length)).toBe(4);
-    await appuyer(page, "Enter");
-    await attendreScene(page, "course-menu");
-    expect((await sauvegarde(page, "course/licornes/circuit-dessine")).length).toBe(4);
-    expect(await sauvegarde(page, "course/licornes/circuit")).toBe("dessine");
-
-    // Au contre-la-montre, le circuit dessiné est déjà choisi
-    await appuyer(page, "ArrowUp");        // de « Dessiner un circuit » à « Atelier »...
-    await appuyer(page, "ArrowUp");        // ... puis « Contre la montre »
-    await appuyer(page, "Enter");
-    await attendreScene(page, "course-circuits");
-    await appuyer(page, "Enter");
-    await attendreLeDepart(page);
-    expect((await course(page)).circuit).toBe("dessine");
     sansErreur();
   });
 

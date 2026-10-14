@@ -44,7 +44,11 @@ Un nouveau jeu ou un nouveau mode vient avec ses tests dans `tests/`. Dans un te
 `appuyer()` (de `tests/outils.ts`) plutôt que `keyboard.press` enchaînés, et pour ouvrir un jeu au doigt,
 `toucherLaCarte(page, cle)` (les cartes du Hub changent de place quand un jeu arrive). Les tests tournent
 en parallèle un par un (`fullyParallel`) : après une action, attendre l'état voulu (`waitForFunction`)
-plutôt que le lire tout de suite, une image peut tarder quand dix navigateurs jouent en même temps.
+plutôt que le lire tout de suite, une image peut tarder quand dix navigateurs jouent en même temps. Si le
+poste travaille déjà (une autre compilation), des tests qui jouent en temps réel échouent par manque de
+processeur : `npx playwright test --workers=4` avant de conclure à un défaut. Un test ne vérifie un
+comportement qu'une fois : le code commun à plusieurs jeux (ou aux deux thèmes de la course) n'est testé
+qu'à un endroit.
 
 ## Le socle (`src/socle/`) : à utiliser plutôt que les appels Phaser directs
 

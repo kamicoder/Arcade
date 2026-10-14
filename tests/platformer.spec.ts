@@ -259,44 +259,6 @@ test("l'Infini : le monde se fabrique devant, s'oublie derrière, et le record e
   sansErreur();
 });
 
-test("à deux : chacun ses touches, chacun son monde, le premier à 15 points gagne", async ({ page }) => {
-  const { sansErreur } = await menuPlatformer(page);
-  await choisirLeMode(page, 2, "platformer-duo");
-  expect(await scenesActives(page)).toEqual(["platformer-duo", "platformer-tableau"]);
-  const coureurs = () => page.evaluate(() => (window as any).jeu.scene.getScene("platformer-duo").coureurs
-    .map((c: any) => ({ x: c.heros.body.x, y: c.heros.body.y, score: c.score })));
-  await page.waitForTimeout(300);
-  const depart = await coureurs();
-  expect(depart[1].y - depart[0].y).toBe(1000);   // le monde du joueur 2 est sous celui du joueur 1
-
-  await page.keyboard.down("d");           // D : le joueur 1 seulement
-  await page.waitForTimeout(300);
-  await page.keyboard.up("d");
-  let apres = await coureurs();
-  expect(apres[0].x).toBeGreaterThan(depart[0].x + 40);
-  expect(apres[1].x).toBe(depart[1].x);
-  await page.keyboard.down("ArrowLeft");   // les flèches : le joueur 2
-  await page.waitForTimeout(150);
-  await page.keyboard.up("ArrowLeft");
-  apres = await coureurs();
-  expect(apres[1].x).toBeLessThan(depart[1].x);
-
-  // Le joueur 2 a 14 points, et une pièce apparaît sur lui (le monde est tiré au hasard) : il gagne
-  await page.evaluate(() => {
-    const duo = (window as any).jeu.scene.getScene("platformer-duo");
-    const j2 = duo.coureurs[1];
-    j2.score = 14;
-    const corps = j2.heros.body;
-    j2.monde.ajouter([{ sorte: "piece", x: corps.x + 7, y: corps.y - j2.monde.dy + 12 }]);
-  });
-  await attendreScene(page, "platformer-fin");
-  expect(await page.evaluate(() => (window as any).jeu.scene.getScene("platformer-duo").coureurs[1].score)).toBe(15);
-  await page.waitForTimeout(700);
-  await appuyer(page, "Escape");
-  await attendreScene(page, "platformer-menu");
-  sansErreur();
-});
-
 // Une touche telle qu'un clavier AZERTY l'envoie : sa place (code), sa lettre (key) et son keyCode.
 // Le protocole de Chromium les donne séparément ; Playwright, lui, les déduit l'un de l'autre.
 async function toucheAzerty(page: Page, type: "keyDown" | "keyUp", code: string, lettre: string, keyCode: number) {
@@ -306,7 +268,7 @@ async function toucheAzerty(page: Page, type: "keyDown" | "keyUp", code: string,
   });
 }
 
-test("à deux, le joueur 1 sur Q D Z d'un clavier AZERTY : la place de la touche compte, pas sa lettre", async ({ page }) => {
+test("à deux : Q D Z d'un AZERTY à leur place, les flèches pour le joueur 2, chacun son monde, 15 points pour gagner", async ({ page }) => {
   const { sansErreur } = await menuPlatformer(page);
   // Le menu écrit les touches du joueur 1 comme elles sont sur ce clavier (Q D Z sur un AZERTY)
   const attendu = await page.evaluate(async () => {
@@ -318,10 +280,12 @@ test("à deux, le joueur 1 sur Q D Z d'un clavier AZERTY : la place de la touche
   expect(aide).toBe(attendu + " contre les flèches : le premier à 15 points");
 
   await choisirLeMode(page, 2, "platformer-duo");
+  expect(await scenesActives(page)).toEqual(["platformer-duo", "platformer-tableau"]);
   const coureurs = () => page.evaluate(() => (window as any).jeu.scene.getScene("platformer-duo").coureurs
-    .map((c: any) => ({ x: c.heros.body.x, vy: c.heros.body.velocity.y })));
+    .map((c: any) => ({ x: c.heros.body.x, y: c.heros.body.y, vy: c.heros.body.velocity.y })));
   await page.waitForTimeout(400);
   const depart = await coureurs();
+  expect(depart[1].y - depart[0].y).toBe(1000);   // le monde du joueur 2 est sous celui du joueur 1
 
   // D (KeyD) : le joueur 1 court à droite
   await toucheAzerty(page, "keyDown", "KeyD", "d", 68);
@@ -352,6 +316,26 @@ test("à deux, le joueur 1 sur Q D Z d'un clavier AZERTY : la place de la touche
   await page.waitForFunction(() => (window as any).jeu.scene.getScene("platformer-duo").coureurs[0].heros.body.velocity.y < -200);
   await toucheAzerty(page, "keyUp", "KeyW", "z", 90);
   expect((await coureurs())[1].vy).toBeGreaterThan(-50);   // le joueur 2 n'a pas sauté
+
+  // Les flèches : le joueur 2
+  await page.keyboard.down("ArrowLeft");
+  await page.waitForTimeout(150);
+  await page.keyboard.up("ArrowLeft");
+  expect((await coureurs())[1].x).toBeLessThan(depart[1].x);
+
+  // Le joueur 2 a 14 points, et une pièce apparaît sur lui (le monde est tiré au hasard) : il gagne
+  await page.evaluate(() => {
+    const duo = (window as any).jeu.scene.getScene("platformer-duo");
+    const j2 = duo.coureurs[1];
+    j2.score = 14;
+    const corps = j2.heros.body;
+    j2.monde.ajouter([{ sorte: "piece", x: corps.x + 7, y: corps.y - j2.monde.dy + 12 }]);
+  });
+  await attendreScene(page, "platformer-fin");
+  expect(await page.evaluate(() => (window as any).jeu.scene.getScene("platformer-duo").coureurs[1].score)).toBe(15);
+  await page.waitForTimeout(700);
+  await appuyer(page, "Escape");
+  await attendreScene(page, "platformer-menu");
   sansErreur();
 });
 
