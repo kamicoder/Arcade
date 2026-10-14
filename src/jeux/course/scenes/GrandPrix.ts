@@ -13,6 +13,7 @@ import { titre, ecrire, bouton, touche, enNombre, portrait, rangTexte } from "..
 import { LARGEUR } from "../../../socle/style";
 import { surTouche } from "../../../socle/clavier";
 import { surManette, MANETTE, VALIDER } from "../../../socle/manette";
+import { uneSeuleFois } from "../../../socle/fin";
 import { fonduPuis } from "../../../socle/retour";
 
 export interface EtatDuGrandPrix {
@@ -89,14 +90,12 @@ export class Classement extends Phaser.Scene {
       this.tweens.add({ targets: boite, alpha: 1, x: 0, duration: 350, delay: i * 100, ease: "Cubic.Out" });
     });
 
-    let parti = false;
-    const une = (action: () => void) => () => {
-      if (!parti) {
-        parti = true;
-        jouer(this, "menu");
-        fonduPuis(this, action);
-      }
-    };
+    // Une seule fois : partir (abandonner, ou la suite), avec le son du menu et un fondu
+    const uneFois = uneSeuleFois();
+    const une = (action: () => void) => uneFois(() => {
+      jouer(this, "menu");
+      fonduPuis(this, action);
+    });
     const abandonner = une(() => this.scene.start("course-menu"));
     bouton(this, LARGEUR / 2 - 120, 494, 240, 36, "Abandonner" + touche(" (Échap)"), abandonner, true);
     surTouche(this, "ESC", abandonner);
@@ -181,14 +180,10 @@ export class Podium extends Phaser.Scene {
     }
 
     this.time.delayedCall(1000, () => {
-      let parti = false;
-      const menu = () => {
-        if (!parti) {
-          parti = true;
-          jouer(this, "menu");
-          fonduPuis(this, () => this.scene.start("course-menu"));
-        }
-      };
+      const menu = uneSeuleFois()(() => {
+        jouer(this, "menu");
+        fonduPuis(this, () => this.scene.start("course-menu"));
+      });
       bouton(this, LARGEUR / 2 - 80, 496, 160, 38, "Menu" + touche(" (Entrée)"), menu, true);
       surTouche(this, "ENTER", menu);
       surTouche(this, "ESC", menu);

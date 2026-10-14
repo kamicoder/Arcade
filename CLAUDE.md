@@ -59,6 +59,8 @@ Chaque fichier dit en tête pourquoi il existe.
 - `fonduPuis(scene, action)` au lieu de `camera.fadeOut()` ; `retourAuHub(scene)` pour quitter un jeu.
 - `surManette(scene, MANETTE.B, action)` (`manette.ts`) au lieu de `gamepad.on("down")` et ses numéros : dans les
   menus, listes et fins, A ou Start valide (`VALIDER`), B revient ; en partie, chaque jeu décide.
+- `uneSeuleFois()` (`fin.ts`) : une garde contre un double départ (rejouer OU revenir) ; `ecranDeFin(scene, ...)` :
+  l'écran « GAME OVER » à deux boutons (tir, platformer).
 - `boutonDuSon(scene, cle)`, `toucheDuSon`, `appliquerLeSon` (`son.ts`) : le son coupé ou remis (M), rangé sous
   `<cle>/son` ; `retourAuHub` le remet. Ne jamais relire `sound.mute` (voir `docs/PIEGES-PHASER.md`).
 - `TouchesPhysiques` : une touche qui sert à **jouer** se reconnaît à sa place (`event.code`, « KeyW » = le

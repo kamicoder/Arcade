@@ -9,6 +9,7 @@ import { ecrire, titre, bouton, touche, portrait, enNombre, rangTexte } from "..
 import { LARGEUR, HAUTEUR } from "../../../socle/style";
 import { surTouche } from "../../../socle/clavier";
 import { surManette, MANETTE, VALIDER } from "../../../socle/manette";
+import { uneSeuleFois } from "../../../socle/fin";
 
 export class Arrivee extends Phaser.Scene {
   constructor() {
@@ -62,13 +63,7 @@ export class Arrivee extends Phaser.Scene {
 
     // On attend une seconde avant d'écouter : le pouce était peut-être encore sur les commandes
     this.time.delayedCall(1000, () => {
-      let fini = false;
-      const une = (action: () => void) => () => {
-        if (!fini) {
-          fini = true;
-          action();
-        }
-      };
+      const une = uneSeuleFois();
       const menu = une(() => course.quitter());
       const suite = gp ? une(() => this.versLeGrandPrix(course)) : menu;
       const rejouer = une(() => course.rejouer());
