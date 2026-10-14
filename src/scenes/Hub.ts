@@ -5,6 +5,7 @@ import Phaser from "phaser";
 import { CATALOGUE, type FicheDeJeu } from "../jeux/catalogue";
 import { LARGEUR, HAUTEUR, COULEURS, POLICE } from "../socle/style";
 import { surTouche } from "../socle/clavier";
+import { surManette, MANETTE, VALIDER } from "../socle/manette";
 import { fonduPuis } from "../socle/retour";
 import { quandNouvelleVersion, installerNouvelleVersion } from "../socle/miseAJour";
 
@@ -137,16 +138,12 @@ export class Hub extends Phaser.Scene {
     surTouche(this, "ENTER", () => this.lancer());
     surTouche(this, "SPACE", () => this.lancer());
 
-    // Les boutons d'une manette « standard » : 0 = A, 12 à 15 = la croix (haut, bas, gauche, droite)
-    this.input.gamepad?.on("down", (_manette: Phaser.Input.Gamepad.Gamepad, bouton: Phaser.Input.Gamepad.Button) => {
-      switch (bouton.index) {
-        case 12: this.deplacer(0, -1); break;
-        case 13: this.deplacer(0, 1); break;
-        case 14: this.deplacer(-1, 0); break;
-        case 15: this.deplacer(1, 0); break;
-        case 0: this.lancer(); break;
-      }
-    });
+    // La manette : la croix pour choisir, A ou Start pour lancer
+    surManette(this, MANETTE.HAUT, () => this.deplacer(0, -1));
+    surManette(this, MANETTE.BAS, () => this.deplacer(0, 1));
+    surManette(this, MANETTE.GAUCHE, () => this.deplacer(-1, 0));
+    surManette(this, MANETTE.DROITE, () => this.deplacer(1, 0));
+    surManette(this, VALIDER, () => this.lancer());
   }
 
   private deplacer(dx: number, dy: number) {

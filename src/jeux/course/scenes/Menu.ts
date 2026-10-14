@@ -13,6 +13,7 @@ import {
 } from "../interface";
 import { LARGEUR } from "../../../socle/style";
 import { surTouche, surChaqueTouche } from "../../../socle/clavier";
+import { surManette, MANETTE, VALIDER } from "../../../socle/manette";
 import { estTactile } from "../../../socle/tactile";
 import { etiquette } from "../../../socle/touchesPhysiques";
 import { retourAuHub, fonduPuis } from "../../../socle/retour";
@@ -221,16 +222,12 @@ export class Menu extends Phaser.Scene {
         this.changerVehicule(1, 1);
       }
     });
-    this.input.gamepad?.on("down", (_m: Phaser.Input.Gamepad.Gamepad, b: Phaser.Input.Gamepad.Button) => {
-      switch (b.index) {
-        case 12: this.choisir(this.choisi - 1); break;
-        case 13: this.choisir(this.choisi + 1); break;
-        case 14: this.changerVehicule(0, -1); break;
-        case 15: this.changerVehicule(0, 1); break;
-        case 0: this.valider(); break;
-        case 1: retourAuHub(this); break;
-      }
-    });
+    surManette(this, MANETTE.HAUT, () => this.choisir(this.choisi - 1));
+    surManette(this, MANETTE.BAS, () => this.choisir(this.choisi + 1));
+    surManette(this, MANETTE.GAUCHE, () => this.changerVehicule(0, -1));
+    surManette(this, MANETTE.DROITE, () => this.changerVehicule(0, 1));
+    surManette(this, VALIDER, () => this.valider());
+    surManette(this, MANETTE.B, () => retourAuHub(this));
   }
 
   private choisir(i: number, avecSon = true) {

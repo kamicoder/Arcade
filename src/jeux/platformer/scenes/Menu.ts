@@ -11,6 +11,7 @@ import { Genres } from "../genres";
 import { FOND, VERT, VIES, SAUVEGARDE } from "../reglages";
 import { LARGEUR, HAUTEUR, POLICE } from "../../../socle/style";
 import { surTouche } from "../../../socle/clavier";
+import { surManette, MANETTE, VALIDER } from "../../../socle/manette";
 import { estTactile } from "../../../socle/tactile";
 import { retourAuHub, fonduPuis } from "../../../socle/retour";
 import { boutonArcade } from "../../../socle/boutonArcade";
@@ -69,14 +70,10 @@ export class Menu extends Phaser.Scene {
     surTouche(this, "ENTER", () => this.lancer());
     surTouche(this, "SPACE", () => this.lancer());
     surTouche(this, "ESC", () => this.quitter());
-    this.input.gamepad?.on("down", (_m: Phaser.Input.Gamepad.Gamepad, bouton: Phaser.Input.Gamepad.Button) => {
-      switch (bouton.index) {
-        case 12: this.choisir(this.choisi - 1); break;
-        case 13: this.choisir(this.choisi + 1); break;
-        case 0: case 9: this.lancer(); break;
-        case 1: this.quitter(); break;
-      }
-    });
+    surManette(this, MANETTE.HAUT, () => this.choisir(this.choisi - 1));
+    surManette(this, MANETTE.BAS, () => this.choisir(this.choisi + 1));
+    surManette(this, VALIDER, () => this.lancer());
+    surManette(this, MANETTE.B, () => this.quitter());
     this.choisir(this.choisi);
   }
 

@@ -13,6 +13,7 @@ import { Tuile } from "../Tuile";
 import { TAILLE, COULEURS } from "../textures";
 import { LARGEUR, HAUTEUR } from "../../../socle/style";
 import { surTouche } from "../../../socle/clavier";
+import { surManette, MANETTE } from "../../../socle/manette";
 import { estTactile } from "../../../socle/tactile";
 import { fonduPuis } from "../../../socle/retour";
 
@@ -539,21 +540,20 @@ export class Partie extends Phaser.Scene {
     surTouche(this, "ESC", action(() => this.quitter()));
 
     // La manette : la croix déplace, A creuse, X ou Y plante un drapeau, B revient aux niveaux
-    this.input.gamepad?.on("down", (_m: Phaser.Input.Gamepad.Gamepad, bouton: Phaser.Input.Gamepad.Button) => {
-      if (this.scene.isActive("demineur-fin")) {
-        return;
+    // La manette (sauf quand la fin est affichée : elle a ses boutons). En partie, Start relance.
+    const enPartie = (action: () => void) => () => {
+      if (!this.scene.isActive("demineur-fin")) {
+        action();
       }
-      switch (bouton.index) {
-        case 12: this.deplacerLeCurseur(-1, 0); break;
-        case 13: this.deplacerLeCurseur(1, 0); break;
-        case 14: this.deplacerLeCurseur(0, -1); break;
-        case 15: this.deplacerLeCurseur(0, 1); break;
-        case 0: this.agirAuCurseur(false); break;
-        case 2: case 3: this.agirAuCurseur(true); break;
-        case 1: this.quitter(); break;
-        case 9: this.nouvellePartie(); break;
-      }
-    });
+    };
+    surManette(this, MANETTE.HAUT, enPartie(() => this.deplacerLeCurseur(-1, 0)));
+    surManette(this, MANETTE.BAS, enPartie(() => this.deplacerLeCurseur(1, 0)));
+    surManette(this, MANETTE.GAUCHE, enPartie(() => this.deplacerLeCurseur(0, -1)));
+    surManette(this, MANETTE.DROITE, enPartie(() => this.deplacerLeCurseur(0, 1)));
+    surManette(this, MANETTE.A, enPartie(() => this.agirAuCurseur(false)));
+    surManette(this, [MANETTE.X, MANETTE.Y], enPartie(() => this.agirAuCurseur(true)));
+    surManette(this, MANETTE.B, enPartie(() => this.quitter()));
+    surManette(this, MANETTE.START, enPartie(() => this.nouvellePartie()));
   }
 
   private deplacerLeCurseur(dr: number, dc: number) {

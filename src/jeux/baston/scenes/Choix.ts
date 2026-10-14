@@ -11,6 +11,7 @@ import { cleDePlanche, cleDAnimation, type CouleurDeRobot } from "../textures";
 import { BLEU, ORANGE, GRIS, JAUNE } from "../reglages";
 import { POLICE } from "../../../socle/style";
 import { surTouche } from "../../../socle/clavier";
+import { surManette, MANETTE, VALIDER } from "../../../socle/manette";
 import { estTactile } from "../../../socle/tactile";
 import { fonduPuis } from "../../../socle/retour";
 import { elargir, suivreLaLargeur } from "../../../socle/largeur";
@@ -94,16 +95,17 @@ export class Choix extends Phaser.Scene {
 
     // Les manettes : la première pour le bleu, la deuxième pour l'orange. La croix change de modèle,
     // A ou X valide, B revient au titre.
-    this.input.gamepad?.on("down", (manette: Phaser.Input.Gamepad.Gamepad, bouton: Phaser.Input.Gamepad.Button) => {
+    // Chaque manette commande son côté
+    const pourSonCote = (action: (cote: Cote) => void) => (manette: Phaser.Input.Gamepad.Gamepad) => {
       const cote = this.coteDeLaManette(manette);
-      if (!cote) {
-        return;
+      if (cote) {
+        action(cote);
       }
-      if (bouton.index === 14) this.changer(cote, -1);
-      if (bouton.index === 15) this.changer(cote, 1);
-      if (bouton.index === 0 || bouton.index === 2) this.valider(cote);
-      if (bouton.index === 1) this.retour();
-    });
+    };
+    surManette(this, MANETTE.GAUCHE, pourSonCote((cote) => this.changer(cote, -1)));
+    surManette(this, MANETTE.DROITE, pourSonCote((cote) => this.changer(cote, 1)));
+    surManette(this, [...VALIDER, MANETTE.X], pourSonCote((cote) => this.valider(cote)));
+    surManette(this, MANETTE.B, pourSonCote(() => this.retour()));
 
     const retour = this.add.text(20, 16, "← Retour", { fontFamily: POLICE, fontSize: "18px", color: "#a49cb4" })
       .setInteractive({ useHandCursor: true });

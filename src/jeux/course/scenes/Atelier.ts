@@ -10,6 +10,7 @@ import {
 import { jouer } from "../son";
 import { titre, ecrire, bouton, touche, zone, enNombre, textureCadre, couleurDuNom, assombrir } from "../interface";
 import { surChaqueTouche } from "../../../socle/clavier";
+import { surManette, MANETTE } from "../../../socle/manette";
 import { estTactile } from "../../../socle/tactile";
 import { fonduPuis } from "../../../socle/retour";
 
@@ -87,16 +88,12 @@ export class Atelier extends Phaser.Scene {
 
     // Une seule écoute pour tout le clavier : sur la ligne du nom, les lettres s'écrivent
     surChaqueTouche(this, (e) => this.touche(e));
-    this.input.gamepad?.on("down", (_m: Phaser.Input.Gamepad.Gamepad, b: Phaser.Input.Gamepad.Button) => {
-      switch (b.index) {
-        case 12: this.choisir(this.choisie - 1); break;
-        case 13: this.choisir(this.choisie + 1); break;
-        case 14: this.changer(-1); break;
-        case 15: this.changer(1); break;
-        case 0: this.toucherLaLigne(this.choisie, 0); break;
-        case 1: this.terminer(); break;
-      }
-    });
+    surManette(this, MANETTE.HAUT, () => this.choisir(this.choisie - 1));
+    surManette(this, MANETTE.BAS, () => this.choisir(this.choisie + 1));
+    surManette(this, MANETTE.GAUCHE, () => this.changer(-1));
+    surManette(this, MANETTE.DROITE, () => this.changer(1));
+    surManette(this, MANETTE.A, () => this.toucherLaLigne(this.choisie, 0));
+    surManette(this, [MANETTE.B, MANETTE.START], () => this.terminer());   // Start : c'est fini, on garde tout
 
     this.montrerTout();
   }

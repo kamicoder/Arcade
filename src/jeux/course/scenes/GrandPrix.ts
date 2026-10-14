@@ -12,6 +12,7 @@ import { jouer } from "../son";
 import { titre, ecrire, bouton, touche, enNombre, portrait, rangTexte } from "../interface";
 import { LARGEUR } from "../../../socle/style";
 import { surTouche } from "../../../socle/clavier";
+import { surManette, MANETTE, VALIDER } from "../../../socle/manette";
 import { fonduPuis } from "../../../socle/retour";
 
 export interface EtatDuGrandPrix {
@@ -116,13 +117,8 @@ export class Classement extends Phaser.Scene {
       const b = bouton(this, LARGEUR / 2 - 230, 430, 460, 50, texte + touche(" (Entrée)"), suite).setScale(0.6);
       this.tweens.add({ targets: b, scale: 1, duration: 300, ease: "Back.Out" });
       surTouche(this, "ENTER", suite);
-      this.input.gamepad?.on("down", (_m: Phaser.Input.Gamepad.Gamepad, bt: Phaser.Input.Gamepad.Button) => {
-        if (bt.index === 0) {
-          suite();
-        } else if (bt.index === 1) {
-          abandonner();
-        }
-      });
+      surManette(this, VALIDER, suite);
+      surManette(this, MANETTE.B, abandonner);
     });
   }
 }
@@ -196,7 +192,7 @@ export class Podium extends Phaser.Scene {
       bouton(this, LARGEUR / 2 - 80, 496, 160, 38, "Menu" + touche(" (Entrée)"), menu, true);
       surTouche(this, "ENTER", menu);
       surTouche(this, "ESC", menu);
-      this.input.gamepad?.on("down", menu);
+      surManette(this, [...VALIDER, MANETTE.B], menu);
     });
   }
 }

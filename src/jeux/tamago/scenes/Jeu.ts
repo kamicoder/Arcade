@@ -8,6 +8,7 @@ import type { Ecran } from "./Ecran";
 import { formeDe } from "../vie";
 import { habillage as h, ECRAN, CENTRE_ECRAN } from "../habillage";
 import { surTouche } from "../../../socle/clavier";
+import { surManette, MANETTE } from "../../../socle/manette";
 
 const MANCHES = 5;
 
@@ -55,11 +56,9 @@ export class Jeu extends Phaser.Scene {
     surTouche(this, "LEFT", () => this.deviner("gauche"));
     surTouche(this, "RIGHT", () => this.deviner("droite"));
     surTouche(this, "ESC", () => this.arreter());
-    this.input.gamepad?.on("down", (_m: Phaser.Input.Gamepad.Gamepad, b: Phaser.Input.Gamepad.Button) => {
-      if (b.index === 14) this.deviner("gauche");
-      if (b.index === 15) this.deviner("droite");
-      if (b.index === 1) this.arreter();
-    });
+    surManette(this, MANETTE.GAUCHE, () => this.deviner("gauche"));
+    surManette(this, MANETTE.DROITE, () => this.deviner("droite"));
+    surManette(this, MANETTE.B, () => this.arreter());
     this.mancheSuivante();
   }
 

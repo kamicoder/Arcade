@@ -17,6 +17,7 @@ import {
 } from "../reglages";
 import { HAUTEUR, POLICE } from "../../../socle/style";
 import { surTouche } from "../../../socle/clavier";
+import { surManette, MANETTE } from "../../../socle/manette";
 import { estTactile } from "../../../socle/tactile";
 import { fonduPuis } from "../../../socle/retour";
 import { elargir } from "../../../socle/largeur";
@@ -117,11 +118,7 @@ export class Combat extends Phaser.Scene {
     this.preparerLesPilotes();
     surTouche(this, "ESC", () => this.quitter());
     // Le bouton Start d'une manette (le 9 d'une manette « standard ») : on quitte aussi
-    this.input.gamepad?.on("down", (_manette: Phaser.Input.Gamepad.Gamepad, bouton: Phaser.Input.Gamepad.Button) => {
-      if (bouton.index === 9) {
-        this.quitter();
-      }
-    });
+    surManette(this, MANETTE.START, () => this.quitter());
 
     if (BOITES) {
       this.boites = this.add.graphics().setDepth(PROFONDEUR.boites);

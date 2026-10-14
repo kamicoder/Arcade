@@ -10,6 +10,7 @@ import { album, amis } from "../souvenirs";
 import { habillage as h, ECRAN, CENTRE_ECRAN } from "../habillage";
 import { COEURS, UN_AN } from "../reglages";
 import { surTouche } from "../../../socle/clavier";
+import { surManette, MANETTE, VALIDER } from "../../../socle/manette";
 
 const PAGES = ["ÉTAT", "JOURNAL", "AMIS", "ALBUM"];
 
@@ -48,11 +49,9 @@ export class Carnet extends Phaser.Scene {
     surTouche(this, "ESC", () => this.fermer());
     surTouche(this, "ENTER", () => this.fermer());
     surTouche(this, "EIGHT", () => this.fermer());
-    this.input.gamepad?.on("down", (_m: Phaser.Input.Gamepad.Gamepad, b: Phaser.Input.Gamepad.Button) => {
-      if (b.index === 14) this.tourner(-1);
-      if (b.index === 15) this.tourner(1);
-      if (b.index === 0 || b.index === 1) this.fermer();
-    });
+    surManette(this, MANETTE.GAUCHE, () => this.tourner(-1));
+    surManette(this, MANETTE.DROITE, () => this.tourner(1));
+    surManette(this, [...VALIDER, MANETTE.B], () => this.fermer());
     this.montrer();
   }
 

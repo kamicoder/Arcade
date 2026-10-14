@@ -5,6 +5,7 @@ import Phaser from "phaser";
 import { FOND, COULEUR_SOL, SOL, ORANGE, PROFONDEUR } from "./reglages";
 import { HAUTEUR, POLICE } from "../../socle/style";
 import { surTouche } from "../../socle/clavier";
+import { surManette, MANETTE, VALIDER } from "../../socle/manette";
 
 export const enCouleur = (couleur: number) => "#" + couleur.toString(16).padStart(6, "0");
 
@@ -72,11 +73,9 @@ export class ListeDeBoutons {
     surTouche(scene, "DOWN", () => this.choisir(this.choisi + 1));
     surTouche(scene, "ENTER", () => this.valider());
     surTouche(scene, "SPACE", () => this.valider());
-    scene.input.gamepad?.on("down", (_m: Phaser.Input.Gamepad.Gamepad, bouton: Phaser.Input.Gamepad.Button) => {
-      if (bouton.index === 12) this.choisir(this.choisi - 1);
-      if (bouton.index === 13) this.choisir(this.choisi + 1);
-      if (bouton.index === 0) this.valider();
-    });
+    surManette(scene, MANETTE.HAUT, () => this.choisir(this.choisi - 1));
+    surManette(scene, MANETTE.BAS, () => this.choisir(this.choisi + 1));
+    surManette(scene, VALIDER, () => this.valider());
     this.choisir(0);
   }
 

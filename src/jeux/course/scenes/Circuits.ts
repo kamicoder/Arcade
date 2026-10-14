@@ -12,6 +12,7 @@ import { jouer } from "../son";
 import { titre, ecrire, bouton, touche, zone, boutonSon, textureCadre, textureApercu } from "../interface";
 import { LARGEUR } from "../../../socle/style";
 import { surTouche, surChaqueTouche } from "../../../socle/clavier";
+import { surManette, MANETTE, VALIDER } from "../../../socle/manette";
 import { estTactile } from "../../../socle/tactile";
 import { etiquette } from "../../../socle/touchesPhysiques";
 import { fonduPuis } from "../../../socle/retour";
@@ -87,15 +88,11 @@ export class Circuits extends Phaser.Scene {
         this.changer(1);
       }
     });
-    this.input.gamepad?.on("down", (_m: Phaser.Input.Gamepad.Gamepad, b: Phaser.Input.Gamepad.Button) => {
-      switch (b.index) {
-        case 14: this.changer(-1); break;
-        case 15: this.changer(1); break;
-        case 0: this.partir(); break;
-        case 1: this.retour(); break;
-        case 2: this.changerLesRivaux(); break;
-      }
-    });
+    surManette(this, MANETTE.GAUCHE, () => this.changer(-1));
+    surManette(this, MANETTE.DROITE, () => this.changer(1));
+    surManette(this, VALIDER, () => this.partir());
+    surManette(this, MANETTE.B, () => this.retour());
+    surManette(this, MANETTE.X, () => this.changerLesRivaux());
 
     this.montrer(0);
   }

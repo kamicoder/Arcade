@@ -21,6 +21,7 @@ import {
 } from "../reglages";
 import { lire, ecrire } from "../../../socle/sauvegarde";
 import { surTouche } from "../../../socle/clavier";
+import { surManette, MANETTE } from "../../../socle/manette";
 import { toucheDuSon } from "../../../socle/son";
 import { fonduPuis } from "../../../socle/retour";
 
@@ -133,11 +134,7 @@ export class Niveau extends Phaser.Scene {
     this.commandes = new Commandes(this, "seul");
     surTouche(this, "ESC", () => this.quitter());
     toucheDuSon(this, SAUVEGARDE);
-    this.input.gamepad?.on("down", (_m: Phaser.Input.Gamepad.Gamepad, bouton: Phaser.Input.Gamepad.Button) => {
-      if (bouton.index === 9 || bouton.index === 8) {   // Start ou Select : on s'en va
-        this.quitter();
-      }
-    });
+    surManette(this, [MANETTE.START, MANETTE.SELECT], () => this.quitter());   // en partie, Start ou Select : on s'en va
 
     this.scene.launch("platformer-tableau");
   }

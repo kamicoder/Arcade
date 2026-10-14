@@ -8,6 +8,7 @@ import { NIVEAUX, lireLesRecords, ajouterUnRecord, dernierNom, enSecondes, type 
 import { creerChampDeNom, type ChampDeNom } from "../saisie";
 import { LARGEUR, HAUTEUR, POLICE } from "../../../socle/style";
 import { surTouche } from "../../../socle/clavier";
+import { surManette, MANETTE, VALIDER } from "../../../socle/manette";
 import { estTactile } from "../../../socle/tactile";
 
 export interface DonneesDeFin {
@@ -80,17 +81,8 @@ export class Fin extends Phaser.Scene {
     surTouche(this, "SPACE", () => this.rejouer());
     surTouche(this, "R", () => this.rejouer());
     surTouche(this, "ESC", () => this.versLesNiveaux());
-    this.input.gamepad?.on("down", (_m: Phaser.Input.Gamepad.Gamepad, bouton: Phaser.Input.Gamepad.Button) => {
-      if (bouton.index === 0) {
-        if (this.champ) {
-          this.validerLeNom();
-        } else {
-          this.rejouer();
-        }
-      } else if (bouton.index === 1) {
-        this.versLesNiveaux();
-      }
-    });
+    surManette(this, VALIDER, () => (this.champ ? this.validerLeNom() : this.rejouer()));
+    surManette(this, MANETTE.B, () => this.versLesNiveaux());
     this.time.delayedCall(500, () => {
       this.pret = true;
     });

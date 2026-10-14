@@ -6,6 +6,7 @@ import type { Niveau, Fin as Issue } from "./Niveau";
 import type { Duo } from "./Duo";
 import { LARGEUR, HAUTEUR, POLICE } from "../../../socle/style";
 import { surTouche } from "../../../socle/clavier";
+import { surManette, MANETTE, VALIDER } from "../../../socle/manette";
 
 export interface DonneesDeFin {
   fin: Issue;
@@ -79,13 +80,8 @@ export class Fin extends Phaser.Scene {
       surTouche(this, "ENTER", rejouer);
       surTouche(this, "R", rejouer);
       surTouche(this, "ESC", quitter);
-      this.input.gamepad?.on("down", (_m: Phaser.Input.Gamepad.Gamepad, b: Phaser.Input.Gamepad.Button) => {
-        if (b.index === 0 || b.index === 9) {
-          rejouer();
-        } else if (b.index === 1) {
-          quitter();
-        }
-      });
+      surManette(this, VALIDER, rejouer);
+      surManette(this, MANETTE.B, quitter);
     });
   }
 }

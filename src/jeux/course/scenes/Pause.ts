@@ -6,6 +6,7 @@ import { themeEnCours } from "../sauvegarde";
 import { ecrire, bouton, touche } from "../interface";
 import { LARGEUR, HAUTEUR } from "../../../socle/style";
 import { surTouche } from "../../../socle/clavier";
+import { surManette, MANETTE, VALIDER } from "../../../socle/manette";
 
 export class Pause extends Phaser.Scene {
   constructor() {
@@ -24,12 +25,7 @@ export class Pause extends Phaser.Scene {
     bouton(this, LARGEUR / 2 + 10, HAUTEUR / 2 + 10, 190, 50, "Menu" + touche(" (Échap)"), menu, true);
     surTouche(this, "P", reprendre);
     surTouche(this, "ESC", menu);
-    this.input.gamepad?.on("down", (_m: Phaser.Input.Gamepad.Gamepad, b: Phaser.Input.Gamepad.Button) => {
-      if (b.index === 9 || b.index === 0) {
-        reprendre();
-      } else if (b.index === 1) {
-        menu();
-      }
-    });
+    surManette(this, VALIDER, reprendre);
+    surManette(this, MANETTE.B, menu);
   }
 }

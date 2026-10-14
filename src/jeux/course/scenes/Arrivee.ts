@@ -8,6 +8,7 @@ import { themeEnCours } from "../sauvegarde";
 import { ecrire, titre, bouton, touche, portrait, enNombre, rangTexte } from "../interface";
 import { LARGEUR, HAUTEUR } from "../../../socle/style";
 import { surTouche } from "../../../socle/clavier";
+import { surManette, MANETTE, VALIDER } from "../../../socle/manette";
 
 export class Arrivee extends Phaser.Scene {
   constructor() {
@@ -86,13 +87,8 @@ export class Arrivee extends Phaser.Scene {
       if (!gp) {
         surTouche(this, "R", rejouer);
       }
-      this.input.gamepad?.on("down", (_m: Phaser.Input.Gamepad.Gamepad, b: Phaser.Input.Gamepad.Button) => {
-        if (b.index === 0) {
-          suite();
-        } else if (b.index === 1) {
-          menu();
-        }
-      });
+      surManette(this, VALIDER, suite);
+      surManette(this, MANETTE.B, menu);
     });
   }
 

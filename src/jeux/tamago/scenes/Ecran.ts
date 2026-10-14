@@ -16,6 +16,7 @@ import { habillage as h, CONSOLE, ECRAN, CENTRE_ECRAN } from "../habillage";
 import { COEURS, PAROLE_MIN, PAROLE_MAX, SECONDE } from "../reglages";
 import { lire, ecrire } from "../../../socle/sauvegarde";
 import { surTouche } from "../../../socle/clavier";
+import { surManette, MANETTE, VALIDER } from "../../../socle/manette";
 import { retourAuHub } from "../../../socle/retour";
 import { boutonArcade } from "../../../socle/boutonArcade";
 import { appliquerLeSon, boutonDuSon } from "../../../socle/son";
@@ -199,14 +200,10 @@ export class Ecran extends Phaser.Scene {
       surTouche(this, touche, () => this.agir(ACTIONS[i].id));
       surTouche(this, "NUMPAD_" + touche, () => this.agir(ACTIONS[i].id));
     });
-    this.input.gamepad?.on("down", (_m: Phaser.Input.Gamepad.Gamepad, bouton: Phaser.Input.Gamepad.Button) => {
-      switch (bouton.index) {
-        case 14: this.choisir(this.choisi - 1); break;
-        case 15: this.choisir(this.choisi + 1); break;
-        case 0: this.agir(ACTIONS[this.choisi].id); break;
-        case 1: this.quitter(); break;
-      }
-    });
+    surManette(this, MANETTE.GAUCHE, () => this.choisir(this.choisi - 1));
+    surManette(this, MANETTE.DROITE, () => this.choisir(this.choisi + 1));
+    surManette(this, VALIDER, () => this.agir(ACTIONS[this.choisi].id));
+    surManette(this, MANETTE.B, () => this.quitter());
   }
 
   // Le jeu disparaît (un autre onglet, le téléphone qu'on verrouille) : on sauve, il s'endort.

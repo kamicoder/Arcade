@@ -16,6 +16,7 @@ import {
 import { LARGEUR, HAUTEUR } from "../../../socle/style";
 import { lire, ecrire } from "../../../socle/sauvegarde";
 import { surTouche } from "../../../socle/clavier";
+import { surManette, MANETTE } from "../../../socle/manette";
 import { fonduPuis } from "../../../socle/retour";
 import { toucheDuSon } from "../../../socle/son";
 
@@ -135,11 +136,7 @@ export class Partie extends Phaser.Scene implements Terrain {
     // À la souris, le vaisseau est le curseur : la flèche se cache pendant la partie, et revient à la fin
     this.input.setDefaultCursor("none");
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.input.setDefaultCursor("default"));
-    this.input.gamepad?.on("down", (_m: Phaser.Input.Gamepad.Gamepad, bouton: Phaser.Input.Gamepad.Button) => {
-      if (bouton.index === 9 || bouton.index === 8) {   // Start ou Select : on s'en va
-        this.quitter();
-      }
-    });
+    surManette(this, [MANETTE.START, MANETTE.SELECT], () => this.quitter());   // en partie, Start ou Select : on s'en va
 
     this.scene.launch("tir-tableau");
     this.commencerLaVague(donnees.vague ?? 1);

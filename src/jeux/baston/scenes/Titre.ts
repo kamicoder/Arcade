@@ -9,6 +9,7 @@ import { cleDePlanche, cleDAnimation } from "../textures";
 import { SOL, ECHELLE, ORANGE } from "../reglages";
 import { POLICE } from "../../../socle/style";
 import { surTouche } from "../../../socle/clavier";
+import { surManette, MANETTE } from "../../../socle/manette";
 import { estTactile } from "../../../socle/tactile";
 import { retourAuHub, fonduPuis } from "../../../socle/retour";
 import { elargir, suivreLaLargeur } from "../../../socle/largeur";
@@ -69,6 +70,7 @@ export class Titre extends Phaser.Scene {
     surTouche(this, "O", () => this.lancer(true));
     surTouche(this, "D", () => this.lancer(false));
     surTouche(this, "ESC", () => retourAuHub(this));
+    surManette(this, MANETTE.B, () => retourAuHub(this));
 
     const bilan = lireLeBilan();
     if (bilan.victoires + bilan.defaites > 0) {

@@ -6,6 +6,7 @@ import { lireLeRecord } from "./Partie";
 import { FOND, CYAN, VIES } from "../reglages";
 import { LARGEUR, HAUTEUR, POLICE } from "../../../socle/style";
 import { surTouche } from "../../../socle/clavier";
+import { surManette, MANETTE, VALIDER } from "../../../socle/manette";
 import { estTactile } from "../../../socle/tactile";
 import { retourAuHub, fonduPuis } from "../../../socle/retour";
 import { boutonArcade } from "../../../socle/boutonArcade";
@@ -64,13 +65,8 @@ export class Menu extends Phaser.Scene {
     surTouche(this, "ENTER", () => this.lancer());
     surTouche(this, "SPACE", () => this.lancer());
     surTouche(this, "ESC", () => this.quitter());
-    this.input.gamepad?.on("down", (_m: Phaser.Input.Gamepad.Gamepad, bouton: Phaser.Input.Gamepad.Button) => {
-      if (bouton.index === 0 || bouton.index === 9) {
-        this.lancer();
-      } else if (bouton.index === 1) {
-        this.quitter();
-      }
-    });
+    surManette(this, VALIDER, () => this.lancer());
+    surManette(this, MANETTE.B, () => this.quitter());
   }
 
   update(_temps: number, delta: number) {
