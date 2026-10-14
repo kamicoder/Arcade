@@ -1,5 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
-import { ouvrir, appuyer, attendreScene, scenesActives, versLaPage, toucher, tailleDuJeu } from "./outils";
+import { ouvrir, appuyer, attendreScene, scenesActives, versLaPage, toucher, tailleDuJeu, toucherLaCarte } from "./outils";
 
 // Du Hub jusqu'au titre de la baston : la quatrième carte, sous la première
 async function titreBaston(page: Page) {
@@ -230,7 +230,7 @@ test.describe("au doigt", () => {
   test("l'arène élargie, le joystick et les trois boutons", async ({ page }) => {
     const { sansErreur } = await ouvrir(page);
     expect(await tailleDuJeu(page)).toEqual({ largeur: 960, hauteur: 540 });
-    await toucher(page, 345, 400);         // la carte de la baston
+    await toucherLaCarte(page, "baston");
     await attendreScene(page, "baston-titre");
 
     // La baston prend la proportion du téléphone : plus de bandes noires sur les côtés
@@ -349,7 +349,7 @@ test.describe("au doigt", () => {
 
   test("de retour au Hub, puis dans un autre jeu : 960 × 540", async ({ page }) => {
     const { sansErreur } = await ouvrir(page);
-    await toucher(page, 345, 400);
+    await toucherLaCarte(page, "baston");
     await attendreScene(page, "baston-titre");
     expect((await tailleDuJeu(page)).largeur).toBe(Math.round(540 * 844 / 390));
     // L'écran change de forme (un autre téléphone, le plein écran) : le titre suit
@@ -361,7 +361,7 @@ test.describe("au doigt", () => {
     expect(await tailleDuJeu(page)).toEqual({ largeur: 960, hauteur: 540 });
     expect(await page.evaluate(() => (window as any).jeu.scene.getScene("Hub").cameras.main.width)).toBe(960);
 
-    await toucher(page, 750, 200);         // le démineur
+    await toucherLaCarte(page, "demineur");
     await attendreScene(page, "demineur-menu");
     expect(await tailleDuJeu(page)).toEqual({ largeur: 960, hauteur: 540 });
     // Le démineur garde ses bandes noires : il n'a rien demandé

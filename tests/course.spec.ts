@@ -2,7 +2,7 @@
 // Chaque scénario de l'ancienne course de voitures et de l'ancienne course des licornes est ici, dans son
 // thème ; plus ceux qui prouvent qu'un thème se branche simplement sur le même jeu.
 import { test, expect, type Page } from "@playwright/test";
-import { ouvrir, appuyer, attendreScene, scenesActives, versLaPage, toucher } from "./outils";
+import { ouvrir, appuyer, attendreScene, scenesActives, versLaPage, toucher, toucherLaCarte } from "./outils";
 
 type IdTheme = "voitures" | "licornes";
 const CARTE: Record<IdTheme, number> = { voitures: 0, licornes: 1 };
@@ -548,7 +548,7 @@ test.describe("les voitures", () => {
 
     test("on choisit au doigt, la voiture accélère seule, et ◀ ▶ tournent", async ({ page }) => {
       const { sansErreur } = await ouvrir(page);
-      await toucher(page, 225, 225);       // la carte de la course de voitures
+      await toucherLaCarte(page, "voiture");
       await attendreScene(page, "course-menu");
       await toucher(page, 610, 227);       // « Contre la montre »
       await attendreScene(page, "course-circuits");
@@ -912,7 +912,7 @@ test.describe("les licornes", () => {
 
     test("pas de course à deux, la licorne galope seule, ◀ ▶ tournent, et le bouton pause", async ({ page }) => {
       const { sansErreur } = await ouvrir(page);
-      await toucher(page, 480, 200);       // la carte des licornes
+      await toucherLaCarte(page, "licorne");
       await attendreScene(page, "course-menu");
       const modes = await page.evaluate(() =>
         (window as any).jeu.scene.getScene("course-menu").modes.map((m: any) => m.id));

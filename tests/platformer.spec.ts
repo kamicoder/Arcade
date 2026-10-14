@@ -1,5 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
-import { ouvrir, appuyer, attendreScene, scenesActives, versLaPage, toucher } from "./outils";
+import { ouvrir, appuyer, attendreScene, scenesActives, versLaPage, toucher, toucherLaCarte } from "./outils";
 
 // Du Hub jusqu'au menu du platformer (la 5e carte : une rangée plus bas, une carte à droite)
 async function menuPlatformer(page: Page) {
@@ -488,7 +488,7 @@ test.describe("au doigt", () => {
 
   test("on choisit au doigt, ▶ fait courir, ▲ fait sauter", async ({ page }) => {
     const { sansErreur } = await ouvrir(page);
-    await toucher(page, 615, 400);         // la carte du platformer (la 2e de la 2e rangée)
+    await toucherLaCarte(page, "platformer");
     await attendreScene(page, "platformer-menu");
     expect(await page.evaluate(() => (window as any).jeu.scene.getScene("platformer-menu").boutons[2].possible)).toBe(false);
     await toucher(page, 480, 150);         // « Aventure »

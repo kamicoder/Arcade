@@ -1,5 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
-import { ouvrir, appuyer, attendreScene, versLaPage, toucher } from "./outils";
+import { ouvrir, appuyer, attendreScene, versLaPage, toucher, toucherLaCarte } from "./outils";
 
 // Dix mines connues pour le niveau Facile (9 × 9), loin du coin en bas à gauche où l'on commence :
 // (8, 0) n'a aucune mine autour, et la cascade ouvre une belle zone
@@ -255,7 +255,7 @@ test.describe("au doigt", () => {
 
   test("toucher pour creuser, appui long ou bouton pour le drapeau", async ({ page }) => {
     const { sansErreur } = await ouvrir(page);
-    await toucher(page, 750, 225);         // la carte du démineur
+    await toucherLaCarte(page, "demineur");
     await attendreScene(page, "demineur-menu");
     await page.waitForTimeout(500);
     await toucher(page, 180, 300);         // le niveau Facile

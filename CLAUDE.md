@@ -41,7 +41,8 @@ npm run build
 
 Les tests lisent l'état du jeu à travers `window.jeu`, qui n'existe qu'en développement (`main.ts`).
 Un nouveau jeu ou un nouveau mode vient avec ses tests dans `tests/`. Dans un test, passer par
-`appuyer()` (de `tests/outils.ts`) plutôt que `keyboard.press` enchaînés.
+`appuyer()` (de `tests/outils.ts`) plutôt que `keyboard.press` enchaînés, et pour ouvrir un jeu au doigt,
+`toucherLaCarte(page, cle)` (les cartes du Hub changent de place quand un jeu arrive).
 
 ## Le socle (`src/socle/`) : à utiliser plutôt que les appels Phaser directs
 
@@ -163,6 +164,6 @@ compatibilité de leurs sauvegardes (elle range les siennes à sa façon, voir l
 jeu trouvé ici existe peut-être aussi là-bas : le signaler à l'utilisateur.
 
 Avancement : les jeux sont là (la course, avec ses thèmes voitures et licornes, le démineur, la baston de
-robots, le platformer), chacun avec ses modes, le doigt, le clavier et la manette. Pistes ouvertes : les
-petits outils de socle que les agents ont réclamés (saisie de texte, couleurs, fondu de toutes les
-caméras, menus à boutons).
+robots, le platformer, le tir spatial), chacun avec ses modes, le doigt, le clavier et la manette. Pistes
+ouvertes : les petits outils de socle que les agents ont réclamés (saisie de texte, couleurs, fondu de
+toutes les caméras, menus à boutons).

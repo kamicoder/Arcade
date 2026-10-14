@@ -53,3 +53,12 @@ export async function toucher(page: Page, x: number, y: number) {
   const p = await versLaPage(page, x, y);
   await page.touchscreen.tap(p.x, p.y);
 }
+
+// Toucher la carte d'un jeu dans le Hub, d'après sa clé (catalogue.ts) : sa place change quand un jeu arrive
+export async function toucherLaCarte(page: Page, cle: string) {
+  const { x, y } = await page.evaluate((cle) => {
+    const carte = (window as any).jeu.scene.getScene("Hub").cartes.find((c: any) => c.fiche.cle === cle);
+    return { x: carte.boite.x as number, y: carte.boite.y as number };
+  }, cle);
+  await toucher(page, x, y);
+}
