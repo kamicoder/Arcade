@@ -2,7 +2,8 @@
 
 import Phaser from "phaser";
 import type { Combat } from "./Combat";
-import { ListeDeBoutons, enCouleur } from "../decor";
+import { enCouleur } from "../decor";
+import { ListeDeBoutons } from "../../../socle/listeDeBoutons";
 import { BLEU, ORANGE, MANCHES_GAGNANTES } from "../reglages";
 import { HAUTEUR, POLICE } from "../../../socle/style";
 import { surTouche } from "../../../socle/clavier";
@@ -46,7 +47,7 @@ export class Fin extends Phaser.Scene {
         { nom: "Revanche", action: () => combat.revanche() },
         { nom: "Changer de robots", action: () => combat.quitter("baston-choix") },
         { nom: "Menu", action: () => combat.quitter() },
-      ], { x: milieu, y: 280, largeur: 340, hauteur: 58, ecart: 74 });
+      ], { x: milieu, y: 280, largeur: 340, hauteur: 58, ecart: 74 }, { couleur: ORANGE });
       surTouche(this, "ESC", () => combat.quitter());
       surManette(this, MANETTE.B, () => combat.quitter());
     });

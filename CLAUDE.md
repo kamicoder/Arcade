@@ -61,6 +61,8 @@ Chaque fichier dit en tête pourquoi il existe.
   menus, listes et fins, A ou Start valide (`VALIDER`), B revient ; en partie, chaque jeu décide.
 - `uneSeuleFois()` (`fin.ts`) : une garde contre un double départ (rejouer OU revenir) ; `ecranDeFin(scene, ...)` :
   l'écran « GAME OVER » à deux boutons (tir, platformer).
+- `ListeDeBoutons` (`listeDeBoutons.ts`) : des boutons les uns sous les autres, au clavier, à la manette, à la souris
+  et au doigt (titre et fin de la baston, menu du platformer).
 - `boutonDuSon(scene, cle)`, `toucheDuSon`, `appliquerLeSon` (`son.ts`) : le son coupé ou remis (M), rangé sous
   `<cle>/son` ; `retourAuHub` le remet. Ne jamais relire `sound.mute` (voir `docs/PIEGES-PHASER.md`).
 - `TouchesPhysiques` : une touche qui sert à **jouer** se reconnaît à sa place (`event.code`, « KeyW » = le
@@ -101,4 +103,4 @@ compatibilité de leurs sauvegardes. Un défaut de jeu trouvé ici existe peut-�
 signaler à l'utilisateur.
 
 Pistes ouvertes : les petits outils de socle que les agents ont réclamés (saisie de texte, couleurs,
-fondu de toutes les caméras, menus à boutons).
+fondu de toutes les caméras).

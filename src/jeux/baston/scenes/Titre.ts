@@ -1,7 +1,8 @@
 // Le titre : deux robots qui se toisent, et le choix du mode (contre l'ordinateur, ou à deux).
 
 import Phaser from "phaser";
-import { ListeDeBoutons, dessinerArene, enCouleur, type Choix } from "../decor";
+import { dessinerArene, enCouleur } from "../decor";
+import { ListeDeBoutons, type Choix } from "../../../socle/listeDeBoutons";
 import { lireLeBilan } from "../partie";
 import { manettes, TOUCHES, type Cote } from "../commandes";
 import { etiquette } from "../../../socle/touchesPhysiques";
@@ -66,7 +67,7 @@ export class Titre extends Phaser.Scene {
     if (!estTactile() || manettes(this).length >= 2) {
       choix.push({ nom: "À deux", aide: "D", action: () => this.lancer(false) });
     }
-    new ListeDeBoutons(this, choix, { x: milieu, y: 190, largeur: 380, hauteur: 70, ecart: 90 });
+    new ListeDeBoutons(this, choix, { x: milieu, y: 190, largeur: 380, hauteur: 70, ecart: 90 }, { couleur: ORANGE });
     surTouche(this, "O", () => this.lancer(true));
     surTouche(this, "D", () => this.lancer(false));
     surTouche(this, "ESC", () => retourAuHub(this));
