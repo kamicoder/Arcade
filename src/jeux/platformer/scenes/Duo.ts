@@ -9,10 +9,10 @@ import { Heros } from "../Heros";
 import { Commandes, type Joueur } from "../commandes";
 import { Generateur } from "../generateur";
 import { Genres } from "../genres";
-import { toucheDuSon } from "../son";
-import { FOND, ZOOM, HAUTEUR_MONDE, OBJECTIF_DUO } from "../reglages";
+import { FOND, ZOOM, HAUTEUR_MONDE, OBJECTIF_DUO, SAUVEGARDE } from "../reglages";
 import { LARGEUR, HAUTEUR } from "../../../socle/style";
 import { surTouche } from "../../../socle/clavier";
+import { toucheDuSon } from "../../../socle/son";
 import { fonduPuis } from "../../../socle/retour";
 
 const DECALAGE = 1000;                     // le monde du joueur 2 est rangé sous celui du joueur 1
@@ -71,7 +71,7 @@ export class Duo extends Phaser.Scene {
     });
 
     surTouche(this, "ESC", () => this.quitter());
-    toucheDuSon(this);
+    toucheDuSon(this, SAUVEGARDE);
     this.scene.launch("platformer-tableau");
   }
 

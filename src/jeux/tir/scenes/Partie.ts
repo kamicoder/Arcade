@@ -9,7 +9,6 @@ import Phaser from "phaser";
 import { Commandes } from "../commandes";
 import { Ennemi, Boss, type Terrain } from "../Ennemi";
 import { vague, type Vague } from "../vagues";
-import { toucheDuSon } from "../son";
 import {
   VITESSE, CADENCE, VITESSE_BALLE, ARME_MAX, INVINCIBLE, VIES, HAUT_DU_VAISSEAU, ENNEMIS, BOSS,
   VITESSE_BALLE_ENNEMIE, CHANCE_DE_BONUS, VITESSE_BONUS, FOND, SAUVEGARDE,
@@ -18,6 +17,7 @@ import { LARGEUR, HAUTEUR } from "../../../socle/style";
 import { lire, ecrire } from "../../../socle/sauvegarde";
 import { surTouche } from "../../../socle/clavier";
 import { fonduPuis } from "../../../socle/retour";
+import { toucheDuSon } from "../../../socle/son";
 
 export type GenreDeBonus = "arme" | "bouclier" | "vie";
 
@@ -131,7 +131,7 @@ export class Partie extends Phaser.Scene implements Terrain {
 
     this.commandes = new Commandes(this, () => this.vaisseau.body.center.clone());
     surTouche(this, "ESC", () => this.quitter());
-    toucheDuSon(this);
+    toucheDuSon(this, "tir");
     // À la souris, le vaisseau est le curseur : la flèche se cache pendant la partie, et revient à la fin
     this.input.setDefaultCursor("none");
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.input.setDefaultCursor("default"));

@@ -3,17 +3,18 @@
 
 import Phaser from "phaser";
 import { chargerTous, liste } from "../niveaux";
-import { lancerLaMusique, quitterLePlatformer, basculerLeSon, sonAllume, toucheDuSon } from "../son";
+import { lancerLaMusique, quitterLePlatformer } from "../son";
 import { lireLeRecord, type DonneesDeNiveau } from "./Niveau";
 import { lettresDuJoueur1 } from "../commandes";
 import { texturePour, ECHELLE_TUILE } from "../textures";
 import { Genres } from "../genres";
-import { FOND, VERT, VIES } from "../reglages";
+import { FOND, VERT, VIES, SAUVEGARDE } from "../reglages";
 import { LARGEUR, HAUTEUR, POLICE } from "../../../socle/style";
 import { surTouche } from "../../../socle/clavier";
 import { estTactile } from "../../../socle/tactile";
 import { retourAuHub, fonduPuis } from "../../../socle/retour";
 import { boutonArcade } from "../../../socle/boutonArcade";
+import { boutonDuSon } from "../../../socle/son";
 
 type Choix = "aventure" | "infini" | "duo" | "editeur";
 
@@ -32,7 +33,6 @@ export class Menu extends Phaser.Scene {
   private boutons: Bouton[] = [];
   private parti = false;
   private alerte!: Phaser.GameObjects.Text;
-  private boutonDuSon!: Phaser.GameObjects.Text;
 
   constructor() {
     super("platformer-menu");
@@ -62,15 +62,7 @@ export class Menu extends Phaser.Scene {
     const aide = auDoigt ? "Touche un mode pour jouer !" : "↑ ↓ : choisir    Entrée : jouer    M : le son    Échap : l'Arcade";
     this.add.text(LARGEUR / 2, 515, aide, { fontFamily: POLICE, fontSize: "16px", color: "#e9e4f0" }).setOrigin(0.5);
 
-    // Le bouton du son, en haut à droite (la touche M fait pareil)
-    this.boutonDuSon = this.add.text(LARGEUR - 20, 20, "", { fontFamily: POLICE, fontSize: "18px", color: "#a49cb4" })
-      .setOrigin(1, 0).setPadding(8).setInteractive({ useHandCursor: true });
-    this.boutonDuSon.on("pointerup", () => {
-      basculerLeSon(this);
-      this.montrerLeSon();
-    });
-    this.montrerLeSon();
-    toucheDuSon(this, () => this.montrerLeSon());
+    boutonDuSon(this, SAUVEGARDE);
 
     surTouche(this, "UP", () => this.choisir(this.choisi - 1));
     surTouche(this, "DOWN", () => this.choisir(this.choisi + 1));
@@ -129,10 +121,6 @@ export class Menu extends Phaser.Scene {
       bouton.aide.setColor(elu ? "#14121c" : "#a49cb4");
       this.tweens.add({ targets: [bouton.fond, bouton.nom, bouton.aide], scale: elu ? 1.04 : 1, duration: 120, ease: "Back.Out" });
     });
-  }
-
-  private montrerLeSon() {
-    this.boutonDuSon.setText(sonAllume() ? "🔊 Son (M)" : "🔇 Muet (M)");
   }
 
   private lancer() {

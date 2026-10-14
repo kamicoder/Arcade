@@ -1,5 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
-import { ouvrir, appuyer, attendreScene, scenesActives, versLaPage, toucher, ouvrirLaCarte } from "./outils";
+import { ouvrir, appuyer, attendreScene, scenesActives, versLaPage, toucher, ouvrirLaCarte, manette } from "./outils";
 
 // Du Hub jusqu'au menu du jeu de tir
 async function menuDuTir(page: Page) {
@@ -229,6 +229,71 @@ test("le boss arrive à la vague 5 ; battu, la vague 6 commence", async ({ page 
     return p.vague.numero === 6;
   }, undefined, { timeout: 15_000 });
   expect((await partie(page)).score).toBeGreaterThanOrEqual(3000);
+  sansErreur();
+});
+
+// Le son coupé (socle/son.ts) : le même pour tous les jeux qui n'ont que « allumé » ou « coupé »
+test("le son : M le coupe et le bouton le remet, c'est gardé, et le retour au Hub le rend à l'Arcade", async ({ page }) => {
+  const { sansErreur } = await menuDuTir(page);
+  // Ce que le jeu demande, d'après l'événement « mute » de Phaser : relire sound.mute peut mentir quand
+  // rien ne joue (docs/PIEGES-PHASER.md)
+  await page.evaluate(() => {
+    (window as any).__muet = false;
+    (window as any).jeu.sound.on("mute", (_sons: unknown, muet: boolean) => { (window as any).__muet = muet; });
+  });
+  const muet = () => page.evaluate(() => (window as any).__muet as boolean);
+  const bouton = () => page.evaluate(() => (window as any).jeu.scene.getScene("tir-menu").children.list
+    .find((o: any) => typeof o.text === "string" && o.text.includes("(M)")).text as string);
+  expect(await muet()).toBe(false);
+  await appuyer(page, "m");
+  expect(await muet()).toBe(true);
+  expect(await bouton()).toContain("Muet");
+  expect(await page.evaluate(() => localStorage.getItem("tir/son"))).toBe("false");
+
+  // En partie, toujours coupé ; M fonctionne là aussi
+  await appuyer(page, "Enter");
+  await attendreScene(page, "tir-partie");
+  expect(await muet()).toBe(true);
+  await appuyer(page, "m");
+  expect(await muet()).toBe(false);
+  await appuyer(page, "m");
+
+  // Au Hub, le son revient pour toute l'Arcade, mais le tir s'en souvient
+  await appuyer(page, "Escape");
+  await attendreScene(page, "tir-menu");
+  await appuyer(page, "Escape");
+  await attendreScene(page, "Hub");
+  expect(await muet()).toBe(false);
+  await ouvrirLaCarte(page, "tir");
+  await attendreScene(page, "tir-menu");
+  expect(await muet()).toBe(true);
+  sansErreur();
+});
+
+// La manette (socle/manette.ts) : A ou Start valide, B revient, dans les menus et les fins de partie
+test("à la manette : A lance la partie, Start rejoue après la fin, B revient au menu", async ({ page }) => {
+  const { sansErreur } = await menuDuTir(page);
+  await manette(page, "tir-menu", 0);
+  await attendreScene(page, "tir-partie");
+  await page.evaluate(() => {
+    const p = (window as any).jeu.scene.getScene("tir-partie");
+    p.vies = 1;
+    p.toucherLeVaisseau();
+  });
+  await attendreScene(page, "tir-fin");
+  await page.waitForTimeout(700);          // la fin n'écoute qu'après un petit moment
+  await manette(page, "tir-fin", 9);
+  await page.waitForFunction(() => !(window as any).jeu.scene.isActive("tir-fin")
+    && (window as any).jeu.scene.getScene("tir-partie").enJeu);
+  await page.evaluate(() => {
+    const p = (window as any).jeu.scene.getScene("tir-partie");
+    p.vies = 1;
+    p.toucherLeVaisseau();
+  });
+  await attendreScene(page, "tir-fin");
+  await page.waitForTimeout(700);
+  await manette(page, "tir-fin", 1);
+  await attendreScene(page, "tir-menu");
   sansErreur();
 });
 

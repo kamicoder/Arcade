@@ -57,6 +57,8 @@ Chaque fichier dit en tête pourquoi il existe.
 - `surTouche(scene, "ENTER", action)` au lieu de `keyboard.on("keydown-...")` (un défaut de Phaser 4.2) ;
   `surChaqueTouche(scene, action)` pour toutes les touches, avec l'événement du navigateur.
 - `fonduPuis(scene, action)` au lieu de `camera.fadeOut()` ; `retourAuHub(scene)` pour quitter un jeu.
+- `boutonDuSon(scene, cle)`, `toucheDuSon`, `appliquerLeSon` (`son.ts`) : le son coupé ou remis (M), rangé sous
+  `<cle>/son` ; `retourAuHub` le remet. Ne jamais relire `sound.mute` (voir `docs/PIEGES-PHASER.md`).
 - `TouchesPhysiques` : une touche qui sert à **jouer** se reconnaît à sa place (`event.code`, « KeyW » = le
   Z d'un AZERTY) ; une touche qui sert à écrire, ou un raccourci nommé par sa lettre (M pour le son), à
   sa lettre. `etiquette(code)` donne ce qui est écrit sur la touche de ce clavier.

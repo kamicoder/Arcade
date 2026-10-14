@@ -33,6 +33,14 @@ bugs de Phaser : c'est sa façon de faire, logique une fois qu'on la connaît, m
   survivent à son arrêt : préférer sa méthode `update()`.
 - Une scène en pause n'entend plus le clavier : une touche lâchée pendant la pause reste « tenue ».
 
+**Le son**
+
+- Ne jamais **relire** `sound.mute` pour savoir si le son est coupé. Avec le Web Audio, il relit le gain du
+  nœud de coupure, que Chrome et Edge ne recalculent que quand un son le traverse : au Hub, où rien ne
+  joue, il peut répondre « coupé » longtemps après qu'on a remis le son (le son, lui, revient bien). Le
+  jeu sait ce qu'il a demandé (sa sauvegarde, `socle/son.ts`) ; un test écoute l'événement `"mute"` que
+  Phaser émet à chaque changement.
+
 **Le clavier et le doigt**
 
 - Un appui bref (enfoncé et relâché dans la même image, ou une tape au doigt) n'est jamais vu « tenu » :

@@ -14,7 +14,6 @@ import { Commandes } from "../commandes";
 import { Generateur } from "../generateur";
 import { Genres } from "../genres";
 import { chargerTous } from "../niveaux";
-import { toucheDuSon } from "../son";
 import { creerLeDecor, defilerLeDecor } from "../decor";
 import type { Boss } from "../Ennemis";
 import {
@@ -22,6 +21,7 @@ import {
 } from "../reglages";
 import { lire, ecrire } from "../../../socle/sauvegarde";
 import { surTouche } from "../../../socle/clavier";
+import { toucheDuSon } from "../../../socle/son";
 import { fonduPuis } from "../../../socle/retour";
 
 export type Mode = "aventure" | "infini" | "test";
@@ -132,7 +132,7 @@ export class Niveau extends Phaser.Scene {
 
     this.commandes = new Commandes(this, "seul");
     surTouche(this, "ESC", () => this.quitter());
-    toucheDuSon(this);
+    toucheDuSon(this, SAUVEGARDE);
     this.input.gamepad?.on("down", (_m: Phaser.Input.Gamepad.Gamepad, bouton: Phaser.Input.Gamepad.Button) => {
       if (bouton.index === 9 || bouton.index === 8) {   // Start ou Select : on s'en va
         this.quitter();

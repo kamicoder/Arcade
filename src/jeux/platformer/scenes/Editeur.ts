@@ -24,9 +24,10 @@ import {
 import { Bouton, Fenetre, Saisie, SURVOL, PANNEAU, BORD, TEXTE, GRIS, ALERTE } from "../editeur/interface";
 import { FenetreDesNiveaux, FenetreDuGenre, type PourLesFenetres } from "../editeur/fenetres";
 import { texturePour, ECHELLE_TUILE } from "../textures";
-import { lancerLaMusique, basculerLeSon, sonAllume } from "../son";
+import { lancerLaMusique } from "../son";
+import { basculerLeSon, sonAllume } from "../../../socle/son";
 import type { DonneesDeNiveau } from "./Niveau";
-import { FOND, HAUTEUR_MONDE, VIES } from "../reglages";
+import { FOND, HAUTEUR_MONDE, VIES, SAUVEGARDE } from "../reglages";
 import { LARGEUR, HAUTEUR, POLICE } from "../../../socle/style";
 import { fonduPuis } from "../../../socle/retour";
 
@@ -199,7 +200,7 @@ export class Editeur extends Phaser.Scene implements PourLesOutils, PourLesFenet
     x += 154;
     enHaut("apres", 28, ">", () => this.changerDeNiveau(1), "Le niveau d'après (Page bas)");
     this.bouton("son", LARGEUR - 236, 7, 56, 30, "", () => {
-      basculerLeSon(this);
+      basculerLeSon(this, SAUVEGARDE);
       this.changer();
     }, "Couper le son, ou le remettre (M)");
     this.bouton("moins", LARGEUR - 172, 7, 30, 30, "−", () => this.zoomer(-1), "Dézoomer (molette)");
@@ -374,7 +375,7 @@ export class Editeur extends Phaser.Scene implements PourLesOutils, PourLesFenet
     b.supprimer!.setActif(this.selection.length > 0);
     b.coller!.setActif(this.pressePapiers.length > 0);
     b.aimant!.setTexte(this.aimant ? "Aimant : oui" : "Aimant : non");
-    b.son!.setTexte(sonAllume() ? "Son" : "Muet");
+    b.son!.setTexte(sonAllume(SAUVEGARDE) ? "Son" : "Muet");
     this.nomAffiche.setText(this.nom + (this.modifie ? " ★" : ""));
     this.longueur.setText("Longueur : " + this.largeur);
     this.alerte.setText(probleme(this.elements));
@@ -594,7 +595,7 @@ export class Editeur extends Phaser.Scene implements PourLesOutils, PourLesFenet
       "s": () => this.choisirLOutil("selection"),
       "g": () => this.choisirLOutil("gomme"),
       "h": () => this.choisirLOutil("main"),
-      "m": () => basculerLeSon(this),
+      "m": () => basculerLeSon(this, SAUVEGARDE),
       "Escape": () => this.choisir([]),
     };
     const action = raccourcis[(ctrl ? "ctrl+" : "") + touche];

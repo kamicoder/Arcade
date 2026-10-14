@@ -3,17 +3,16 @@
 
 import Phaser from "phaser";
 import { lireLeRecord } from "./Partie";
-import { appliquerLeSon, quitterLeTir, basculerLeSon, sonAllume, toucheDuSon } from "../son";
 import { FOND, CYAN, VIES } from "../reglages";
 import { LARGEUR, HAUTEUR, POLICE } from "../../../socle/style";
 import { surTouche } from "../../../socle/clavier";
 import { estTactile } from "../../../socle/tactile";
 import { retourAuHub, fonduPuis } from "../../../socle/retour";
 import { boutonArcade } from "../../../socle/boutonArcade";
+import { appliquerLeSon, boutonDuSon } from "../../../socle/son";
 
 export class Menu extends Phaser.Scene {
   private parti = false;
-  private boutonDuSon!: Phaser.GameObjects.Text;
   private etoiles: Phaser.GameObjects.TileSprite[] = [];
 
   constructor() {
@@ -23,7 +22,7 @@ export class Menu extends Phaser.Scene {
   create() {
     this.parti = false;
     this.cameras.main.setBackgroundColor(FOND).fadeIn(250);
-    appliquerLeSon(this);
+    appliquerLeSon(this, "tir");
 
     // Les étoiles défilent déjà, et le vaisseau flotte : le jeu donne envie
     this.etoiles = ["loin", "milieu", "pres"].map((couche) =>
@@ -60,15 +59,7 @@ export class Menu extends Phaser.Scene {
       fontFamily: POLICE, fontSize: "14px", color: "#a59fc0",
     }).setOrigin(0.5);
 
-    // Le bouton du son, en haut à droite (la touche M fait pareil)
-    this.boutonDuSon = this.add.text(LARGEUR - 20, 20, "", { fontFamily: POLICE, fontSize: "18px", color: "#a49cb4" })
-      .setOrigin(1, 0).setPadding(8).setInteractive({ useHandCursor: true });
-    this.boutonDuSon.on("pointerup", () => {
-      basculerLeSon(this);
-      this.montrerLeSon();
-    });
-    this.montrerLeSon();
-    toucheDuSon(this, () => this.montrerLeSon());
+    boutonDuSon(this, "tir");
 
     surTouche(this, "ENTER", () => this.lancer());
     surTouche(this, "SPACE", () => this.lancer());
@@ -86,10 +77,6 @@ export class Menu extends Phaser.Scene {
     this.etoiles.forEach((couche, i) => (couche.tilePositionY -= [20, 50, 120][i] * delta / 1000));
   }
 
-  private montrerLeSon() {
-    this.boutonDuSon.setText(sonAllume() ? "🔊 Son (M)" : "🔇 Muet (M)");
-  }
-
   private lancer() {
     if (this.parti) {
       return;
@@ -103,7 +90,6 @@ export class Menu extends Phaser.Scene {
       return;
     }
     this.parti = true;
-    quitterLeTir(this);
     retourAuHub(this);
   }
 }

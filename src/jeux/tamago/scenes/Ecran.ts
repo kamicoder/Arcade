@@ -14,12 +14,11 @@ import { replique, parleDeCrotte, parleDuRoi, merci, REFUS, bonjour } from "../r
 import { garderEnSouvenir, recevoirUnVisiteur, ETAT } from "../souvenirs";
 import { habillage as h, CONSOLE, ECRAN, CENTRE_ECRAN } from "../habillage";
 import { COEURS, PAROLE_MIN, PAROLE_MAX, SECONDE } from "../reglages";
-import { appliquerLeSon, quitterLeTamago, basculerLeSon, sonAllume, toucheDuSon } from "../son";
-import { LARGEUR } from "../../../socle/style";
 import { lire, ecrire } from "../../../socle/sauvegarde";
 import { surTouche } from "../../../socle/clavier";
 import { retourAuHub } from "../../../socle/retour";
 import { boutonArcade } from "../../../socle/boutonArcade";
+import { appliquerLeSon, boutonDuSon } from "../../../socle/son";
 
 export type Action = "repas" | "friandise" | "jouer" | "nettoyer" | "soigner" | "gronder" | "caresser" | "carnet";
 
@@ -63,7 +62,6 @@ export class Ecran extends Phaser.Scene {
   private boutons: Bouton[] = [];
   private choisi = 0;
   private etincelles!: Phaser.GameObjects.Particles.ParticleEmitter;
-  private boutonDuSon!: Phaser.GameObjects.Text;
   private avantParole = PAROLE_MIN;
   private avantSauvegarde = SAUVER_TOUTES_LES;
   private avantRappel = 0;
@@ -82,7 +80,7 @@ export class Ecran extends Phaser.Scene {
     this.boutons = [];
     this.enDepart = false;
     this.quitte = false;
-    appliquerLeSon(this);
+    appliquerLeSon(this, "tamago");
     this.cameras.main.setBackgroundColor(h.fond).fadeIn(300);
 
     this.dessinerLaConsole();
@@ -90,13 +88,7 @@ export class Ecran extends Phaser.Scene {
     this.creerLesBoutons();
 
     boutonArcade(this, () => this.quitter(), { police: h.police, fond: 0x1e1e5a, fondAlpha: 0.8 });
-    this.boutonDuSon = this.add.text(LARGEUR - 20, 20, "", { fontFamily: h.police, fontSize: "18px", color: h.ecran.doux })
-      .setOrigin(1, 0).setPadding(8).setInteractive({ useHandCursor: true }).setDepth(1000);
-    this.boutonDuSon.on("pointerup", () => {
-      basculerLeSon(this);
-      this.montrerLeSon();
-    });
-    this.montrerLeSon();
+    boutonDuSon(this, "tamago", { police: h.police, couleur: h.ecran.doux });
 
     this.ecouterLeClavierEtLaManette();
     this.ecouterLesAllersEtRetours();
@@ -195,10 +187,6 @@ export class Ecran extends Phaser.Scene {
     });
   }
 
-  private montrerLeSon() {
-    this.boutonDuSon.setText(sonAllume() ? "🔊 Son (M)" : "🔇 Muet (M)");
-  }
-
   private ecouterLeClavierEtLaManette() {
     surTouche(this, "LEFT", () => this.choisir(this.choisi - 1));
     surTouche(this, "RIGHT", () => this.choisir(this.choisi + 1));
@@ -211,7 +199,6 @@ export class Ecran extends Phaser.Scene {
       surTouche(this, touche, () => this.agir(ACTIONS[i].id));
       surTouche(this, "NUMPAD_" + touche, () => this.agir(ACTIONS[i].id));
     });
-    toucheDuSon(this, () => this.montrerLeSon());
     this.input.gamepad?.on("down", (_m: Phaser.Input.Gamepad.Gamepad, bouton: Phaser.Input.Gamepad.Button) => {
       switch (bouton.index) {
         case 14: this.choisir(this.choisi - 1); break;
@@ -639,7 +626,6 @@ export class Ecran extends Phaser.Scene {
     }
     this.quitte = true;
     this.sauver();
-    quitterLeTamago(this);
     retourAuHub(this);
   }
 }
