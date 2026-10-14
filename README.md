@@ -30,10 +30,11 @@ Les téléphones récupèrent la nouvelle version tout seuls, au retour dans le 
 | `src/scenes/` | Les scènes de l'Arcade : `Demarrage`, puis le `Hub` (le menu des jeux) |
 | `src/jeux/catalogue.ts` | La liste des jeux ; chacun vit dans `src/jeux/<cle>/` et n'est chargé qu'à son lancement |
 | `src/socle/` | Ce que tous les jeux partagent : style, clavier, transitions, sauvegardes, tactile, largeur, mise à jour |
-| `src/jeux/course/` | La course : un seul jeu (scènes, conduite, circuits, atelier, sauvegardes) et ses thèmes dans `themes/` (voitures, licornes) |
+| `src/jeux/course/` | La course : un seul jeu (scènes, conduite, circuits, atelier, sauvegardes) et ses thèmes dans `themes/` (voitures, licornes) ; voir son `LISEZMOI.md` |
 | `tests/` | Les tests Playwright ; un test raté garde sa trace : `npx playwright show-trace <chemin>` |
 | `public/` | Copié tel quel : icônes, sons |
 | `docs/CARNET-PHASER.md` | Apprendre Phaser en suivant la construction de l'Arcade |
+| `docs/PIEGES-PHASER.md` | Les pièges de Phaser 4 rencontrés en route, et les défauts de la 4.2 contournés |
 
 ## Ajouter un jeu
 

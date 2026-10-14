@@ -81,6 +81,72 @@ test("le Hub lance le tir spatial : le vaisseau se pilote, tire tout seul et aba
   sansErreur();
 });
 
+// Par les vrais chocs de la physique, pas en appelant toucherLeVaisseau : Phaser passe les deux objets
+// d'un overlap dans l'ordre qui lui chante, et un ennemi qui percutait détruisait le vaisseau à sa place
+test("un ennemi qui percute le vaisseau, puis une balle ennemie : une vie de moins chaque fois, et ça continue", async ({ page }) => {
+  const { sansErreur } = await menuDuTir(page);
+  await appuyer(page, "Enter");
+  await attendreScene(page, "tir-partie");
+
+  // Le vaisseau se jette sur le premier éclaireur qui passe à sa portée
+  await page.waitForFunction(() => {
+    const p = (window as any).jeu.scene.getScene("tir-partie");
+    const ennemi = p.ennemis.getChildren().find((e: any) => e.y > 230 && e.y < 500);
+    if (ennemi && p.vaisseau.body) {
+      p.vaisseau.body.reset(ennemi.x, ennemi.y);
+    }
+    return p.vies < 3;
+  }, undefined, { timeout: 20_000 });
+  const images = await page.evaluate(() => (window as any).jeu.loop.frame);
+  await page.waitForTimeout(300);
+  expect(await page.evaluate(() => (window as any).jeu.loop.frame)).toBeGreaterThan(images + 5);
+  expect(await partie(page)).toMatchObject({ vies: 2, enJeu: true });
+
+  // Une balle ennemie posée sur le vaisseau, une fois son clignotement fini
+  await page.evaluate(() => {
+    const p = (window as any).jeu.scene.getScene("tir-partie");
+    p.invincibleJusqua = 0;
+    p.tirer(p.vaisseau.x, p.vaisseau.y, 90, 1);
+  });
+  await page.waitForFunction(() => (window as any).jeu.scene.getScene("tir-partie").vies === 1);
+  expect((await partie(page)).enJeu).toBe(true);
+  sansErreur();
+});
+
+test("à la souris, le vaisseau suit le curseur sans cliquer ; une touche reprend la main", async ({ page }) => {
+  const { sansErreur } = await menuDuTir(page);
+  await appuyer(page, "Enter");
+  await attendreScene(page, "tir-partie");
+  await page.waitForTimeout(300);
+
+  const vers = await versLaPage(page, 250, 350);
+  await page.mouse.move(vers.x, vers.y, { steps: 5 });
+  await page.waitForFunction(() => {
+    const c = (window as any).jeu.scene.getScene("tir-partie").vaisseau.body.center;
+    return Math.abs(c.x - 250) < 4 && Math.abs(c.y - 350) < 4;
+  });
+  // Le curseur est caché pendant la partie : le vaisseau le remplace
+  expect(await page.evaluate(() => (window as any).jeu.canvas.style.cursor)).toBe("none");
+
+  // Plus haut que sa limite, il s'arrête à la limite
+  const haut = await versLaPage(page, 600, 60);
+  await page.mouse.move(haut.x, haut.y, { steps: 5 });
+  await page.waitForFunction(() => {
+    const c = (window as any).jeu.scene.getScene("tir-partie").vaisseau.body.center;
+    return Math.abs(c.x - 600) < 4 && c.y > 190 && c.y < 240;
+  });
+
+  // La flèche droite reprend la main : le vaisseau ne revient pas vers le curseur une fois lâchée
+  await page.keyboard.down("ArrowRight");
+  await page.waitForTimeout(300);
+  await page.keyboard.up("ArrowRight");
+  const apres = await partie(page);
+  expect(apres.x).toBeGreaterThan(650);
+  await page.waitForTimeout(300);
+  expect((await partie(page)).x).toBeCloseTo(apres.x, 0);
+  sansErreur();
+});
+
 test("trois coups : la partie est perdue, le record reste, et Entrée rejoue", async ({ page }) => {
   const { sansErreur } = await menuDuTir(page);
   await appuyer(page, "Enter");
@@ -101,6 +167,7 @@ test("trois coups : la partie est perdue, le record reste, et Entrée rejoue", a
   }
   expect((await partie(page)).enJeu).toBe(false);
   await attendreScene(page, "tir-fin");
+  expect(await page.evaluate(() => (window as any).jeu.canvas.style.cursor)).toBe("default");
   expect(await page.evaluate(() => localStorage.getItem("tir/record"))).toBe("4321");
 
   await page.waitForTimeout(700);           // la fin n'écoute qu'après un petit moment

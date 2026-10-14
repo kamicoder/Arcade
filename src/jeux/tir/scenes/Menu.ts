@@ -54,7 +54,7 @@ export class Menu extends Phaser.Scene {
 
     const aide = estTactile()
       ? `Glisse le doigt pour piloter : ton vaisseau tire tout seul.  ${VIES} vies.`
-      : `Flèches ou Z Q S D : piloter (il tire tout seul)    M : le son    Échap : l'Arcade`;
+      : `Souris, flèches ou Z Q S D : piloter (il tire tout seul)    M : le son    Échap : l'Arcade`;
     this.add.text(LARGEUR / 2, 490, aide, { fontFamily: POLICE, fontSize: "16px", color: "#e9e4f0" }).setOrigin(0.5);
     this.add.text(LARGEUR / 2, 515, "Bonus :  orange = plus de tirs    bleu = bouclier    rouge = une vie", {
       fontFamily: POLICE, fontSize: "14px", color: "#a59fc0",

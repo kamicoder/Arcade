@@ -1,10 +1,13 @@
-// Qui pilote le vaisseau : le clavier, la manette et le doigt. On ne tire jamais à la main (le vaisseau
+// Qui pilote le vaisseau : la souris, le clavier, la manette et le doigt. On ne tire jamais à la main (le vaisseau
 // tire tout seul) : il n'y a qu'à se déplacer.
+//   - la souris : le vaisseau suit le curseur, sans cliquer ;
 //   - le clavier : les flèches, ou Z Q S D reconnues à leur PLACE (KeyW, KeyA, KeyS, KeyD : voir
 //     socle/touchesPhysiques.ts) ;
 //   - la manette : la croix ou le stick gauche ;
 //   - le doigt : posé n'importe où, il fait glisser le vaisseau comme une souris (le vaisseau suit le
 //     mouvement du doigt, pas sa place : le doigt ne cache jamais le vaisseau).
+// La souris et le clavier se passent la main : une touche reprend le vaisseau, jusqu'à ce que la souris
+// bouge de nouveau.
 
 import Phaser from "phaser";
 import { TouchesPhysiques } from "../../socle/touchesPhysiques";
@@ -12,7 +15,7 @@ import { TouchesPhysiques } from "../../socle/touchesPhysiques";
 export interface Pilotage {
   dx: number;                              // de -1 (gauche) à 1 (droite)
   dy: number;                              // de -1 (haut) à 1 (bas)
-  cible: Phaser.Math.Vector2 | null;       // au doigt : là où le vaisseau doit aller
+  cible: Phaser.Math.Vector2 | null;       // à la souris ou au doigt : là où le vaisseau doit aller
 }
 
 const TOUCHES = {
@@ -25,6 +28,7 @@ const TOUCHES = {
 export class Commandes {
   private readonly tenues: TouchesPhysiques;
   private doigt: Phaser.Input.Pointer | null = null;
+  private souris: Phaser.Math.Vector2 | null = null;   // là où est le curseur, tant que la souris pilote
   private depart = { doigt: new Phaser.Math.Vector2(), vaisseau: new Phaser.Math.Vector2() };
 
   // ouLeVaisseau : la place du vaisseau quand un doigt se pose
@@ -33,12 +37,18 @@ export class Commandes {
     // Les flèches sont pour le jeu : le navigateur ne fait pas défiler la page avec
     scene.input.keyboard!.addCapture("UP,DOWN,LEFT,RIGHT,SPACE");
     scene.input.on(Phaser.Input.Events.POINTER_DOWN, (doigt: Phaser.Input.Pointer, dessus: Phaser.GameObjects.GameObject[]) => {
-      if (dessus.length > 0 || this.doigt) {
-        return;                            // un bouton (le ✕ du tableau de bord), ou déjà un doigt qui pilote
+      // La souris pilote sans cliquer ; un bouton (le ✕ du tableau de bord), ou un doigt qui pilote déjà
+      if (!doigt.wasTouch || dessus.length > 0 || this.doigt) {
+        return;
       }
       this.doigt = doigt;
       this.depart.doigt.set(doigt.x, doigt.y);
       this.depart.vaisseau.copy(this.ouLeVaisseau());
+    });
+    scene.input.on(Phaser.Input.Events.POINTER_MOVE, (pointeur: Phaser.Input.Pointer) => {
+      if (!pointeur.wasTouch) {
+        this.souris = new Phaser.Math.Vector2(pointeur.worldX, pointeur.worldY);
+      }
     });
     scene.input.on(Phaser.Input.Events.POINTER_UP, (doigt: Phaser.Input.Pointer) => {
       if (doigt === this.doigt) {
@@ -63,7 +73,10 @@ export class Commandes {
       dx /= longueur;
       dy /= longueur;
     }
-    let cible: Phaser.Math.Vector2 | null = null;
+    if (dx !== 0 || dy !== 0) {
+      this.souris = null;                  // le clavier ou la manette reprend la main
+    }
+    let cible = this.souris;
     if (this.doigt?.isDown) {
       cible = new Phaser.Math.Vector2(
         this.depart.vaisseau.x + (this.doigt.x - this.depart.doigt.x),

@@ -114,17 +114,17 @@ export class Partie extends Phaser.Scene implements Terrain {
     this.physics.add.overlap(this.balles, this.ennemis, (a, b) => a instanceof Ennemi
       ? this.balleSurEnnemi(b as Mobile, a)
       : this.balleSurEnnemi(a as Mobile, b as Ennemi));
-    this.physics.add.overlap(this.ballesEnnemies, this.vaisseau, (_v, balle) => {
-      if ((balle as Mobile).active && this.toucherLeVaisseau()) {
-        this.ranger(balle as Mobile);
+    this.surUnDe(this.vaisseau, this.ballesEnnemies, (balle: Mobile) => {
+      if (balle.active && this.toucherLeVaisseau()) {
+        this.ranger(balle);
       }
     });
-    this.physics.add.overlap(this.ennemis, this.vaisseau, (_v, ennemi) => {
-      if ((ennemi as Ennemi).active && this.toucherLeVaisseau()) {
-        this.abattre(ennemi as Ennemi, false);
+    this.surUnDe(this.vaisseau, this.ennemis, (ennemi: Ennemi) => {
+      if (ennemi.active && this.toucherLeVaisseau()) {
+        this.abattre(ennemi, false);
       }
     });
-    this.physics.add.overlap(this.bonus, this.vaisseau, (_v, bonus) => this.ramasser(bonus as Phaser.Physics.Arcade.Image));
+    this.surUnDe(this.vaisseau, this.bonus, (bonus: Phaser.Physics.Arcade.Image) => this.ramasser(bonus));
 
     // Le vaisseau tire tout seul, tant qu'il est là
     this.time.addEvent({ delay: CADENCE, loop: true, callback: () => this.tirerDuVaisseau() });
@@ -132,6 +132,9 @@ export class Partie extends Phaser.Scene implements Terrain {
     this.commandes = new Commandes(this, () => this.vaisseau.body.center.clone());
     surTouche(this, "ESC", () => this.quitter());
     toucheDuSon(this);
+    // À la souris, le vaisseau est le curseur : la flèche se cache pendant la partie, et revient à la fin
+    this.input.setDefaultCursor("none");
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.input.setDefaultCursor("default"));
     this.input.gamepad?.on("down", (_m: Phaser.Input.Gamepad.Gamepad, bouton: Phaser.Input.Gamepad.Button) => {
       if (bouton.index === 9 || bouton.index === 8) {   // Start ou Select : on s'en va
         this.quitter();
@@ -140,6 +143,14 @@ export class Partie extends Phaser.Scene implements Terrain {
 
     this.scene.launch("tir-tableau");
     this.commencerLaVague(donnees.vague ?? 1);
+  }
+
+  // Quand un objet seul (le vaisseau, le boss) touche un objet d'un groupe. Phaser ne passe pas les deux
+  // dans l'ordre où on les a donnés (entre un groupe et un objet seul, il les inverse) : on reconnaît
+  // l'objet seul, et l'action reçoit l'autre. Sinon, un ennemi qui percute le vaisseau détruisait le
+  // vaisseau à sa place, et le jeu s'arrêtait net.
+  private surUnDe<T>(seul: Phaser.GameObjects.GameObject, groupe: Phaser.GameObjects.Group, action: (autre: T) => void) {
+    this.physics.add.overlap(seul, groupe, (a, b) => action((a === seul ? b : a) as T));
   }
 
   update(_temps: number, delta: number) {
@@ -168,7 +179,7 @@ export class Partie extends Phaser.Scene implements Terrain {
     if (cible) {
       // Au doigt : le vaisseau rattrape la cible, vite, sans la dépasser. On part de body.center :
       // la place de l'image a un pas de physique de retard.
-      const ecart = cible.subtract(corps.center);
+      const ecart = cible.clone().subtract(corps.center);
       corps.velocity.copy(ecart.scale(18).limit(VITESSE * 3));
     } else {
       corps.setVelocity(dx * VITESSE, dy * VITESSE);
@@ -192,7 +203,7 @@ export class Partie extends Phaser.Scene implements Terrain {
       this.time.delayedCall(annonce, () => {
         if (this.enJeu) {
           this.boss = new Boss(this, this, this.vague.serie);
-          this.physics.add.overlap(this.balles, this.boss, (_b, balle) => this.balleSurBoss(balle as Mobile));
+          this.surUnDe(this.boss, this.balles, (balle: Mobile) => this.balleSurBoss(balle));
           this.physics.add.overlap(this.boss, this.vaisseau, () => this.toucherLeVaisseau());
         }
       });
@@ -413,6 +424,7 @@ export class Partie extends Phaser.Scene implements Terrain {
 
   private perdre() {
     this.enJeu = false;
+    this.input.setDefaultCursor("default");
     this.vaisseau.setVisible(false);
     this.vaisseau.body.setVelocity(0, 0).enable = false;
     this.reacteur.stop();
