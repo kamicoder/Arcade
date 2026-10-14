@@ -6,6 +6,8 @@ import Phaser from "phaser";
 import type { Partie } from "./Partie";
 import { ARME_MAX, CYAN } from "../reglages";
 import { LARGEUR, POLICE } from "../../../socle/style";
+import { boutonFermer } from "../../../socle/boutonArcade";
+import { annoncer } from "../../../socle/annonce";
 
 export class Tableau extends Phaser.Scene {
   private partie!: Partie;
@@ -33,9 +35,7 @@ export class Tableau extends Phaser.Scene {
     this.viesEnPlus = this.add.text(LARGEUR - 72 - 5 * 26 + 6, 20, "", style).setOrigin(1, 0.5);
 
     // Revenir au menu, en haut à droite
-    this.add.text(LARGEUR - 26, 20, "✕", { fontFamily: POLICE, fontSize: "26px", color: "#ffffff" })
-      .setOrigin(0.5).setPadding(10).setInteractive({ useHandCursor: true })
-      .on("pointerup", () => this.partie.quitter());
+    boutonFermer(this, LARGEUR - 26, 20, () => this.partie.quitter());
 
     // La vie du boss, cachée tant qu'il n'est pas là
     const largeur = 420;
@@ -67,16 +67,7 @@ export class Tableau extends Phaser.Scene {
 
   // Un titre en grand, qui arrive en grossissant et s'en va tout seul
   private annoncer(titre: string, couleur: string) {
-    const bandeau = this.add.text(LARGEUR / 2, 220, titre, {
-      fontFamily: POLICE, fontSize: "44px", fontStyle: "bold", color: couleur, stroke: "#14121c", strokeThickness: 8,
-    }).setOrigin(0.5).setScale(0.6).setAlpha(0);
-    this.tweens.chain({
-      targets: bandeau,
-      tweens: [
-        { alpha: 1, scale: 1, duration: 350, ease: "Back.Out" },
-        { alpha: 0, y: 190, duration: 400, delay: 900, onComplete: () => bandeau.destroy() },
-      ],
-    });
+    annoncer(this, titre, { y: 220, couleur });
   }
 
   // Un petit vaisseau par vie, de droite à gauche ; au-delà de 5, « + n »

@@ -1,5 +1,6 @@
-// Le bouton « ← Arcade » du menu de chaque jeu : un vrai bouton, avec un fond, que le doigt touche
-// partout (le texte seul était trop petit sur un téléphone). Plus grand au doigt qu'à la souris.
+// Les boutons que tous les jeux partagent. « ← Arcade », dans le menu de chaque jeu : un vrai bouton,
+// avec un fond, que le doigt touche partout (le texte seul était trop petit sur un téléphone). Plus grand
+// au doigt qu'à la souris. Et le ✕ qui ferme.
 
 import Phaser from "phaser";
 import { POLICE } from "./style";
@@ -52,4 +53,14 @@ export function boutonArcade(
     action();
   });
   return bouton;
+}
+
+// Le ✕ qui ferme ou quitte (le tableau de bord d'une partie, un panneau) : un grand padding, pour le doigt
+export function boutonFermer(
+  scene: Phaser.Scene, x: number, y: number, action: () => void,
+  style: { police?: string; couleur?: string; taille?: number } = {},
+): Phaser.GameObjects.Text {
+  return scene.add.text(x, y, "✕", {
+    fontFamily: style.police ?? POLICE, fontSize: (style.taille ?? 26) + "px", color: style.couleur ?? "#ffffff",
+  }).setOrigin(0.5).setPadding(10).setInteractive({ useHandCursor: true }).on("pointerup", action);
 }

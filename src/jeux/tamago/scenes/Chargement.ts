@@ -3,7 +3,7 @@
 
 import Phaser from "phaser";
 import { habillage } from "../habillage";
-import { LARGEUR, HAUTEUR } from "../../../socle/style";
+import { barreDeChargement } from "../../../socle/chargement";
 
 export const SONS = [
   "bip", "miam", "joie", "non", "appel", "prout", "nettoie", "soin", "gronde", "evolution", "eclosion", "roi",
@@ -16,10 +16,7 @@ export class Chargement extends Phaser.Scene {
   }
 
   preload() {
-    const barre = this.add.rectangle(LARGEUR / 2 - 150, HAUTEUR / 2, 0, 12, 0xff2d95).setOrigin(0, 0.5);
-    this.load.on("progress", (avancement: number) => {
-      barre.width = 300 * avancement;
-    });
+    barreDeChargement(this, 0xff2d95);
     habillage.charger(this);
     this.load.setPath("tamago/sons");
     for (const nom of SONS) {

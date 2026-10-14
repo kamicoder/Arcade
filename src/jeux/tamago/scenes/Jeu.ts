@@ -9,6 +9,7 @@ import { formeDe } from "../vie";
 import { habillage as h, ECRAN, CENTRE_ECRAN } from "../habillage";
 import { surTouche } from "../../../socle/clavier";
 import { surManette, MANETTE } from "../../../socle/manette";
+import { boutonFermer } from "../../../socle/boutonArcade";
 
 const MANCHES = 5;
 
@@ -50,9 +51,7 @@ export class Jeu extends Phaser.Scene {
       }).setOrigin(0.5).setPadding(16).setInteractive({ useHandCursor: true });
       fleche.on("pointerup", () => this.deviner(cote));
     }
-    this.add.text(ECRAN.x + ECRAN.largeur - 24, ECRAN.y + 20, "✕", { fontFamily: h.police, fontSize: "20px", color: h.ecran.texte })
-      .setOrigin(0.5).setPadding(10).setInteractive({ useHandCursor: true })
-      .on("pointerup", () => this.arreter());
+    boutonFermer(this, ECRAN.x + ECRAN.largeur - 24, ECRAN.y + 20, () => this.arreter(), { police: h.police, couleur: h.ecran.texte, taille: 20 });
     surTouche(this, "LEFT", () => this.deviner("gauche"));
     surTouche(this, "RIGHT", () => this.deviner("droite"));
     surTouche(this, "ESC", () => this.arreter());

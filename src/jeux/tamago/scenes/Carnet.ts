@@ -11,6 +11,7 @@ import { habillage as h, ECRAN, CENTRE_ECRAN } from "../habillage";
 import { COEURS, UN_AN } from "../reglages";
 import { surTouche } from "../../../socle/clavier";
 import { surManette, MANETTE, VALIDER } from "../../../socle/manette";
+import { boutonFermer } from "../../../socle/boutonArcade";
 
 const PAGES = ["ÉTAT", "JOURNAL", "AMIS", "ALBUM"];
 
@@ -40,9 +41,7 @@ export class Carnet extends Phaser.Scene {
         .on("pointerup", () => this.tourner(sens));
     fleche(ECRAN.x + 30, "◀", -1);
     fleche(ECRAN.x + ECRAN.largeur - 64, "▶", 1);
-    this.add.text(ECRAN.x + ECRAN.largeur - 24, ECRAN.y + 20, "✕", { fontFamily: h.police, fontSize: "20px", color: h.ecran.texte })
-      .setOrigin(0.5).setPadding(10).setInteractive({ useHandCursor: true })
-      .on("pointerup", () => this.fermer());
+    boutonFermer(this, ECRAN.x + ECRAN.largeur - 24, ECRAN.y + 20, () => this.fermer(), { police: h.police, couleur: h.ecran.texte, taille: 20 });
 
     surTouche(this, "LEFT", () => this.tourner(-1));
     surTouche(this, "RIGHT", () => this.tourner(1));

@@ -7,9 +7,8 @@ import { themeParId } from "../themes";
 import { choisirLeTheme, themeEnCours } from "../sauvegarde";
 import { brancherLeSon, musicien } from "../son";
 import { enNombre } from "../interface";
-import { LARGEUR, HAUTEUR } from "../../../socle/style";
-import { chargerLaDisposition } from "../../../socle/touchesPhysiques";
 import { lire, ecrire } from "../../../socle/sauvegarde";
+import { barreDeChargement } from "../../../socle/chargement";
 
 export interface DonneesDeDepart {
   theme?: string;                          // sans thème : celui de la dernière fois
@@ -33,12 +32,7 @@ export class Chargement extends Phaser.Scene {
   // preload : Phaser charge tout ce qu'on lui demande ici, et n'appelle create() qu'une fois tout arrivé
   preload() {
     const theme = themeEnCours();
-    // Une barre qui se remplit : le chargeur prévient à chaque progrès (de 0 à 1)
-    const barre = this.add.rectangle(LARGEUR / 2 - 150, HAUTEUR / 2, 0, 12, enNombre(theme.habillage.couleurs.accent))
-      .setOrigin(0, 0.5);
-    this.load.on("progress", (avancement: number) => {
-      barre.width = 300 * avancement;
-    });
+    barreDeChargement(this, enNombre(theme.habillage.couleurs.accent));
     theme.charger?.(this);
   }
 
@@ -47,7 +41,6 @@ export class Chargement extends Phaser.Scene {
     // Le grain des étincelles est celui du Hub (« etincelle ») ; le reste, c'est le thème qui le dessine
     theme.fabriquerTextures(this);
     brancherLeSon(this);
-    chargerLaDisposition();
     // La musique passe d'une scène à l'autre : elle a sa propre scène, qui tourne à côté des autres
     this.scene.stop("course-musique");
     if (theme.musique) {

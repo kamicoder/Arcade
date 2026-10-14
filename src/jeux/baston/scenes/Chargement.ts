@@ -3,9 +3,8 @@
 
 import Phaser from "phaser";
 import { creerAnimations, cleDePlanche } from "../textures";
-import { chargerLaDisposition } from "../../../socle/touchesPhysiques";
 import { ORANGE } from "../reglages";
-import { LARGEUR, HAUTEUR } from "../../../socle/style";
+import { barreDeChargement } from "../../../socle/chargement";
 
 export class Chargement extends Phaser.Scene {
   constructor() {
@@ -13,10 +12,7 @@ export class Chargement extends Phaser.Scene {
   }
 
   preload() {
-    const barre = this.add.rectangle(LARGEUR / 2 - 150, HAUTEUR / 2, 0, 12, ORANGE).setOrigin(0, 0.5);
-    this.load.on("progress", (avancement: number) => {
-      barre.width = 300 * avancement;
-    });
+    barreDeChargement(this, ORANGE);
 
     // Une planche + son atlas : l'image, et le .json qui nomme chaque case (« marche-2 »...)
     this.load.setPath("baston");
@@ -29,7 +25,6 @@ export class Chargement extends Phaser.Scene {
 
   create() {
     creerAnimations(this);
-    chargerLaDisposition();                // pour écrire les bonnes lettres sur les touches
     this.scene.start("baston-titre");
   }
 }

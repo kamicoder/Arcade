@@ -3,7 +3,7 @@
 
 import Phaser from "phaser";
 import { fabriquerTextures } from "../textures";
-import { LARGEUR, HAUTEUR } from "../../../socle/style";
+import { barreDeChargement } from "../../../socle/chargement";
 
 export class Chargement extends Phaser.Scene {
   constructor() {
@@ -11,10 +11,7 @@ export class Chargement extends Phaser.Scene {
   }
 
   preload() {
-    const barre = this.add.rectangle(LARGEUR / 2 - 150, HAUTEUR / 2, 0, 12, 0x4fb3ff).setOrigin(0, 0.5);
-    this.load.on("progress", (avancement: number) => {
-      barre.width = 300 * avancement;
-    });
+    barreDeChargement(this, 0x4fb3ff);
 
     this.load.setPath("demineur");
     for (const nom of ["mine", "drapeau", "smiley", "smiley_oh", "smiley_gagne", "smiley_perdu"]) {

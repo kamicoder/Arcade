@@ -5,8 +5,7 @@ import Phaser from "phaser";
 import { fabriquerTextures, garderLesPixelsNets } from "../textures";
 import { creerLesAnimations, type Descriptif } from "../Heros";
 import { AVEC_IMAGE } from "../genres";
-import { LARGEUR, HAUTEUR } from "../../../socle/style";
-import { chargerLaDisposition } from "../../../socle/touchesPhysiques";
+import { barreDeChargement } from "../../../socle/chargement";
 
 const IMAGES = ["drapeau", "ennemi", "volant", "sauteur", "piece"];
 const SONS = ["saut", "piece", "aie", "boss", "vie"];
@@ -17,11 +16,7 @@ export class Chargement extends Phaser.Scene {
   }
 
   preload() {
-    chargerLaDisposition();                // pendant le chargement : pour écrire les bonnes lettres au menu
-    const barre = this.add.rectangle(LARGEUR / 2 - 150, HAUTEUR / 2, 0, 12, 0x5fd068).setOrigin(0, 0.5);
-    this.load.on("progress", (avancement: number) => {
-      barre.width = 300 * avancement;
-    });
+    barreDeChargement(this, 0x5fd068);
 
     this.load.setPath("platformer/images");
     for (const nom of IMAGES) {

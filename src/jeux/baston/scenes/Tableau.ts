@@ -13,6 +13,7 @@ import { VIE, JAUGE, SOL, GRIS, JAUNE, MANCHES_GAGNANTES } from "../reglages";
 import { HAUTEUR, POLICE } from "../../../socle/style";
 import { BoutonsAuDoigt } from "../../../socle/doigts";
 import { estTactile } from "../../../socle/tactile";
+import { boutonFermer } from "../../../socle/boutonArcade";
 
 const BARRE = { largeur: 300, marge: 20 };
 
@@ -103,9 +104,7 @@ export class Tableau extends Phaser.Scene {
 
     // Le bouton pour revenir au titre, en haut au milieu (entre les deux barres de vie). Créé après
     // la zone du joystick, il passe dessus : un doigt posé sur le ✕ ne fait pas apparaître le joystick.
-    this.add.text(largeur / 2, 30, "✕", { fontFamily: POLICE, fontSize: "28px", color: "#ffffff" })
-      .setOrigin(0.5).setPadding(10).setInteractive({ useHandCursor: true })
-      .on("pointerup", () => this.combat.quitter());
+    boutonFermer(this, largeur / 2, 30, () => this.combat.quitter(), { taille: 28 });
 
     // On écoute le combat. Ses écouteurs ne disparaissent pas quand CETTE scène s'arrête : on les retire.
     this.combat.events.on("phase", this.montrerLaPhase, this);

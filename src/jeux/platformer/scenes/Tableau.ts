@@ -10,6 +10,8 @@ import { OBJECTIF_DUO } from "../reglages";
 import { LARGEUR, HAUTEUR, POLICE } from "../../../socle/style";
 import { estTactile } from "../../../socle/tactile";
 import { BoutonsAuDoigt } from "../../../socle/doigts";
+import { boutonFermer } from "../../../socle/boutonArcade";
+import { annoncer } from "../../../socle/annonce";
 
 type Action = keyof Entrees;
 
@@ -45,9 +47,7 @@ export class Tableau extends Phaser.Scene {
     this.viesEnPlus = this.add.text(LARGEUR - 66, 20, "", style).setOrigin(1, 0.5);
 
     // Revenir au menu (ou à l'éditeur), en haut à droite
-    this.add.text(LARGEUR - 26, 20, "✕", { fontFamily: POLICE, fontSize: "26px", color: "#ffffff" })
-      .setOrigin(0.5).setPadding(10).setInteractive({ useHandCursor: true })
-      .on("pointerup", () => (this.niveau ?? this.duo)!.quitter());
+    boutonFermer(this, LARGEUR - 26, 20, () => (this.niveau ?? this.duo)!.quitter());
 
     if (this.duo) {
       this.add.rectangle(LARGEUR / 2, HAUTEUR / 2, 4, HAUTEUR, 0x14141e);   // le trait entre les deux moitiés
@@ -72,16 +72,7 @@ export class Tableau extends Phaser.Scene {
     } else {
       titre = "Infini : va le plus loin possible !";
     }
-    const bandeau = this.add.text(LARGEUR / 2, 140, titre, {
-      fontFamily: POLICE, fontSize: "40px", fontStyle: "bold", color: "#ffffff", stroke: "#14121c", strokeThickness: 8,
-    }).setOrigin(0.5).setScale(0.6).setAlpha(0);
-    this.tweens.chain({
-      targets: bandeau,
-      tweens: [
-        { alpha: 1, scale: 1, duration: 350, ease: "Back.Out" },
-        { alpha: 0, y: 110, duration: 400, delay: 1300 },
-      ],
-    });
+    annoncer(this, titre, { y: 140, taille: 40, reste: 1300 });
   }
 
   // Les ronds à tenir au doigt (socle/doigts.ts : quel doigt tient quel bouton)
