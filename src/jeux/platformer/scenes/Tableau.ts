@@ -9,6 +9,7 @@ import type { Entrees } from "../Heros";
 import { OBJECTIF_DUO } from "../reglages";
 import { LARGEUR, HAUTEUR, POLICE } from "../../../socle/style";
 import { estTactile } from "../../../socle/tactile";
+import { BoutonsAuDoigt } from "../../../socle/doigts";
 
 type Action = keyof Entrees;
 
@@ -26,7 +27,6 @@ export class Tableau extends Phaser.Scene {
   private texte2?: Phaser.GameObjects.Text;
   private coeurs: Phaser.GameObjects.Image[] = [];
   private viesEnPlus!: Phaser.GameObjects.Text;
-  private doigts = new Map<number, Action>();   // pour chaque doigt posé : la commande qu'il tient
   private ronds = new Map<Action, Phaser.GameObjects.Arc>();
 
   constructor() {
@@ -37,7 +37,6 @@ export class Tableau extends Phaser.Scene {
     this.niveau = this.scene.isActive("platformer-niveau") ? this.scene.get("platformer-niveau") as Niveau : null;
     this.duo = this.niveau ? null : this.scene.get("platformer-duo") as Duo;
     this.coeurs = [];
-    this.doigts.clear();
     this.ronds.clear();
 
     this.add.rectangle(0, 0, LARGEUR, 40, 0x000000, 0.45).setOrigin(0);
@@ -85,40 +84,20 @@ export class Tableau extends Phaser.Scene {
     });
   }
 
+  // Les ronds à tenir au doigt (socle/doigts.ts : quel doigt tient quel bouton)
   private creerCommandes() {
+    const doigts = new BoutonsAuDoigt<Action>(this, { quandChange: (tenues) => this.recompterLesDoigts(tenues) });
     for (const commande of COMMANDES) {
       const { x, y, rayon } = commande;
       const rond = this.add.circle(x, y, rayon, 0xffffff, 0.16).setStrokeStyle(3, 0xffffff, 0.6);
-      // La zone sensible déborde du bouton : un pouce, ça ne vise pas au pixel près
-      rond.setInteractive(new Phaser.Geom.Circle(rayon, rayon, rayon * 1.35), Phaser.Geom.Circle.Contains);
       this.add.text(x, y, commande.icone, { fontFamily: POLICE, fontSize: Math.round(rayon * 0.7) + "px", color: "#ffffff" })
         .setOrigin(0.5).setAlpha(0.85);
-      // Un doigt se pose sur le bouton, ou y glisse en restant appuyé : il le tient.
-      // Il le lâche en se levant, ou en glissant hors du bouton.
-      rond.on("pointerdown", (doigt: Phaser.Input.Pointer) => this.tenir(doigt, commande.action));
-      rond.on("pointerover", (doigt: Phaser.Input.Pointer) => {
-        if (doigt.isDown) {
-          this.tenir(doigt, commande.action);
-        }
-      });
-      rond.on("pointerout", (doigt: Phaser.Input.Pointer) => this.lacher(doigt));
+      doigts.ajouter(rond, commande.action, 1.35);
       this.ronds.set(commande.action, rond);
     }
-    this.input.on("pointerup", (doigt: Phaser.Input.Pointer) => this.lacher(doigt));
   }
 
-  private tenir(doigt: Phaser.Input.Pointer, action: Action) {
-    this.doigts.set(doigt.id, action);
-    this.recompterLesDoigts();
-  }
-
-  private lacher(doigt: Phaser.Input.Pointer) {
-    this.doigts.delete(doigt.id);
-    this.recompterLesDoigts();
-  }
-
-  private recompterLesDoigts() {
-    const tenues = new Set(this.doigts.values());
+  private recompterLesDoigts(tenues: Set<Action>) {
     const tactile = this.niveau!.commandes.tactile;
     for (const [action, rond] of this.ronds) {
       tactile[action] = tenues.has(action);

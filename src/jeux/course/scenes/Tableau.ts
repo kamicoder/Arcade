@@ -10,6 +10,7 @@ import { themeEnCours } from "../sauvegarde";
 import { changerReglageSon, jouer } from "../son";
 import { ecrire, enNombre, Annonces, rangTexte } from "../interface";
 import { LARGEUR, HAUTEUR } from "../../../socle/style";
+import { BoutonsAuDoigt } from "../../../socle/doigts";
 import { estTactile } from "../../../socle/tactile";
 import { surTouche } from "../../../socle/clavier";
 
@@ -49,7 +50,6 @@ export class Tableau extends Phaser.Scene {
   private nombreTurbos?: Phaser.GameObjects.Text;
   private iconeTactile?: Phaser.GameObjects.Image;
   private pause?: Phaser.GameObjects.Container;
-  private doigts = new Map<number, Action>();   // pour chaque doigt posé : la commande qu'il tient
 
   constructor() {
     super("course-tableau");
@@ -61,7 +61,6 @@ export class Tableau extends Phaser.Scene {
     this.compteurs = [];
     this.points = [];
     this.boutonsTactiles = [];
-    this.doigts.clear();
     this.nombreTurbos = undefined;
     this.iconeTactile = undefined;
     this.pause = undefined;
@@ -178,21 +177,19 @@ export class Tableau extends Phaser.Scene {
 
   private creerCommandes() {
     const { couleurs: c, icones } = themeEnCours().habillage;
+    // Les ronds à tenir au doigt (socle/doigts.ts). Le turbo part dès que le doigt se pose dessus.
+    const doigts = new BoutonsAuDoigt<Action>(this, {
+      quandChange: (tenues) => this.recompterLesDoigts(tenues),
+      quandPose: (action, nouveau) => {
+        if (action === "turbo" && nouveau && this.course.enCourse) {
+          this.course.joueurs[0].lancerTurbo();
+        }
+      },
+    });
     for (const commande of COMMANDES) {
       const { x, y, rayon } = commande;
       const rond = this.add.circle(x, y, rayon, 0xffffff, c.alphaCommande).setStrokeStyle(3, 0xffffff, 0.9);
-      // La zone sensible est un cercle un peu plus grand que le bouton (un pouce, ça déborde).
-      // Ses coordonnées se comptent depuis le coin haut gauche du rond.
-      rond.setInteractive(new Phaser.Geom.Circle(rayon, rayon, rayon * 1.4), Phaser.Geom.Circle.Contains);
-      // Un doigt se pose sur le bouton, ou y glisse en restant appuyé : il le tient.
-      // Il le lâche en se levant, ou en glissant hors du bouton.
-      rond.on("pointerdown", (doigt: Phaser.Input.Pointer) => this.tenir(doigt, commande.action));
-      rond.on("pointerover", (doigt: Phaser.Input.Pointer) => {
-        if (doigt.isDown) {
-          this.tenir(doigt, commande.action);
-        }
-      });
-      rond.on("pointerout", (doigt: Phaser.Input.Pointer) => this.lacher(doigt));
+      doigts.ajouter(rond, commande.action, 1.4);
       this.boutonsTactiles.push({ action: commande.action, rond });
 
       if (commande.action === "turbo") {
@@ -202,7 +199,6 @@ export class Tableau extends Phaser.Scene {
         ecrire(this, x, y + 2, commande.icone, Math.round(rayon * 0.75), c.commande, { gras: false }).setAlpha(0.85);
       }
     }
-    this.input.on("pointerup", (doigt: Phaser.Input.Pointer) => this.lacher(doigt));
 
     // Le bouton pause, en haut au milieu
     const rond = this.add.circle(0, 0, 24, 0xffffff, 0.7);
@@ -212,22 +208,7 @@ export class Tableau extends Phaser.Scene {
       .on("pointerup", () => this.course.mettreEnPause());
   }
 
-  private tenir(doigt: Phaser.Input.Pointer, action: Action) {
-    const avant = this.doigts.get(doigt.id);
-    this.doigts.set(doigt.id, action);
-    if (action === "turbo" && avant !== "turbo" && this.course.enCourse) {
-      this.course.joueurs[0].lancerTurbo();
-    }
-    this.recompterLesDoigts();
-  }
-
-  private lacher(doigt: Phaser.Input.Pointer) {
-    this.doigts.delete(doigt.id);
-    this.recompterLesDoigts();
-  }
-
-  private recompterLesDoigts() {
-    const tenues = new Set(this.doigts.values());
+  private recompterLesDoigts(tenues: Set<Action>) {
     this.course.tactile.gauche = tenues.has("gauche");
     this.course.tactile.droite = tenues.has("droite");
     this.course.tactile.reculer = tenues.has("reculer");

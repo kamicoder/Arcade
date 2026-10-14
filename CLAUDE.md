@@ -63,6 +63,8 @@ Chaque fichier dit en tête pourquoi il existe.
   l'écran « GAME OVER » à deux boutons (tir, platformer).
 - `ListeDeBoutons` (`listeDeBoutons.ts`) : des boutons les uns sous les autres, au clavier, à la manette, à la souris
   et au doigt (titre et fin de la baston, menu du platformer).
+- `BoutonsAuDoigt` (`doigts.ts`) : des ronds tenus au doigt, plusieurs à la fois (platformer, course, baston) ;
+  chaque jeu dessine et éclaire ses ronds.
 - `boutonDuSon(scene, cle)`, `toucheDuSon`, `appliquerLeSon` (`son.ts`) : le son coupé ou remis (M), rangé sous
   `<cle>/son` ; `retourAuHub` le remet. Ne jamais relire `sound.mute` (voir `docs/PIEGES-PHASER.md`).
 - `TouchesPhysiques` : une touche qui sert à **jouer** se reconnaît à sa place (`event.code`, « KeyW » = le
