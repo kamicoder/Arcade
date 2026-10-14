@@ -1,13 +1,10 @@
 import { test, expect, type Page } from "@playwright/test";
-import { ouvrir, appuyer, attendreScene, scenesActives, versLaPage, toucher } from "./outils";
+import { ouvrir, appuyer, attendreScene, scenesActives, versLaPage, toucher, ouvrirLaCarte } from "./outils";
 
-// Du Hub jusqu'au menu du jeu de tir (la 6e carte : une rangée plus bas, deux cartes à droite)
+// Du Hub jusqu'au menu du jeu de tir
 async function menuDuTir(page: Page) {
   const ouverte = await ouvrir(page);
-  await appuyer(page, "ArrowDown");
-  await appuyer(page, "ArrowRight");
-  await appuyer(page, "ArrowRight");
-  await appuyer(page, "Enter");
+  await ouvrirLaCarte(page, "tir");
   await attendreScene(page, "tir-menu");
   return ouverte;
 }

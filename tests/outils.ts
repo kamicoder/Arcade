@@ -62,3 +62,19 @@ export async function toucherLaCarte(page: Page, cle: string) {
   }, cle);
   await toucher(page, x, y);
 }
+
+// Au clavier, jusqu'à la carte d'un jeu dans le Hub, puis Entrée. → avance d'une carte à la fois, quelle
+// que soit la mise en page (le nombre de cartes par rangée change quand des jeux arrivent).
+export async function ouvrirLaCarte(page: Page, cle: string) {
+  const { choisie, cible } = await page.evaluate((cle) => {
+    const hub = (window as any).jeu.scene.getScene("Hub");
+    return { choisie: hub.choisie as number, cible: hub.cartes.findIndex((c: any) => c.fiche.cle === cle) as number };
+  }, cle);
+  for (let i = choisie; i < cible; i++) {
+    await appuyer(page, "ArrowRight");
+  }
+  for (let i = choisie; i > cible; i--) {
+    await appuyer(page, "ArrowLeft");
+  }
+  await appuyer(page, "Enter");
+}

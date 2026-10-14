@@ -1,12 +1,10 @@
 import { test, expect, type Page } from "@playwright/test";
-import { ouvrir, appuyer, attendreScene, scenesActives, versLaPage, toucher, toucherLaCarte } from "./outils";
+import { ouvrir, appuyer, attendreScene, scenesActives, versLaPage, toucher, toucherLaCarte, ouvrirLaCarte } from "./outils";
 
-// Du Hub jusqu'au menu du platformer (la 5e carte : une rangée plus bas, une carte à droite)
+// Du Hub jusqu'au menu du platformer
 async function menuPlatformer(page: Page) {
   const ouverte = await ouvrir(page);
-  await appuyer(page, "ArrowDown");
-  await appuyer(page, "ArrowRight");
-  await appuyer(page, "Enter");
+  await ouvrirLaCarte(page, "platformer");
   await attendreScene(page, "platformer-menu");
   return ouverte;
 }
@@ -473,9 +471,7 @@ test("un niveau abîmé dans la sauvegarde est sauté, sans planter", async ({ p
   const { sansErreur } = await ouvrir(page);
   await page.evaluate(() => localStorage.setItem("platformer/niveau/Premiers pas", "{ pas du json"));
   await page.evaluate(() => localStorage.setItem("platformer/niveau/Grand saut", JSON.stringify({ largeur: "abc", elements: [] })));
-  await appuyer(page, "ArrowDown");
-  await appuyer(page, "ArrowRight");
-  await appuyer(page, "Enter");
+  await ouvrirLaCarte(page, "platformer");
   await attendreScene(page, "platformer-menu");
   await choisirLeMode(page, 0, "platformer-niveau");
   expect(await page.evaluate(() => (window as any).jeu.scene.getScene("platformer-niveau").donnees.niveaux.map((n: any) => n.nom)))

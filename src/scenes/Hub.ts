@@ -8,10 +8,13 @@ import { surTouche } from "../socle/clavier";
 import { fonduPuis } from "../socle/retour";
 import { quandNouvelleVersion, installerNouvelleVersion } from "../socle/miseAJour";
 
-const PAR_RANGEE = 3;
-const CARTE_L = 240;
-const CARTE_H = 170;
-const ECART = 30;
+// Jusqu'à 6 jeux, 3 grandes cartes par rangée ; au-delà, 4 plus petites (trois rangées ne tiendraient
+// pas en hauteur)
+const GRANDES = CATALOGUE.length <= 6;
+const PAR_RANGEE = GRANDES ? 3 : 4;
+const CARTE_L = GRANDES ? 240 : 200;
+const CARTE_H = GRANDES ? 170 : 160;
+const ECART = GRANDES ? 30 : 24;
 
 interface Carte {
   fiche: FicheDeJeu;
@@ -88,9 +91,9 @@ export class Hub extends Phaser.Scene {
       const fond = this.add.rectangle(0, 0, CARTE_L, CARTE_H, COULEURS.carte)
         .setRounded(22)
         .setStrokeStyle(3, COULEURS.carteBord);
-      const emoji = this.add.text(0, -18, fiche.emoji, { fontSize: "64px" }).setOrigin(0.5);
+      const emoji = this.add.text(0, -18, fiche.emoji, { fontSize: GRANDES ? "64px" : "58px" }).setOrigin(0.5);
       const titre = this.add.text(0, 52, fiche.titre, {
-        fontFamily: POLICE, fontSize: "20px", fontStyle: "bold", color: COULEURS.texte,
+        fontFamily: POLICE, fontSize: GRANDES ? "20px" : "18px", fontStyle: "bold", color: COULEURS.texte,
       }).setOrigin(0.5);
       const boite = this.add.container(x, y, [fond, emoji, titre]);
 

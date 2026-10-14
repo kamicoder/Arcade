@@ -1,5 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
-import { ouvrir, appuyer, attendreScene, versLaPage, toucher, toucherLaCarte } from "./outils";
+import { ouvrir, appuyer, attendreScene, versLaPage, toucher, toucherLaCarte, ouvrirLaCarte } from "./outils";
 
 // Dix mines connues pour le niveau Facile (9 × 9), loin du coin en bas à gauche où l'on commence :
 // (8, 0) n'a aucune mine autour, et la cascade ouvre une belle zone
@@ -8,12 +8,10 @@ const MINES = [
   { r: 4, c: 6 }, { r: 5, c: 8 }, { r: 6, c: 4 }, { r: 7, c: 7 }, { r: 2, c: 1 },
 ];
 
-// Du Hub jusqu'au menu du démineur (la troisième carte)
+// Du Hub jusqu'au menu du démineur
 async function menuDemineur(page: Page) {
   const ouverte = await ouvrir(page);
-  await appuyer(page, "ArrowRight");
-  await appuyer(page, "ArrowRight");
-  await appuyer(page, "Enter");
+  await ouvrirLaCarte(page, "demineur");
   await attendreScene(page, "demineur-menu");
   return ouverte;
 }

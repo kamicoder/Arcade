@@ -47,4 +47,8 @@ export const CATALOGUE: FicheDeJeu[] = [
     cle: "tir", titre: "Tir spatial", emoji: "🚀", couleur: 0x5ff0ff,
     charger: () => import("./tir").then((module) => module.default),
   },
+  {
+    cle: "tamago", titre: "Tamago", emoji: "🥚", couleur: 0xff2d95,
+    charger: () => import("./tamago").then((module) => module.default),
+  },
 ];

@@ -71,7 +71,8 @@ une scène lancée par-dessus (tableau de bord, arrivée) vient après. Ses sons
 `public/<cle>/`.
 
 La course est un seul jeu avec des thèmes (voitures, licornes) : avant d'y toucher, lire
-`src/jeux/course/LISEZMOI.md`.
+`src/jeux/course/LISEZMOI.md`. Le Tamago a ses règles dans `src/jeux/tamago/REGLES.md` : les garder à jour
+quand elles changent.
 
 ## Les pièges de Phaser
 

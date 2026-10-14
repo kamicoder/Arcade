@@ -1,11 +1,10 @@
 import { test, expect, type Page } from "@playwright/test";
-import { ouvrir, appuyer, attendreScene, scenesActives, versLaPage, toucher, tailleDuJeu, toucherLaCarte } from "./outils";
+import { ouvrir, appuyer, attendreScene, scenesActives, versLaPage, toucher, tailleDuJeu, toucherLaCarte, ouvrirLaCarte } from "./outils";
 
-// Du Hub jusqu'au titre de la baston : la quatrième carte, sous la première
+// Du Hub jusqu'au titre de la baston
 async function titreBaston(page: Page) {
   const ouverte = await ouvrir(page);
-  await appuyer(page, "ArrowDown");
-  await appuyer(page, "Enter");
+  await ouvrirLaCarte(page, "baston");
   await attendreScene(page, "baston-titre");
   return ouverte;
 }

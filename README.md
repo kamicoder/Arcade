@@ -33,6 +33,7 @@ Les téléphones récupèrent la nouvelle version tout seuls, au retour dans le 
 | `src/jeux/course/` | La course : un seul jeu (scènes, conduite, circuits, atelier, sauvegardes) et ses thèmes dans `themes/` (voitures, licornes) ; voir son `LISEZMOI.md` |
 | `tests/` | Les tests Playwright ; un test raté garde sa trace : `npx playwright show-trace <chemin>` |
 | `public/` | Copié tel quel : icônes, sons |
+| `src/jeux/tamago/` | Le Tamago : un animal virtuel qui vit pendant qu'on joue ; ses règles dans `REGLES.md` |
 | `docs/CARNET-PHASER.md` | Apprendre Phaser en suivant la construction de l'Arcade |
 | `docs/PIEGES-PHASER.md` | Les pièges de Phaser 4 rencontrés en route, et les défauts de la 4.2 contournés |
 
