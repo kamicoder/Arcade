@@ -15,6 +15,7 @@ export class Tuile extends Phaser.GameObjects.Container {
   private couvercle: Phaser.GameObjects.Image;
   private marque: Phaser.GameObjects.Image;
   private ouverte = false;
+  enfoncee = false;                        // pour les tests : la case est-elle enfoncée ?
 
   constructor(scene: Phaser.Scene, readonly r: number, readonly c: number) {
     super(scene, c * TAILLE + TAILLE / 2, r * TAILLE + TAILLE / 2);
@@ -43,8 +44,29 @@ export class Tuile extends Phaser.GameObjects.Container {
     if (this.ouverte) {
       return;
     }
+    this.enfoncee = oui;
     this.couvercle.setScale(oui ? S * 0.88 : S).setTint(oui ? 0xc8d0ff : 0xffffff);
     this.marque.setScale(oui ? S_IMAGE * 0.88 : S_IMAGE);
+  }
+
+  // Un accord raté : la case fermée s'enfonce un instant, puis remonte (une minuterie de la scène : elle
+  // attend avec la pause)
+  flechir() {
+    this.enfoncer(true);
+    this.scene.time.delayedCall(180, () => {
+      if (this.active) {
+        this.enfoncer(false);
+      }
+    });
+  }
+
+  // Un accord raté : le chiffre tremble, comme une tête qui fait « non »
+  trembler() {
+    const x = this.c * TAILLE + TAILLE / 2;
+    this.scene.tweens.killTweensOf(this);
+    // killTweensOf coupe aussi l'apparition (une case de la cascade, pas encore à sa taille) : on la finit
+    this.setX(x).setScale(1).setAlpha(1);
+    this.scene.tweens.add({ targets: this, x: x + 4, duration: 45, yoyo: true, repeat: 2, ease: "Sine.InOut" });
   }
 
   // Le couvercle s'envole, le contenu apparaît en rebondissant

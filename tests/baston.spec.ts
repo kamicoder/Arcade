@@ -590,11 +590,10 @@ test.describe("au doigt", () => {
     expect(await tailleDuJeu(page)).toEqual({ largeur: 960, hauteur: 540 });
     expect(await page.evaluate(() => (window as any).jeu.scene.getScene("Hub").cameras.main.width)).toBe(960);
 
+    // Le démineur s'élargit lui aussi, à la forme de l'écran d'aujourd'hui
     await toucherLaCarte(page, "demineur");
     await attendreScene(page, "demineur-menu");
-    expect(await tailleDuJeu(page)).toEqual({ largeur: 960, hauteur: 540 });
-    // Le démineur garde ses bandes noires : il n'a rien demandé
-    expect((await page.locator("canvas").boundingBox())!.width).toBeLessThan(800);
+    expect(await tailleDuJeu(page)).toEqual({ largeur: Math.round(540 * 760 / 390), hauteur: 540 });
     sansErreur();
   });
 });

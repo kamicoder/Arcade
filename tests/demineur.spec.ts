@@ -1,6 +1,7 @@
 import { test, expect, type Page } from "@playwright/test";
 import {
   ouvrir, appuyer, attendreScene, versLaPage, toucher, toucherLaCarte, ouvrirLaCarte, quitterParLaPause, attendreLaPause,
+  tailleDuJeu,
 } from "./outils";
 
 // Dix mines connues pour le niveau Facile (9 × 9), loin du coin en bas à gauche où l'on commence :
@@ -143,6 +144,18 @@ test("une partie perdue : la mine saute, les autres se montrent, le faux drapeau
   expect(neuve.issue).toBe("");
   expect(neuve.etats.flat().every((e) => e === "cachee")).toBe(true);
   expect(neuve.smiley).toBe("demineur-smiley");
+
+  // Perdue encore, puis les niveaux, puis un niveau : la scène repart sans planter (Phaser avait détruit la
+  // chaîne des mines à l'arrêt, et la nouvelle partie la détruisait une seconde fois)
+  await page.evaluate((mines) => (window as any).jeu.registry.set("demineur-mines-imposees", mines), MINES);
+  await cliquer(page, 8, 0);
+  await cliquer(page, 3, 2);
+  await attendreScene(page, "demineur-fin");
+  await page.waitForTimeout(600);
+  await appuyer(page, "Escape");
+  await attendreScene(page, "demineur-menu");
+  await partieFacile(page);
+  expect((await partie(page)).etats.flat().every((e) => e === "cachee")).toBe(true);
   sansErreur();
 });
 
@@ -183,6 +196,26 @@ test("le premier clic ne tombe jamais sur une mine, ni à côté", async ({ page
     await page.waitForTimeout(50);
     expect((await partie(page)).etats.flat().every((e) => e === "cachee")).toBe(true);
   }
+  sansErreur();
+});
+
+test("un accord raté se voit : les voisines s'enfoncent puis remontent, rien ne s'ouvre", async ({ page }) => {
+  const { sansErreur } = await menuDemineur(page);
+  await partieFacile(page);
+  await cliquer(page, 8, 0);
+  await page.waitForTimeout(300);
+  const avant = await partie(page);
+  expect(avant.etats[4][3]).toBe("ouverte");   // un « 1 » : sa mine, en (3, 2), n'a pas de drapeau
+  expect(avant.etats[3][3]).toBe("cachee");
+  const enfoncee = () => page.evaluate(() =>
+    (window as any).jeu.scene.getScene("demineur-partie").tuiles[3][3].enfoncee as boolean);
+  await cliquer(page, 4, 3);
+  await page.waitForFunction(() => (window as any).jeu.scene.getScene("demineur-partie").tuiles[3][3].enfoncee);
+  await page.waitForFunction(() => !(window as any).jeu.scene.getScene("demineur-partie").tuiles[3][3].enfoncee);
+  expect(await enfoncee()).toBe(false);
+  const apres = await partie(page);
+  expect(apres.etats).toEqual(avant.etats);
+  expect(apres.issue).toBe("");
   sansErreur();
 });
 
@@ -340,15 +373,30 @@ test("le son : M le coupe au menu comme en partie, et c'est gardé", async ({ pa
 test.describe("au doigt", () => {
   test.use({ viewport: { width: 844, height: 390 }, hasTouch: true, isMobile: true });
 
-  test("toucher pour creuser, appui long ou bouton pour le drapeau", async ({ page }) => {
-    const { sansErreur } = await ouvrir(page);
+  // Le menu au doigt, puis un niveau (0 : Facile, 1 : Moyen) touché sur sa carte, avec des mines connues.
+  // Le téléphone n'a pas de vibreur : les vibrations ne doivent rien casser (sansErreur).
+  async function partieAuDoigt(page: Page, niveau: number) {
+    await page.evaluate(() => Object.defineProperty(navigator, "vibrate", { value: undefined, configurable: true }));
     await toucherLaCarte(page, "demineur");
     await attendreScene(page, "demineur-menu");
     await page.waitForTimeout(500);
-    await toucher(page, 180, 300);         // le niveau Facile
+    const { largeur } = await tailleDuJeu(page);
+    await toucher(page, largeur / 2 + (niveau - 1) * 300, 300);
     await attendreScene(page, "demineur-partie");
     await attendreScene(page, "demineur-barre");
     await page.evaluate((mines) => (window as any).jeu.registry.set("demineur-mines-imposees", mines), MINES);
+  }
+
+  test("toucher pour creuser, appui long ou bouton pour le drapeau, dans un jeu à la forme du téléphone", async ({ page }) => {
+    const { sansErreur } = await ouvrir(page);
+    await partieAuDoigt(page, 0);
+
+    // Le jeu prend la proportion de l'écran (20/9), sans bandes noires (socle/largeur.ts)
+    const { largeur } = await tailleDuJeu(page);
+    expect(largeur).toBe(Math.round(540 * 844 / 390));
+    expect((await page.locator("canvas").boundingBox())!.width).toBeCloseTo(844, 0);
+    expect(await page.evaluate(() => (window as any).jeu.scene.getScene("demineur-partie").cameras.main.width))
+      .toBe(largeur);
 
     // Les cases sont assez grandes pour un doigt
     const a = await caseALaPage(page, 0, 0);
@@ -363,7 +411,7 @@ test.describe("au doigt", () => {
     expect((await partie(page)).etats[3][2]).toBe("drapeau");
 
     // Le bouton du mode : maintenant, un toucher plante le drapeau, et l'appui long creuse
-    await toucher(page, 894, 474);
+    await toucher(page, largeur - 66, 474);
     expect((await partie(page)).modeDrapeau).toBe(true);
     await toucherCase(page, 0, 4);
     expect((await partie(page)).etats[0][4]).toBe("drapeau");
@@ -372,6 +420,79 @@ test.describe("au doigt", () => {
     await appuiLong(page, 8, 8);
     expect((await partie(page)).etats[8][8]).toBe("ouverte");
     expect((await partie(page)).issue).toBe("");
+
+    // On finit la partie en creusant tout ce qui reste
+    await toucher(page, largeur - 66, 474);
+    expect((await partie(page)).modeDrapeau).toBe(false);
+    const estMine = (r: number, c: number) => MINES.some((m) => m.r === r && m.c === c);
+    for (let r = 0; r < 9; r++) {
+      for (let c = 0; c < 9; c++) {
+        if (!estMine(r, c) && (await partie(page)).etats[r][c] !== "ouverte") {
+          await toucherCase(page, r, c);
+        }
+      }
+    }
+    expect((await partie(page)).issue).toBe("gagne");
+
+    // Le champ du nom (un élément de la page, posé sur le canvas) est bien sur la carte, au milieu du
+    // jeu élargi : son centre est 34 pixels du jeu à gauche du milieu, 18 sous le centre de la carte
+    await attendreScene(page, "demineur-fin");
+    const champ = page.locator("input[aria-label='Ton nom']");
+    await expect(champ).toBeVisible();
+    const boite = (await champ.boundingBox())!;
+    const voulu = await versLaPage(page, largeur / 2 - 34, (540 + 68) / 2 + 18);
+    expect(Math.abs(boite.x + boite.width / 2 - voulu.x)).toBeLessThan(2);
+    expect(Math.abs(boite.y + boite.height / 2 - voulu.y)).toBeLessThan(2);
+    sansErreur();
+  });
+
+  test("le ⏸ de la barre est assez grand pour un pouce, et la barre le contient", async ({ page }) => {
+    const { sansErreur } = await ouvrir(page);
+    await partieAuDoigt(page, 0);
+    const pause = await page.evaluate(() => {
+      const barre = (window as any).jeu.scene.getScene("demineur-barre");
+      const bouton = barre.children.list.find((o: any) => o.depth === 1000);
+      return { x: bouton.x, y: bouton.y, rayon: bouton.list[0].radius, haut: barre.haut };
+    });
+    expect(pause.rayon * 2).toBeGreaterThanOrEqual(64);
+    expect(pause.y - pause.rayon).toBeGreaterThanOrEqual(0);
+    expect(pause.y + pause.rayon).toBeLessThanOrEqual(pause.haut);
+    // Un pouce posé un peu à côté du dessin l'ouvre quand même
+    await toucher(page, pause.x - pause.rayon - 4, pause.y);
+    await attendreLaPause(page);
+    sansErreur();
+  });
+
+  test("la fin montre toute la grille : la caméra recule, et les mines éclatent en chaîne", async ({ page }) => {
+    const { sansErreur } = await ouvrir(page);
+    await partieAuDoigt(page, 1);          // Moyen : 16 × 16, trop grand pour tenir à l'écran au doigt
+    const vue = () => page.evaluate(() => {
+      const p = (window as any).jeu.scene.getScene("demineur-partie");
+      const v = p.cameras.main.worldView;
+      const l = p.niveau.colonnes * 48;
+      const h = p.niveau.rangees * 48;
+      return { toutVu: v.x <= 1 && v.y <= 1 && v.right >= l - 1 && v.bottom >= h - 1 };
+    });
+    expect((await vue()).toutVu).toBe(false);
+
+    await toucherCase(page, 10, 10);       // loin des mines : la cascade
+    await page.waitForTimeout(300);
+    await toucherCase(page, 6, 4);         // une mine
+    expect((await partie(page)).issue).toBe("perdu");
+    await page.waitForFunction(() => {
+      const p = (window as any).jeu.scene.getScene("demineur-partie");
+      const v = p.cameras.main.worldView;
+      return v.x <= 1 && v.y <= 1 && v.right >= p.niveau.colonnes * 48 - 1 && v.bottom >= p.niveau.rangees * 48 - 1;
+    });
+    // La chaîne des autres mines : chacune a sa gerbe
+    await page.waitForFunction(() =>
+      (window as any).jeu.scene.getScene("demineur-partie").chaine?.complete === true);
+    await attendreScene(page, "demineur-fin");
+    // Rejouer remet la caméra comme au départ
+    await page.waitForTimeout(600);
+    await appuyer(page, "r");
+    await page.waitForFunction(() => !(window as any).jeu.scene.isActive("demineur-fin"));
+    expect((await vue()).toutVu).toBe(false);
     sansErreur();
   });
 });

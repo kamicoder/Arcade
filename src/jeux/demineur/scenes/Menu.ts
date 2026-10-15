@@ -1,16 +1,18 @@
 // Le menu du démineur : les trois niveaux, côte à côte, chacun avec ses records.
-// Flèches et Entrée, manette, souris ou doigt.
+// Flèches et Entrée, manette, souris ou doigt. Au doigt, le jeu prend la proportion du téléphone
+// (socle/largeur.ts) : plus de place pour la grille ; tout se place d'après this.scale.width.
 
 import Phaser from "phaser";
 import { NIVEAUX, lireLesRecords, enSecondes, type Niveau } from "../niveaux";
 import { COULEURS } from "../textures";
-import { LARGEUR, HAUTEUR, POLICE } from "../../../socle/style";
+import { HAUTEUR, POLICE } from "../../../socle/style";
 import { surTouche } from "../../../socle/clavier";
 import { surManette, MANETTE, VALIDER } from "../../../socle/manette";
 import { estTactile } from "../../../socle/tactile";
 import { retourAuHub, fonduPuis } from "../../../socle/retour";
 import { boutonArcade } from "../../../socle/boutonArcade";
 import { appliquerLeSon, boutonDuSon } from "../../../socle/son";
+import { elargir, suivreLaLargeur } from "../../../socle/largeur";
 
 const CARTE_L = 270;
 const CARTE_H = 340;
@@ -33,6 +35,8 @@ export class Menu extends Phaser.Scene {
   }
 
   create() {
+    elargir(this);
+    suivreLaLargeur(this);
     this.cartes = [];
     this.parti = false;
     this.cameras.main.setBackgroundColor(COULEURS.fond).fadeIn(250);
@@ -44,7 +48,7 @@ export class Menu extends Phaser.Scene {
     const aide = estTactile()
       ? "Touche un niveau pour jouer !"
       : "◀ ▶ : choisir    Entrée : jouer    1 2 3 : niveau direct    M : le son    Échap : l'Arcade";
-    this.add.text(LARGEUR / 2, HAUTEUR - 22, aide, { fontFamily: POLICE, fontSize: "16px", color: "#a59fc0" })
+    this.add.text(this.scale.width / 2, HAUTEUR - 22, aide, { fontFamily: POLICE, fontSize: "16px", color: "#a59fc0" })
       .setOrigin(0.5);
 
     surTouche(this, "LEFT", () => this.choisir(this.choix - 1));
@@ -66,7 +70,7 @@ export class Menu extends Phaser.Scene {
   private creerDecor() {
     // Des mines qui tombent doucement derrière les cartes
     this.add.particles(0, 0, "demineur-mine", {
-      x: { min: 0, max: LARGEUR },
+      x: { min: 0, max: this.scale.width },
       y: -20,
       lifespan: 12000,
       speedY: { min: 25, max: 60 },
@@ -76,7 +80,7 @@ export class Menu extends Phaser.Scene {
       frequency: 700,
     });
 
-    const titre = this.add.text(LARGEUR / 2 + 22, 54, "Démineur", {
+    const titre = this.add.text(this.scale.width / 2 + 22, 54, "Démineur", {
       fontFamily: POLICE, fontSize: "46px", fontStyle: "bold", color: "#4fb3ff",
     }).setOrigin(0.5);
     const mine = this.add.image(titre.x - titre.width / 2 - 34, 54, "demineur-mine").setScale(2);
@@ -87,7 +91,7 @@ export class Menu extends Phaser.Scene {
   }
 
   private creerCarte(niveau: Niveau, i: number) {
-    const x = LARGEUR / 2 + (i - 1) * (CARTE_L + ECART);
+    const x = this.scale.width / 2 + (i - 1) * (CARTE_L + ECART);
     const fond = this.add.rectangle(0, 0, CARTE_L, CARTE_H, 0x221f2e).setRounded(20).setStrokeStyle(3, 0x3a3550);
     const nom = this.add.text(0, -CARTE_H / 2 + 34, niveau.nom, {
       fontFamily: POLICE, fontSize: "30px", fontStyle: "bold", color: "#ffffff",

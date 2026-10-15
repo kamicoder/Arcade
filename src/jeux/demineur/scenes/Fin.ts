@@ -1,12 +1,13 @@
 // La fin de partie, par-dessus la grille : gagné ou perdu, le temps, le nom à taper après un record,
-// le podium du niveau, et deux boutons (rejouer, changer de niveau).
+// le podium du niveau, et deux boutons (rejouer, changer de niveau). Au doigt, le jeu peut être plus large
+// que 960 (socle/largeur.ts) : la carte se place d'après this.scale.width.
 
 import Phaser from "phaser";
 import type { Partie } from "./Partie";
-import { HAUT_BARRE } from "./Partie";
+import { hautBarre } from "./Partie";
 import { NIVEAUX, lireLesRecords, ajouterUnRecord, dernierNom, enSecondes, type Niveau } from "../niveaux";
 import { creerChampDeNom, type ChampDeNom } from "../saisie";
-import { LARGEUR, HAUTEUR, POLICE } from "../../../socle/style";
+import { HAUTEUR, POLICE } from "../../../socle/style";
 import { surTouche } from "../../../socle/clavier";
 import { surManette, MANETTE, VALIDER } from "../../../socle/manette";
 import { estTactile } from "../../../socle/tactile";
@@ -18,7 +19,7 @@ export interface DonneesDeFin {
   record: boolean;
 }
 
-const CARTE = { x: LARGEUR / 2, y: (HAUTEUR + HAUT_BARRE) / 2, largeur: 460, hauteur: 360 };
+const CARTE = { largeur: 460, hauteur: 360 };
 
 export class Fin extends Phaser.Scene {
   private partie!: Partie;
@@ -29,6 +30,7 @@ export class Fin extends Phaser.Scene {
   private podium: Phaser.GameObjects.Text[] = [];
   private objetsDeSaisie: Phaser.GameObjects.GameObject[] = [];
   private pret = false;                    // on n'écoute qu'un instant après l'arrivée de la carte
+  private place = { x: 0, y: 0 };          // le centre de la carte, quand elle est en place
 
   constructor() {
     super("demineur-fin");
@@ -46,9 +48,11 @@ export class Fin extends Phaser.Scene {
   create() {
     this.partie = this.scene.get("demineur-partie") as Partie;
     const { gagne, temps } = this.donnees;
+    const haut = hautBarre();
+    this.place = { x: this.scale.width / 2, y: (HAUTEUR + haut) / 2 };
 
     // Un voile sur la grille (pas sur la barre : le smiley relance toujours la partie)
-    const voile = this.add.rectangle(0, HAUT_BARRE, LARGEUR, HAUTEUR - HAUT_BARRE, 0x000000, gagne ? 0.5 : 0.35)
+    const voile = this.add.rectangle(0, haut, this.scale.width, HAUTEUR - haut, 0x000000, gagne ? 0.5 : 0.35)
       .setOrigin(0).setAlpha(0).setInteractive();   // interactif : les clics ne traversent pas jusqu'à la grille
     this.tweens.add({ targets: voile, alpha: 1, duration: 300 });
     // Un clic à côté de la carte l'écarte, pour revoir la grille (où étaient les mines ?) ; un autre la ramène
@@ -60,7 +64,7 @@ export class Fin extends Phaser.Scene {
     const titre = this.texte(0, -hauteur / 2 + 44, gagne ? "Gagné !" : "Boum !", 44, gagne ? "#5fd068" : "#ff5a50");
     const sousTitre = this.texte(0, -hauteur / 2 + 92,
       gagne ? `${this.niveau.nom} en ${enSecondes(temps)}` : "La prochaine sera la bonne !", 22, "#ffffff");
-    this.carte = this.add.container(CARTE.x, CARTE.y, [fond, titre, sousTitre]).setDepth(2);
+    this.carte = this.add.container(this.place.x, this.place.y, [fond, titre, sousTitre]).setDepth(2);
 
     // La carte tombe en place en rebondissant
     this.carte.setScale(0.6).setAlpha(0);
@@ -92,11 +96,11 @@ export class Fin extends Phaser.Scene {
     if (!this.pret || this.champ) {
       return;                              // pendant la saisie du nom, la carte reste
     }
-    const ecartee = this.carte.y !== CARTE.y;
+    const ecartee = this.carte.y !== this.place.y;
     this.tweens.killTweensOf([this.carte, voile]);
     this.tweens.add({
       targets: this.carte,
-      y: ecartee ? CARTE.y : HAUTEUR + CARTE.hauteur / 2 - 70,   // il en reste un bout en bas, pour la rappeler
+      y: ecartee ? this.place.y : HAUTEUR + CARTE.hauteur / 2 - 70,   // il en reste un bout en bas, pour la rappeler
       duration: 350,
       ease: "Back.Out",
     });
@@ -119,7 +123,7 @@ export class Fin extends Phaser.Scene {
     // Le champ du navigateur suit la carte : il apparaît quand elle a fini de tomber
     this.time.delayedCall(300, () => {
       if (!this.champ && this.sys.isActive()) {
-        this.champ = creerChampDeNom(this, CARTE.x - 34, CARTE.y + 18, dernierNom(), () => this.validerLeNom());
+        this.champ = creerChampDeNom(this, this.place.x - 34, this.place.y + 18, dernierNom(), () => this.validerLeNom());
       }
     });
   }
@@ -195,7 +199,7 @@ export class Fin extends Phaser.Scene {
   // Des confettis qui pleuvent du haut de l'écran, quelques instants
   private confettis() {
     const pluie = this.add.particles(0, 0, "demineur-confetti", {
-      x: { min: 0, max: LARGEUR },
+      x: { min: 0, max: this.scale.width },
       y: -10,
       lifespan: 3200,
       speedY: { min: 120, max: 320 },

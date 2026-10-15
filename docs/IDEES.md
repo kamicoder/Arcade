@@ -15,9 +15,6 @@ l'équilibrage en jouant. Taille : **S** petit, **M** moyen, **L** gros. Une id�
 - Le menu ne tient pas plus de 8 niveaux : des pages, quand un 9e arrivera.
 - Un tir s'arrête au calme, ou au bout de 20 s (un bloc qui glisserait sans fin sur la glace) : à juger.
 
-### Démineur
-- Au doigt, le ⏸ de la barre fait 52 px (la barre en fait 56) au lieu des 64 conseillés.
-
 ### Tamago (et écarts avec `REGLES.md`)
 Le Tamago est une ébauche : on le laisse de côté pour l'instant, ces notes attendent qu'on y revienne.
 - La variante gentille : REGLES.md dit 75 % de discipline, le code veut 0 %, 75 % puis 100 %.
@@ -104,11 +101,6 @@ Le Tamago est une ébauche : on le laisse de côté pour l'instant, ces notes at
 
 ## Démineur
 
-**Finition**
-- Un accord raté se voit (les voisines s'enfoncent) (S).
-- À la fin, la caméra montre toute la grille (S).
-- Les autres mines éclatent en chaîne (S).
-
 **Contenu**
 - La grille du jour (S/M).
 - Des statistiques par niveau (S).
@@ -119,7 +111,6 @@ Le Tamago est une ébauche : on le laisse de côté pour l'instant, ces notes at
 - Un vrai bouton de retour dans la barre (S).
 - La croix tenue qui avance toute seule, et le stick (S).
 - Revoir l'aide (un « ? ») (S).
-- Élargir sur téléphone (M).
 
 **Modes**
 - Sans hasard : une grille toujours soluble par la logique (L).

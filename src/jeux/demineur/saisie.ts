@@ -6,14 +6,14 @@
 // l'écran change de taille. Il disparaît avec la scène.
 
 import Phaser from "phaser";
-import { LARGEUR, POLICE } from "../../socle/style";
+import { POLICE } from "../../socle/style";
 
 export interface ChampDeNom {
   valeur(): string;
   detruire(): void;
 }
 
-// x, y : le centre du champ, en pixels du jeu (960 × 540)
+// x, y : le centre du champ, en pixels du jeu (960 × 540, ou plus large au doigt : socle/largeur.ts)
 export function creerChampDeNom(scene: Phaser.Scene, x: number, y: number, depart: string,
   valider: () => void): ChampDeNom {
   const champ = document.createElement("input");
@@ -35,7 +35,7 @@ export function creerChampDeNom(scene: Phaser.Scene, x: number, y: number, depar
   const hauteur = 46;
   const placer = () => {
     const cadre = scene.game.canvas.getBoundingClientRect();
-    const k = cadre.width / LARGEUR;
+    const k = cadre.width / scene.scale.width;   // des pixels du jeu aux pixels de la page
     Object.assign(champ.style, {
       left: cadre.left + (x - largeur / 2) * k + "px",
       top: cadre.top + (y - hauteur / 2) * k + "px",

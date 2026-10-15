@@ -108,6 +108,10 @@ bugs de Phaser : c'est sa façon de faire, logique une fois qu'on la connaît, m
   `"camerashakestart"`) plutôt que de lire `isRunning`, déjà retombé quand le poste est chargé.
 - Les effets de caméra (`zoomTo`, `pan`) veulent une fonction d'ease (`Phaser.Math.Easing.Sine.Out`),
   pas son nom en texte comme les tweens.
+- Un effet de caméra en route (`zoomTo`, `pan`) continue jusqu'au bout, même si l'on replace la caméra à
+  la main (`setZoom`, `centerOn`) : il l'écrase à chaque image. Une nouvelle partie dans la même scène
+  l'arrête d'abord (`camera.zoomEffect.reset()`, `camera.panEffect.reset()`, comme le démineur qui rejoue
+  pendant que la caméra recule).
 - `scale.setGameSize` : seules les caméras placées en (0, 0) et à la taille d'avant suivent la nouvelle
   taille (celles des scènes arrêtées aussi). Son événement `RESIZE` est le même que celui d'une fenêtre
   qui change de forme : pour les distinguer, comparer `gameSize.width` à la largeur d'avant (4e argument).

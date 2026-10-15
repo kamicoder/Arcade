@@ -11,7 +11,7 @@ import { Grille, hasardAvecGraine, type Coup, type Position } from "../grille";
 import { NIVEAUX, estUnRecord, type Niveau } from "../niveaux";
 import { Tuile } from "../Tuile";
 import { TAILLE, COULEURS } from "../textures";
-import { LARGEUR, HAUTEUR } from "../../../socle/style";
+import { HAUTEUR } from "../../../socle/style";
 import { surTouche, surChaqueTouche } from "../../../socle/clavier";
 import { surManette, MANETTE } from "../../../socle/manette";
 import { estTactile } from "../../../socle/tactile";
@@ -19,8 +19,14 @@ import { fonduPuis } from "../../../socle/retour";
 import { uneSeuleFois } from "../../../socle/fin";
 import { mettreEnPause } from "../../../socle/pause";
 import { toucheDuSon } from "../../../socle/son";
+import { elargir } from "../../../socle/largeur";
+import { vibrer } from "../../../socle/vibration";
 
-export const HAUT_BARRE = 56;              // la barre du haut ; la grille se montre en dessous
+// La barre du haut ; la grille se montre en dessous. Au doigt, elle est un peu plus haute : son ⏸ fait
+// 64 pixels, la taille d'un pouce (socle/pause.ts)
+export function hautBarre(): number {
+  return estTactile() ? 68 : 56;
+}
 export const BAS_AIDE = 40;                // les deux lignes d'aide du clavier, en bas (pas au doigt)
 const MARGE = 10;                          // un peu d'air autour de la grille, dans le monde
 const DOIGT = 38;                          // la plus petite case au doigt, en pixels CSS (un bon centimètre)
@@ -74,6 +80,9 @@ export class Partie extends Phaser.Scene {
   private poussiere!: Phaser.GameObjects.Particles.ParticleEmitter;
   private feu!: Phaser.GameObjects.Particles.ParticleEmitter;
   private fumee!: Phaser.GameObjects.Particles.ParticleEmitter;
+  private eclat!: Phaser.GameObjects.Particles.ParticleEmitter;   // la petite gerbe des mines qui sautent en chaîne
+  private chaine?: Phaser.Time.Timeline;   // la défaite : les autres mines éclatent l'une après l'autre
+  private vueDEnsemble = false;            // la partie est finie : la caméra montre toute la grille, on ne la bouge plus
 
   constructor() {
     super("demineur-partie");
@@ -87,14 +96,21 @@ export class Partie extends Phaser.Scene {
     this.chrono = undefined;
     this.partir = uneSeuleFois();
     this.quitte = false;
+    // La scène sert d'une partie à l'autre : ce que l'arrêt de la scène a déjà défait (Phaser détruit la
+    // chaîne des mines à l'arrêt) ne doit pas être défait une seconde fois par nouvellePartie, qui planterait
+    this.chaine = undefined;
+    this.minuterieFin = undefined;
+    this.vueDEnsemble = false;
   }
 
   create() {
+    // Au doigt, le jeu prend la proportion du téléphone (le menu l'a déjà fait, sauf si l'on arrive autrement)
+    elargir(this);
     const camera = this.cameras.main;
     camera.setBackgroundColor(COULEURS.fond);
     // La caméra ne montre que la place sous la barre (et au-dessus de l'aide, au clavier)
     const bas = estTactile() ? HAUTEUR : HAUTEUR - BAS_AIDE;
-    camera.setViewport(0, HAUT_BARRE, LARGEUR, bas - HAUT_BARRE);
+    camera.setViewport(0, hautBarre(), this.scale.width, bas - hautBarre());
     camera.fadeIn(250);
 
     this.creerEffets();
@@ -132,6 +148,9 @@ export class Partie extends Phaser.Scene {
     // Rejouer pendant l'explosion : la fin de l'ancienne partie ne doit pas tomber sur la nouvelle
     this.minuterieFin?.remove();
     this.minuterieFin = undefined;
+    this.chaine?.destroy();
+    this.chaine = undefined;
+    this.vueDEnsemble = false;
     this.annulerLeGeste();
 
     // Les anciennes tuiles s'en vont toutes ensemble : détruire le Container détruit ses enfants
@@ -177,7 +196,7 @@ export class Partie extends Phaser.Scene {
     })();
   }
 
-  // Pour les tests : où est le centre d'une case, en pixels du jeu (960 × 540)
+  // Pour les tests : où est le centre d'une case, en pixels du jeu (960 × 540, ou plus large au doigt)
   ecranDeCase(r: number, c: number) {
     const camera = this.cameras.main;
     const vue = camera.worldView;
@@ -191,7 +210,11 @@ export class Partie extends Phaser.Scene {
 
   private creuser(r: number, c: number) {
     const imposees = this.registry.get(MINES_IMPOSEES) as Position[] | undefined;
+    const ratee = this.accordRate(r, c);
     const coup = this.grille.clic(r, c, imposees);
+    if (ratee) {
+      this.montrerLAccordRate(r, c, ratee);
+    }
     if (coup.premier) {
       // Le chrono part au premier clic : une minuterie qui ne sonne jamais, dont on lit le temps écoulé
       this.chrono = this.time.addEvent({ delay: 24 * 3600 * 1000 });
@@ -207,7 +230,32 @@ export class Partie extends Phaser.Scene {
     }
   }
 
-  private marquer(r: number, c: number) {
+  // L'accord sur un chiffre dont les drapeaux ne correspondent pas : rien ne s'ouvre. Rend les voisines
+  // encore fermées (celles que l'accord aurait ouvertes), ou null si ce n'est pas un accord raté.
+  private accordRate(r: number, c: number): Position[] | null {
+    const ici = this.grille.case(r, c);
+    if (this.grille.issue !== "" || ici.etat !== "ouverte" || ici.autour === 0) {
+      return null;
+    }
+    const voisines = this.grille.voisines(r, c);
+    const drapeaux = voisines.filter((p) => this.grille.case(p.r, p.c).etat === "drapeau").length;
+    const fermees = voisines.filter((p) => {
+      const etat = this.grille.case(p.r, p.c).etat;
+      return etat === "cachee" || etat === "question";
+    });
+    return drapeaux !== ici.autour && fermees.length > 0 ? fermees : null;
+  }
+
+  // Un accord raté se voit : les voisines fermées s'enfoncent un instant, le chiffre fait « non » de la tête
+  private montrerLAccordRate(r: number, c: number, fermees: Position[]) {
+    for (const p of fermees) {
+      this.tuiles[p.r][p.c].flechir();
+    }
+    this.tuiles[r][c].trembler();
+    this.sound.play("demineur-clic", { rate: 0.6, volume: 0.4 });
+  }
+
+  private marquer(r: number, c: number, auDoigt = false) {
     const avant = this.grille.case(r, c).etat;
     const apres = this.grille.basculer(r, c);
     if (apres === avant) {
@@ -215,8 +263,8 @@ export class Partie extends Phaser.Scene {
     }
     this.tuiles[r][c].marquer(apres);
     this.sound.play("demineur-clic", { rate: apres === "drapeau" ? 1.6 : 1.2, volume: 0.6 });
-    if (apres === "drapeau") {
-      navigator.vibrate?.(25);             // un petit « tac » dans la main, au doigt
+    if (apres === "drapeau" && auDoigt) {
+      vibrer(this, "leger");               // un petit « tac » dans la main
     }
   }
 
@@ -251,12 +299,28 @@ export class Partie extends Phaser.Scene {
     this.fumee.explode(16, ici.x, ici.y);
     this.cameras.main.shake(350, 0.012);
     this.cameras.main.flash(180, 255, 120, 60);
+    vibrer(this, "fort");
+    this.montrerToutLaGrille();
 
-    // Les autres mines se montrent l'une après l'autre, des plus proches aux plus lointaines
+    // Les autres mines se montrent l'une après l'autre, des plus proches aux plus lointaines, et chacune
+    // éclate à son tour : une petite gerbe, un « boum » de plus en plus aigu (comme les clics de la cascade)
     const distance = (p: Position) => Math.hypot(p.r - boum.r, p.c - boum.c);
     const mines = this.grille.minesCachees().sort((a, b) => distance(a) - distance(b));
     const pas = Math.min(60, 1200 / Math.max(1, mines.length));
     mines.forEach((p, k) => this.tuiles[p.r][p.c].ouvrir(this.grille.case(p.r, p.c), 300 + k * pas));
+    // Une Timeline de la scène : elle s'arrête avec la pause, et une nouvelle partie la jette d'un coup.
+    // Pas cent « boum » à la fois : une douzaine au plus, répartis sur la chaîne.
+    const sonTous = Math.ceil(mines.length / 12);
+    this.chaine = this.add.timeline(mines.map((p, k) => ({
+      at: 300 + k * pas + 60,              // quand la mine apparaît dans sa case
+      run: () => {
+        const ici = this.centreDeCase(p.r, p.c);
+        this.eclat.explode(8, ici.x, ici.y);
+        if (k % sonTous === 0) {
+          this.sound.play("demineur-boum", { rate: 1.3 + (k / sonTous) * 0.1, volume: 0.25 });
+        }
+      },
+    }))).play();
     const finDesMines = 300 + mines.length * pas;
     this.grille.drapeauxFaux().forEach((p, k) => this.tuiles[p.r][p.c].barrer(finDesMines + k * 80));
 
@@ -273,6 +337,7 @@ export class Partie extends Phaser.Scene {
     this.arreterLeChrono();
     this.events.emit("visage", "smiley_gagne");
     this.sound.play("demineur-victoire");
+    this.montrerToutLaGrille();
     // Les mines restantes reçoivent leur drapeau, et toute la grille sautille depuis la dernière case
     for (const p of this.grille.toutesLesMines()) {
       this.tuiles[p.r][p.c].marquer("drapeau");
@@ -368,6 +433,9 @@ export class Partie extends Phaser.Scene {
       return;
     }
     if ((geste.type === "appui" || geste.type === "glisse") && geste.pointeur === p.id) {
+      if (this.vueDEnsemble) {
+        return;                            // la partie est finie : la caméra montre toute la grille
+      }
       const dx = p.x - geste.x;
       const dy = p.y - geste.y;
       if (geste.type === "appui" && Math.hypot(dx, dy) > GLISSE) {
@@ -414,7 +482,7 @@ export class Partie extends Phaser.Scene {
       const ici = this.caseSous(p);
       // On agit sur la case où l'on a appuyé, si l'on y est encore
       if (ici && ici.r === geste.cible.r && ici.c === geste.cible.c) {
-        this.toucher(ici, p.wasTouch && this.modeDrapeau);
+        this.toucher(ici, p.wasTouch && this.modeDrapeau, p.wasTouch);
       }
     }
     this.annulerLeGeste();
@@ -422,9 +490,9 @@ export class Partie extends Phaser.Scene {
 
   // Un toucher (ou un clic gauche) : creuser, ou planter un drapeau en mode drapeau.
   // Sur un chiffre déjà ouvert, c'est toujours l'accord, quel que soit le mode.
-  private toucher(cible: Position, drapeau: boolean) {
+  private toucher(cible: Position, drapeau: boolean, auDoigt: boolean) {
     if (drapeau && this.grille.case(cible.r, cible.c).etat !== "ouverte") {
-      this.marquer(cible.r, cible.c);
+      this.marquer(cible.r, cible.c, auDoigt);
     } else {
       this.creuser(cible.r, cible.c);
     }
@@ -440,7 +508,7 @@ export class Partie extends Phaser.Scene {
       this.anneau.setVisible(false);
       this.geste = { type: "fait" };
       this.events.emit("visage", this.visageEnJeu());
-      this.toucher(cible, !this.modeDrapeau);
+      this.toucher(cible, !this.modeDrapeau, true);
     });
   }
 
@@ -481,9 +549,10 @@ export class Partie extends Phaser.Scene {
   // Le zoom qui fait tenir toute la grille, et au doigt, celui qui garde les cases assez grosses
   private cadrerLaGrille() {
     const camera = this.cameras.main;
-    const largeur = this.niveau.colonnes * TAILLE + 2 * MARGE;
-    const hauteur = this.niveau.rangees * TAILLE + 2 * MARGE;
-    const toutVoir = Math.min(camera.width / largeur, camera.height / hauteur, 1.3);
+    // La vue d'ensemble de la partie d'avant, encore en route, ne doit pas emporter la nouvelle grille
+    camera.zoomEffect.reset();
+    camera.panEffect.reset();
+    const toutVoir = this.zoomPourToutVoir();
     let zoom = toutVoir;
     if (estTactile()) {
       // displayScale : combien de pixels du jeu dans un pixel CSS de l'écran
@@ -498,7 +567,30 @@ export class Partie extends Phaser.Scene {
     this.cadrer();
   }
 
+  // Le zoom qui fait tenir toute la grille à l'écran
+  private zoomPourToutVoir(): number {
+    const camera = this.cameras.main;
+    const largeur = this.niveau.colonnes * TAILLE + 2 * MARGE;
+    const hauteur = this.niveau.rangees * TAILLE + 2 * MARGE;
+    return Math.min(camera.width / largeur, camera.height / hauteur, 1.3);
+  }
+
+  // La partie est finie : la caméra recule et se centre, pour montrer toute la grille (au doigt, une grille
+  // zoomée ou déplacée cachait des mines au « Boum »). Les effets de caméra de Phaser font le chemin ; ils
+  // veulent une vraie fonction d'ease, pas son nom (docs/PIEGES-PHASER.md).
+  private montrerToutLaGrille() {
+    this.vueDEnsemble = true;
+    this.annulerAppuiLong();
+    const camera = this.cameras.main;
+    this.centre.set(this.niveau.colonnes * TAILLE / 2, this.niveau.rangees * TAILLE / 2);
+    camera.zoomTo(Math.min(camera.zoom, this.zoomPourToutVoir()), 600, Phaser.Math.Easing.Sine.InOut, true);
+    camera.pan(this.centre.x, this.centre.y, 600, Phaser.Math.Easing.Sine.InOut, true);
+  }
+
   private zoomer(zoom: number, vers?: Phaser.Input.Pointer) {
+    if (this.vueDEnsemble) {
+      return;                              // la partie est finie : la caméra montre toute la grille
+    }
     const camera = this.cameras.main;
     const avant = vers ? camera.getWorldPoint(vers.x, vers.y) : null;
     camera.setZoom(Phaser.Math.Clamp(zoom, this.zoomMin, this.zoomMax));
@@ -670,5 +762,13 @@ export class Partie extends Phaser.Scene {
       alpha: { start: 0.45, end: 0 },
       tint: 0x55505f,
     }).setDepth(4);
+    this.eclat = this.add.particles(0, 0, "etincelle", {
+      emitting: false,
+      lifespan: { min: 250, max: 500 },
+      speed: { min: 60, max: 220 },
+      scale: { start: 1.2, end: 0 },
+      tint: [0xffe14d, 0xff9a2e, 0xff4d2e],
+      blendMode: "ADD",
+    }).setDepth(5);
   }
 }
