@@ -9,11 +9,12 @@ import type { Robot } from "../Robot";
 import { TOUCHES, manettes, type Cote, type NomDeCommande } from "../commandes";
 import { etiquette } from "../../../socle/touchesPhysiques";
 import { enCouleur } from "../decor";
-import { VIE, JAUGE, SOL, GRIS, JAUNE, MANCHES_GAGNANTES } from "../reglages";
+import { VIE, JAUGE, SOL, GRIS, JAUNE, MANCHES_GAGNANTES, DECOMPTE, SAUVEGARDE } from "../reglages";
 import { HAUTEUR, POLICE } from "../../../socle/style";
 import { BoutonsAuDoigt } from "../../../socle/doigts";
 import { estTactile } from "../../../socle/tactile";
 import { boutonFermer } from "../../../socle/boutonArcade";
+import { boutonDuSon } from "../../../socle/son";
 
 const BARRE = { largeur: 300, marge: 20 };
 
@@ -105,13 +106,20 @@ export class Tableau extends Phaser.Scene {
     // Le bouton pour revenir au titre, en haut au milieu (entre les deux barres de vie). Créé après
     // la zone du joystick, il passe dessus : un doigt posé sur le ✕ ne fait pas apparaître le joystick.
     boutonFermer(this, largeur / 2, 30, () => this.combat.quitter(), { taille: 28 });
+    // Au doigt, pas de touche M : le bouton du son, juste à droite du ✕. Pas à sa place habituelle (en
+    // haut à droite, sur la barre de vie de l'orange), ni plus bas (sous le pouce droit et ses boutons).
+    if (estTactile()) {
+      boutonDuSon(this, SAUVEGARDE).setOrigin(0, 0.5).setPosition(largeur / 2 + 30, 30);
+    }
 
     // On écoute le combat. Ses écouteurs ne disparaissent pas quand CETTE scène s'arrête : on les retire.
     this.combat.events.on("phase", this.montrerLaPhase, this);
     this.combat.events.on("coup", this.secouerLaBarre, this);
+    this.combat.events.on("decompte", this.decompter, this);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.combat.events.off("phase", this.montrerLaPhase, this);
       this.combat.events.off("coup", this.secouerLaBarre, this);
+      this.combat.events.off("decompte", this.decompter, this);
     });
     this.montrerLaPhase(this.combat.phase);
   }
@@ -319,11 +327,21 @@ export class Tableau extends Phaser.Scene {
     this.mettreAJourLesCommandes();
   }
 
+  private nomDeLaManche(): string {
+    const m = this.combat.manches;
+    return "Manche " + (m.gauche + m.droite + 1);
+  }
+
+  // « 3 », « 2 », « 1 », la manche rappelée dessous
+  private decompter(chiffre: number) {
+    this.annoncer(String(chiffre), this.nomDeLaManche(), DECOMPTE.chiffre - 150, 150);
+  }
+
   // Les annonces : « Manche 2 », « Combat ! », « K.O. ! »
   private montrerLaPhase(phase: Phase) {
     const m = this.combat.manches;
     if (phase === "debut") {
-      this.annoncer("Manche " + (m.gauche + m.droite + 1), "");
+      this.annoncer(this.nomDeLaManche(), "");
     } else if (phase === "combat") {
       this.annoncer("Combat !", "", 700);
     } else if (phase === "ko") {
@@ -351,13 +369,13 @@ export class Tableau extends Phaser.Scene {
   }
 
   // Un gros texte qui arrive en grossissant ; avec une durée, il s'efface ensuite
-  private annoncer(texte: string, sousTitre: string, duree = 0) {
+  private annoncer(texte: string, sousTitre: string, duree = 0, fondu = 300) {
     this.tweens.killTweensOf([this.grosTexte, this.sousTitre]);
     this.grosTexte.setText(texte).setAlpha(1).setScale(1.8);
     this.tweens.add({ targets: this.grosTexte, scale: 1, duration: 350, ease: "Back.Out" });
     this.sousTitre.setText(sousTitre).setAlpha(sousTitre ? 1 : 0);
     if (duree > 0) {
-      this.tweens.add({ targets: [this.grosTexte, this.sousTitre], alpha: 0, delay: duree, duration: 300 });
+      this.tweens.add({ targets: [this.grosTexte, this.sousTitre], alpha: 0, delay: duree, duration: fondu });
     }
   }
 

@@ -18,7 +18,8 @@ export class Chargement extends Phaser.Scene {
     this.load.setPath("baston");
     this.load.atlas(cleDePlanche("bleu"), "robot-bleu.png", "robot-bleu.json");
     this.load.atlas(cleDePlanche("orange"), "robot-orange.png", "robot-orange.json");
-    for (const son of ["coup", "tir", "special", "ko"]) {
+    // Les quatre premiers viennent de l'atelier ; les autres sont fabriqués par outils/baston/sons.mjs
+    for (const son of ["coup", "tir", "special", "ko", "saut", "bip", "combat", "victoire", "defaite"]) {
       this.load.audio("baston-" + son, "sons/" + son + ".wav");
     }
   }

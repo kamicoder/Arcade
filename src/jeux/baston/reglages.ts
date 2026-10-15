@@ -32,6 +32,12 @@ export const ELAN = 5 * TOUR;
 export const ACTIF = 5 * TOUR;
 export const POING = { largeur: 32, hauteur: 16, hauteurDepuisLeHaut: 36 };   // la hitbox : la zone qui FAIT mal
 
+// Un appui de frappe ou de tir (donc de spécial) donné les mains prises (un tir, un coup, un coup
+// encaissé, un saut) n'est pas perdu : il est gardé ce temps-là, et le coup part si les mains se
+// libèrent avant. Plus long, on frappe sans l'avoir voulu ; plus court, on reperd des appuis.
+// Seulement pour les joueurs : l'ordinateur appuie au hasard, il gagnerait des coups (voir Robot).
+export const APPUI_GARDE = 150 / 1000;     // en secondes
+
 // Touché, il glisse en arrière, de moins en moins vite
 export const RECUL = 8 * 60;               // 8 pixels par tour
 export const RECUL_FREIN = 0.8;            // à chaque tour, il garde 80 % de son élan
@@ -47,13 +53,19 @@ export const TIR = { degats: 6, taille: 14 };
 
 // Le match
 export const MANCHES_GAGNANTES = 2;
-export const DUREE_ANNONCE = 90 * TOUR * 1000;   // en millisecondes : « Manche 1 », personne ne bouge
+// L'annonce, en millisecondes : « Manche 1 », puis « 3 », « 2 », « 1 », et « Combat ! ». Personne ne bouge.
+export const DECOMPTE = { manche: 900, chiffre: 450 };
+export const DUREE_ANNONCE = DECOMPTE.manche + 3 * DECOMPTE.chiffre;
 export const DUREE_KO = 120 * TOUR * 1000;       // pour savourer le K.O. (en temps du jeu : le ralenti l'allonge)
 
 // Le jus
 export const SECOUSSE = 5;                 // de combien de pixels l'écran tremble (il tremble « dégâts » tours)
 export const RALENTI = { vitesse: 1 / 3, duree: 2000 };   // le K.O. : 20 images par seconde au lieu de 60, 2 secondes
 export const COULEUR_ETINCELLES = 0xffe678;
+// L'arrêt sur coup (hit-stop), en vraies millisecondes : quand un coup touche, les deux robots (et les
+// tirs) se figent un instant, le temps de sentir le choc. Court : il retarde le jeu d'autant.
+export const ARRET_SUR_COUP = { coup: 70, special: 150, ko: 150 };
+export const FLASH = 60;                   // le robot touché reste blanc ce temps-là (ms de jeu), après l'arrêt
 export const BOITES = false;               // true : on voit les hurtbox (vert), les hitbox (rouge) et les états
 
 // Le robot de l'ordinateur : ses chances, à chaque tour de 1/60 s
@@ -86,5 +98,6 @@ export const PROFONDEUR = {
   robots: 2,
   tirs: 3,
   etincelles: 4,
-  boites: 5,
+  degats: 5,                               // les « −8 » qui s'envolent
+  boites: 6,
 };

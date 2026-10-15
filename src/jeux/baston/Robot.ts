@@ -13,7 +13,7 @@ import { cleDePlanche, cleDAnimation, type CouleurDeRobot } from "./textures";
 import type { VueDeRobot } from "./ordi";
 import {
   SOL, ECHELLE, CORPS, VIE, JAUGE, TIRS, DUREE, ELAN, ACTIF, POING, RECUL, RECUL_FREIN,
-  JAUGE_POING, JAUGE_TIR, JAUGE_ENCAISSE, PROFONDEUR,
+  JAUGE_POING, JAUGE_TIR, JAUGE_ENCAISSE, PROFONDEUR, APPUI_GARDE,
 } from "./reglages";
 
 export type Etat = "repos" | "marche" | "saut" | "attaque" | "tir" | "special" | "touche" | "ko";
@@ -33,9 +33,14 @@ export class Robot extends Phaser.Physics.Arcade.Sprite implements VueDeRobot {
   invincible = 0;                          // secondes d'invincibilité qu'il lui reste
   recul = 0;                               // sa vitesse de recul quand il est touché (pixels/s)
   direction: 1 | -1 = 1;
+  // Un joueur : ses appuis donnés les mains prises sont gardés un instant (APPUI_GARDE). L'ordinateur, non :
+  // il appuie au hasard à chaque image, et garder ses appuis lui donnerait des coups en plus.
+  retientLesAppuis = true;
   private frappait = false;                // la commande « frapper » était-elle déjà là à l'image d'avant ?
   private tirait = false;                  // et « tirer » (ou « special ») ?
   private specialDemande = false;          // un appui donné jauge pleine, encore tenu : le spécial attend de partir
+  // Les appuis gardés : les secondes qu'il leur reste (0 : aucun appui en attente)
+  private envies = { frapper: 0, tirer: 0, special: 0 };
 
   constructor(scene: Phaser.Scene, x: number, couleur: CouleurDeRobot, teinte: number, modele: Modele) {
     super(scene, x, SOL, cleDePlanche(couleur), "repos-0");
@@ -111,32 +116,32 @@ export class Robot extends Phaser.Physics.Arcade.Sprite implements VueDeRobot {
       }
     }
 
-    // Un nouvel appui seulement : garder la touche ne refrappe pas
-    const frappe = commandes.frapper && !this.frappait;
-    this.frappait = commandes.frapper;
+    // Un nouvel appui seulement (ou un appui gardé) : garder la touche ne refrappe pas
+    const frappe = this.noterLesAppuis(commandes, duree) || this.envies.frapper > 0;
     // Le coup spécial aussi : seul un appui donné jauge pleine le lance. Garder le tir pendant que la
-    // jauge se remplit ne le lâche pas par surprise. L'appui reste valable tant qu'on tient : donné
-    // pendant un tir ou un coup encaissé, le spécial part dès qu'il a les mains libres.
-    const tire = commandes.tirer || commandes.special;
-    if (tire && !this.tirait && this.jauge >= JAUGE) {
-      this.specialDemande = true;
-    } else if (!tire) {
-      this.specialDemande = false;
-    }
-    this.tirait = tire;
+    // jauge se remplit ne le lâche pas par surprise. L'appui reste valable tant qu'on tient (ou un
+    // instant après un appui bref) : donné pendant un tir ou un coup encaissé, le spécial part dès
+    // qu'il a les mains libres.
+    const special = this.specialDemande || this.envies.special > 0;
+    // Le tir se tient (une rafale), ou part d'un appui gardé
+    const tir = commandes.tirer || this.envies.tirer > 0;
 
     let marche = 0;
     if (this.etat === "repos" || this.etat === "marche") {
       // Au sol, les mains libres : il peut tout faire
       if (frappe) {
+        this.envies.frapper = 0;           // un appui, un coup
         this.passer("attaque", DUREE.attaque);
-      } else if (this.specialDemande && this.jauge >= JAUGE) {
+      } else if (special && this.jauge >= JAUGE) {
         this.specialDemande = false;
+        this.envies.special = 0;
         this.lancerLeSpecial();
-      } else if (commandes.tirer && this.tirs.getLength() < TIRS) {
+      } else if (tir && this.tirs.getLength() < TIRS) {
+        this.envies.tirer = 0;
         this.tirer();
       } else if (commandes.saut) {
         this.body.setVelocityY(this.modele.saut);
+        this.scene.sound.play("baston-saut");
         this.passer("saut");
       } else {
         marche = this.marcher(commandes);
@@ -164,6 +169,41 @@ export class Robot extends Phaser.Physics.Arcade.Sprite implements VueDeRobot {
     // Invincible, il clignote : 4 tours sur 8, on ne le voit pas
     const tours = Math.ceil(this.invincible * 60);
     this.setVisible(this.etat === "ko" || tours % 8 < 4);
+  }
+
+  // Les nouveaux appuis de cette image (une touche enfoncée, pas tenue), et ceux qu'on garde.
+  // Appelée à chaque image, même pendant l'arrêt sur coup (duree : 0, le temps est figé pour tout le
+  // monde) : un appui donné pendant le choc part juste après. Renvoie : « frapper » vient d'être appuyé.
+  noterLesAppuis(commandes: Commandes, duree: number): boolean {
+    const garde = this.retientLesAppuis ? APPUI_GARDE : 0;
+    const frapper = commandes.frapper && !this.frappait;
+    this.frappait = commandes.frapper;
+    const tire = commandes.tirer || commandes.special;
+    const tirer = tire && !this.tirait;
+    this.tirait = tire;
+
+    const e = this.envies;
+    e.frapper = frapper ? garde : Math.max(0, e.frapper - duree);
+    e.tirer = Math.max(0, e.tirer - duree);
+    e.special = Math.max(0, e.special - duree);
+    if (tirer && this.jauge >= JAUGE) {
+      this.specialDemande = true;          // jauge pleine : c'est un spécial
+      e.special = garde;
+    } else if (tirer && commandes.tirer) {
+      e.tirer = garde;
+    } else if (!tire) {
+      this.specialDemande = false;
+    }
+    return frapper;
+  }
+
+  // L'arrêt sur coup : il se fige (son animation aussi), puis repart
+  figer(fige: boolean) {
+    if (fige) {
+      this.anims.pause();
+    } else {
+      this.anims.resume();
+    }
   }
 
   private marcher(commandes: Commandes): number {
@@ -223,7 +263,9 @@ export class Robot extends Phaser.Physics.Arcade.Sprite implements VueDeRobot {
 
   // Son poing (sa hitbox de cette image, prise avant les coups) et ses tirs contre le corps de la cible.
   // Un tir qui ne touche pas (la cible est invincible) passe à travers.
-  toucher(cible: Robot, poing: Phaser.Geom.Rectangle | null) {
+  // Renvoie true si un tir du coup spécial l'a touché (le choc est plus fort).
+  toucher(cible: Robot, poing: Phaser.Geom.Rectangle | null): boolean {
+    let special = false;
     if (poing && Phaser.Geom.Intersects.RectangleToRectangle(poing, cible.hurtbox())) {
       if (cible.encaisser(this.modele.degats, this.direction)) {
         this.remplir(JAUGE_POING);
@@ -237,9 +279,11 @@ export class Robot extends Phaser.Physics.Arcade.Sprite implements VueDeRobot {
       if (cible.encaisser(tir.degats, tir.direction)) {
         this.remplir(JAUGE_TIR);
         arrives.push(tir);
+        special ||= tir.special;
       }
     });
     arrives.forEach((tir) => tir.destroy());
+    return special;
   }
 
   // Il reçoit un coup qui le pousse vers « direction ». Renvoie true si le coup l'a vraiment touché.

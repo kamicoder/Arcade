@@ -193,12 +193,93 @@ test("garder le tir pendant que la jauge se remplit ne lâche pas le spécial : 
   expect((await combat(page)).gauche.jauge).toBe(100);
   await page.keyboard.up("g");
 
-  // Un nouvel appui, les mains libres (un appui bref pendant un tir n'est pas gardé, comme pour frapper) :
-  // le spécial part
+  // Un nouvel appui, les mains libres : le spécial part
   await page.waitForFunction(() => (window as any).jeu.scene.getScene("baston-combat").gauche.etat === "repos");
   await appuyer(page, "g");
   await page.waitForFunction(() => (window as any).jeu.scene.getScene("baston-combat").specialsLances === 1);
   expect((await combat(page)).gauche.jauge).toBe(0);
+  sansErreur();
+});
+
+test("un appui bref pendant un tir est gardé : le coup part à la fin du tir", async ({ page }) => {
+  const { sansErreur } = await combatSolo(page);
+  // Ce que fait le robot bleu au moment même où F s'enfonce (pas à l'image suivante)
+  await page.evaluate(() => {
+    const c = (window as any).jeu.scene.getScene("baston-combat");
+    c.etatsAuxAppuis = [];
+    window.addEventListener("keydown", (e) => {
+      if (e.code === "KeyF") c.etatsAuxAppuis.push({ etat: c.gauche.etat, reste: c.gauche.minuteur });
+    }, true);
+  });
+  // L'appui doit tomber pendant le tir, dans ses dernières 150 ms : quand dix navigateurs jouent
+  // ensemble, une image peut tarder et le tir finir avant. On recommence alors.
+  let vu = false;
+  for (let essai = 0; essai < 5 && !vu; essai++) {
+    await placer(page, 200, 600);
+    await page.waitForFunction(() => {
+      const c = (window as any).jeu.scene.getScene("baston-combat");
+      return c.gauche.etat === "repos" && c.gauche.listeDesTirs.length === 0;
+    });
+    await appuyer(page, "g");
+    await page.waitForFunction(() => {
+      const g = (window as any).jeu.scene.getScene("baston-combat").gauche;
+      return g.etat !== "tir" || g.minuteur < 0.1;
+    });
+    await page.keyboard.press("f");
+    await page.waitForFunction((n) => (window as any).jeu.scene.getScene("baston-combat").etatsAuxAppuis.length > n, essai);
+    const appui = await page.evaluate(() => (window as any).jeu.scene.getScene("baston-combat").etatsAuxAppuis.at(-1));
+    // F a été relâché aussitôt ; s'il est tombé pendant le tir, le coup part quand même, à la fin du tir
+    await page.waitForFunction(() => (window as any).jeu.scene.getScene("baston-combat").gauche.etat === "attaque");
+    // Le tir doit durer encore au moins deux images : Phaser ne lit la touche qu'à l'image suivante, et un
+    // tir fini entre-temps ferait partir le coup sans appui gardé (le test passerait sans la fonction)
+    vu = appui.etat === "tir" && appui.reste > 2 / 60;
+    await page.waitForFunction(() => ["repos", "marche"].includes((window as any).jeu.scene.getScene("baston-combat").gauche.etat));
+  }
+  expect(vu).toBe(true);
+  sansErreur();
+});
+
+test("un coup qui touche : le choc fige tout un instant, le robot flashe, ses dégâts s'envolent", async ({ page }) => {
+  const { sansErreur } = await titreBaston(page);
+  await appuyer(page, "o");
+  await attendreScene(page, "baston-choix");
+  // Le décompte de l'annonce : 3, 2, 1, puis le combat
+  await page.evaluate(() => {
+    const c = (window as any).jeu.scene.getScene("baston-combat");
+    c.decomptes = [];
+    c.events.on("decompte", (n: number) => c.decomptes.push(n));
+  });
+  await appuyer(page, "f");
+  await attendreScene(page, "baston-combat");
+  await attendrePhase(page, "combat");
+  expect(await page.evaluate(() => (window as any).jeu.scene.getScene("baston-combat").decomptes)).toEqual([3, 2, 1]);
+
+  // Ce qu'on voit à l'instant du coup
+  await page.evaluate(() => {
+    const c = (window as any).jeu.scene.getScene("baston-combat");
+    c.events.once("coup", (cible: any) => {
+      c.auCoup = {
+        flash: cible.tintMode,             // 1 : la teinte pleine (FILL), en blanc
+        teinte: cible.tintTopLeft,
+        fige: c.physics.world.isPaused && c.time.paused,
+        degats: c.children.list.filter((o: any) => o.type === "Text").map((o: any) => o.text),
+      };
+    });
+  });
+  await placer(page, 400, 450);
+  await appuyer(page, "f");
+  await page.waitForFunction(() => (window as any).jeu.scene.getScene("baston-combat").auCoup);
+  const auCoup = await page.evaluate(() => (window as any).jeu.scene.getScene("baston-combat").auCoup);
+  expect(auCoup).toEqual({ flash: 1, teinte: 0xffffff, fige: true, degats: ["−8"] });
+
+  // Puis tout reprend : plus de flash, le chiffre s'en va, et l'orange se remet de son coup
+  await page.waitForFunction(() => {
+    const c = (window as any).jeu.scene.getScene("baston-combat");
+    return !c.physics.world.isPaused && !c.time.paused && c.droite.tintMode === 0
+      && !c.children.list.some((o: any) => o.type === "Text")
+      && c.droite.etat !== "touche" && c.gauche.etat === "repos";
+  });
+  expect((await combat(page)).droite.vie).toBe(92);
   sansErreur();
 });
 
@@ -450,6 +531,38 @@ test.describe("au doigt", () => {
     await page.waitForFunction(() => (window as any).jeu.scene.getScene("baston-tableau").specialPret === true);
     await toucher(page, largeur - 104, 272);
     await page.waitForFunction(() => (window as any).jeu.scene.getScene("baston-combat").gauche.jauge === 0);
+    sansErreur();
+  });
+
+  test("le bouton du son en combat", async ({ page }) => {
+    const { sansErreur } = await ouvrir(page);
+    await toucherLaCarte(page, "baston");
+    await attendreScene(page, "baston-titre");
+    const { largeur } = await tailleDuJeu(page);
+    await toucher(page, largeur / 2, 190);
+    await attendreScene(page, "baston-choix");
+    await toucher(page, largeur / 4, 430);
+    await attendreScene(page, "baston-combat");
+    await attendrePhase(page, "combat");
+
+    // En haut, à droite du ✕ : loin des barres de vie et des pouces
+    const bouton = () => page.evaluate(() => {
+      const texte = (window as any).jeu.scene.getScene("baston-tableau").children.list
+        .find((o: any) => o.type === "Text" && /Son|Muet/.test(o.text));
+      const b = texte.getBounds();
+      return { x: b.centerX as number, y: b.centerY as number, droite: b.right as number, texte: texte.text as string };
+    });
+    const avant = await bouton();
+    expect(avant.texte).toContain("Son");
+    expect(avant.x).toBeGreaterThan(largeur / 2);
+    expect(avant.droite).toBeLessThan(largeur - 20 - 300);   // la barre de l'orange commence là
+    await toucher(page, avant.x, avant.y);
+    await page.waitForFunction(() => localStorage.getItem("baston/son") === "false");
+    expect((await bouton()).texte).toContain("Muet");
+    expect(await stickVisible(page)).toBe(false);
+    await toucher(page, avant.x, avant.y);
+    await page.waitForFunction(() => localStorage.getItem("baston/son") === "true");
+    expect((await combat(page)).phase).toBe("combat");
     sansErreur();
   });
 

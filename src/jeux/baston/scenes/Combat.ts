@@ -12,8 +12,8 @@ import { aucuneCommande, lireManette, manettes, Clavier, type Commandes, type Co
 import { compterUnMatch, type DonneesDeCombat } from "../partie";
 import { dessinerArene } from "../decor";
 import {
-  SOL, GRAVITE, DEPART, BLEU, ORANGE, MANCHES_GAGNANTES, DUREE_ANNONCE, DUREE_KO,
-  SECOUSSE, RALENTI, COULEUR_ETINCELLES, BOITES, AIDE_MOBILE, PROFONDEUR, SAUVEGARDE,
+  SOL, GRAVITE, DEPART, BLEU, ORANGE, MANCHES_GAGNANTES, DECOMPTE, DUREE_ANNONCE, DUREE_KO,
+  SECOUSSE, RALENTI, COULEUR_ETINCELLES, BOITES, AIDE_MOBILE, PROFONDEUR, SAUVEGARDE, ARRET_SUR_COUP, FLASH,
 } from "../reglages";
 import { HAUTEUR, POLICE } from "../../../socle/style";
 import { surTouche } from "../../../socle/clavier";
@@ -22,6 +22,7 @@ import { estTactile } from "../../../socle/tactile";
 import { fonduPuis } from "../../../socle/retour";
 import { elargir } from "../../../socle/largeur";
 import { toucheDuSon } from "../../../socle/son";
+import { vibrer } from "../../../socle/vibration";
 
 // « debut » : on annonce la manche, personne ne bouge. « ko » : on peut encore bouger, plus se battre.
 // « fini » : le match est joué, tout s'arrête.
@@ -48,6 +49,7 @@ export class Combat extends Phaser.Scene {
   private enPartance = false;              // on quitte déjà la scène (un double appui ne la quitte pas deux fois)
   private vitesse = 1;                     // 1 : normal ; moins : ralenti
   private ralenti = 0;                     // millisecondes (vraies) de ralenti qui restent
+  private arret = 0;                       // millisecondes (vraies) d'arrêt sur coup qui restent
   private clavier!: Clavier;
   private etincelles!: Phaser.GameObjects.Particles.ParticleEmitter;
   private boites?: Phaser.GameObjects.Graphics;
@@ -70,6 +72,7 @@ export class Combat extends Phaser.Scene {
     this.enPartance = false;
     this.vitesse = 1;
     this.ralenti = 0;
+    this.arret = 0;
     this.auDoigt = estTactile();
     this.tactile = aucuneCommande();
     this.appuis.clear();
@@ -91,6 +94,7 @@ export class Combat extends Phaser.Scene {
     this.physics.world.timeScale = 1;
     this.physics.resume();
     this.time.timeScale = 1;
+    this.time.paused = false;              // un arrêt sur coup, si l'on a quitté pendant
     this.tweens.timeScale = 1;
     // Le monde s'arrête au sol : les robots tombent dessus, et ne sortent pas par les côtés
     this.physics.world.setBounds(0, 0, largeur, SOL);
@@ -101,6 +105,9 @@ export class Combat extends Phaser.Scene {
     this.droite = new Robot(this, milieu + DEPART, "orange", ORANGE, MODELES[this.modeles.droite]);
     this.gauche.regarder(this.droite);
     this.droite.regarder(this.gauche);
+    if (this.solo) {
+      this.droite.retientLesAppuis = false;   // l'ordinateur appuie au hasard : rien à lui garder
+    }
     for (const robot of [this.gauche, this.droite]) {
       robot.on("special", () => this.cameras.main.flash(150, 255, 240, 200));
     }
@@ -120,7 +127,11 @@ export class Combat extends Phaser.Scene {
     surTouche(this, "ESC", () => this.quitter());
     // Le bouton Start d'une manette (le 9 d'une manette « standard ») : on quitte aussi
     surManette(this, MANETTE.START, () => this.quitter());
-    toucheDuSon(this, SAUVEGARDE);         // M : couper le son, ou le remettre (aucun robot ne s'en sert)
+    // M : couper le son, ou le remettre (aucun robot ne s'en sert). Au doigt, c'est le bouton du son
+    // du tableau de bord qui s'en charge (avec M aussi : ici, M basculerait deux fois).
+    if (!this.auDoigt) {
+      toucheDuSon(this, SAUVEGARDE);
+    }
 
     if (BOITES) {
       this.boites = this.add.graphics().setDepth(PROFONDEUR.boites);
@@ -129,7 +140,17 @@ export class Combat extends Phaser.Scene {
     // Le tableau de bord par-dessus (ou redémarré, s'il était déjà là : une nouvelle manche)
     this.scene.launch("baston-tableau");
     this.events.emit("phase", "debut");
-    this.time.delayedCall(DUREE_ANNONCE, () => this.changerDePhase("combat"));
+    // « Manche 1 », puis 3, 2, 1 (le tableau de bord les montre), et « Combat ! »
+    for (const chiffre of [3, 2, 1]) {
+      this.time.delayedCall(DECOMPTE.manche + (3 - chiffre) * DECOMPTE.chiffre, () => {
+        this.sound.play("baston-bip");
+        this.events.emit("decompte", chiffre);
+      });
+    }
+    this.time.delayedCall(DUREE_ANNONCE, () => {
+      this.sound.play("baston-combat");
+      this.changerDePhase("combat");
+    });
   }
 
   // Le bleu : le clavier (ses touches, et les flèches aussi quand on est seul) et la première manette.
@@ -158,6 +179,20 @@ export class Combat extends Phaser.Scene {
   }
 
   update(_temps: number, delta: number) {
+    // L'arrêt sur coup : tant qu'il dure, rien ne bouge. On écoute quand même les commandes : un appui
+    // donné pendant le choc est gardé (Robot.noterLesAppuis), et part juste après.
+    if (this.arret > 0) {
+      this.arret -= delta;
+      if (this.arret > 0) {
+        this.lireLesPilotes(0);            // 0 : le temps est figé (l'ordinateur n'appuie sur rien)
+        if (this.phase === "combat" || this.phase === "ko") {
+          this.gauche.noterLesAppuis(this.derniersOrdres.gauche, 0);
+          this.droite.noterLesAppuis(this.derniersOrdres.droite, 0);
+        }
+        return;
+      }
+      this.figer(false);
+    }
     // Le ralenti se compte en vraies millisecondes
     if (this.ralenti > 0) {
       this.ralenti -= delta;
@@ -170,12 +205,7 @@ export class Combat extends Phaser.Scene {
     // Les secondes de jeu de cette image : moins qu'en vrai pendant le ralenti, et jamais de grand bond
     const duree = Math.min(delta / 1000, 0.05) * this.vitesse;
 
-    // Les commandes de chacun, lues à chaque image (le tableau de bord les montre, même pendant l'annonce)
-    for (const cote of ["gauche", "droite"] as Cote[]) {
-      this.derniersOrdres[cote] = this.pilotes[cote](duree);
-    }
-    this.appuis.clear();
-    this.clavier.oublierLesAppuis();
+    this.lireLesPilotes(duree);
 
     if (this.phase === "combat" || this.phase === "ko") {
       this.bougerLesRobots(duree);
@@ -184,6 +214,15 @@ export class Combat extends Phaser.Scene {
       this.echangerLesCoups();
     }
     this.dessinerLesBoites();
+  }
+
+  // Les commandes de chacun, lues à chaque image (le tableau de bord les montre, même pendant l'annonce)
+  private lireLesPilotes(duree: number) {
+    for (const cote of ["gauche", "droite"] as Cote[]) {
+      this.derniersOrdres[cote] = this.pilotes[cote](duree);
+    }
+    this.appuis.clear();
+    this.clavier.oublierLesAppuis();
   }
 
   private bougerLesRobots(duree: number) {
@@ -213,20 +252,83 @@ export class Combat extends Phaser.Scene {
   // L'attaquant essaie de toucher la cible ; si elle a perdu de la vie, on fait du spectacle
   private echanger(attaquant: Robot, cible: Robot, poing: Phaser.Geom.Rectangle | null) {
     const avant = cible.vie;
-    attaquant.toucher(cible, poing);
+    const special = attaquant.toucher(cible, poing);
     const degats = avant - cible.vie;
     if (degats <= 0) {
       return;
     }
+    const ko = cible.etat === "ko";
     // Plus le coup fait mal, plus l'écran tremble longtemps (un tour de 1/60 s par point de dégât)
     this.cameras.main.shake(degats * 1000 / 60, SECOUSSE / this.scale.width);
     this.sound.play("baston-coup");
     this.etincelles.explode(degats * 2, cible.centreX, cible.body.y + 30);
-    if (cible.etat === "ko") {
+    this.marquerLeCoup(cible, degats, special);
+    this.arreterSurLeCoup(ko ? ARRET_SUR_COUP.ko : special ? ARRET_SUR_COUP.special : ARRET_SUR_COUP.coup);
+    this.vibrerPour(cible, ko);
+    if (ko) {
       this.sound.play("baston-ko");
       this.ralentir(cible);
     }
     this.events.emit("coup", cible, degats);
+  }
+
+  // Le robot touché flashe en blanc (la teinte « pleine » : toute l'image prend la couleur), et ses
+  // dégâts s'envolent au-dessus de lui
+  private marquerLeCoup(cible: Robot, degats: number, special: boolean) {
+    cible.setTint(0xffffff).setTintMode(Phaser.TintModes.FILL);
+    // Une minuterie de la scène : figée pendant l'arrêt sur coup, le flash dure jusqu'un peu après
+    this.time.delayedCall(FLASH, () => cible.clearTint());
+    const texte = this.add.text(cible.centreX, cible.body.y - 8, "−" + degats, {
+      fontFamily: POLICE, fontSize: special ? "40px" : "30px", fontStyle: "bold",
+      color: special ? "#fadc5a" : "#ffffff", stroke: "#1c1a25", strokeThickness: 6,
+    }).setOrigin(0.5, 1).setDepth(PROFONDEUR.degats);
+    // Un tween : il ne se fige pas avec le choc (le chiffre part pendant que tout est immobile)
+    this.tweens.add({
+      targets: texte,
+      y: texte.y - 60,
+      alpha: { from: 1, to: 0 },
+      scale: { from: 1.4, to: 1 },
+      duration: 800,
+      ease: "Cubic.Out",
+      onComplete: () => texte.destroy(),
+    });
+  }
+
+  // L'arrêt sur coup : les robots, leurs tirs et les minuteries se figent quelques millisecondes.
+  // Deux coups dans la même image : le plus long des deux.
+  private arreterSurLeCoup(duree: number) {
+    if (this.arret <= 0) {
+      this.figer(true);
+    }
+    this.arret = Math.max(this.arret, duree);
+  }
+
+  private figer(fige: boolean) {
+    if (fige) {
+      this.physics.pause();
+    } else {
+      this.physics.resume();
+    }
+    this.time.paused = fige;
+    this.gauche.figer(fige);
+    this.droite.figer(fige);
+  }
+
+  // La manette (ou le téléphone) de celui qui encaisse vibre ; au K.O., plus fort.
+  // Seul contre l'ordinateur : le joueur sent les coups qu'il reçoit, et le K.O. de l'un ou de l'autre.
+  private vibrerPour(cible: Robot, ko: boolean) {
+    const force = ko ? "fort" : "moyen";
+    if (this.solo) {
+      if (cible === this.gauche || ko) {
+        vibrer(this, force, manettes(this)[0]);   // sans manette : le téléphone, au doigt
+      }
+      return;
+    }
+    // À deux : seulement la manette de celui qui encaisse (sans manette, il joue au clavier : rien)
+    const manette = manettes(this)[cible === this.gauche ? 0 : 1];
+    if (manette) {
+      vibrer(this, force, manette);
+    }
   }
 
   // Le K.O., au ralenti : la physique, les minuteries, les tweens, les animations et les particules
@@ -267,9 +369,12 @@ export class Combat extends Phaser.Scene {
       // Le match est fini : tout s'arrête derrière l'écran de fin
       this.changerDePhase("fini");
       this.physics.pause();
+      const bleuGagne = this.manches.gauche >= MANCHES_GAGNANTES;
       if (this.solo) {
-        compterUnMatch(this.manches.gauche >= MANCHES_GAGNANTES);
+        compterUnMatch(bleuGagne);
       }
+      // Contre l'ordinateur, perdre ne sonne pas comme gagner
+      this.sound.play(this.solo && !bleuGagne ? "baston-defaite" : "baston-victoire");
       this.scene.launch("baston-fin");
       return;
     }

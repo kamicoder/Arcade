@@ -11,10 +11,12 @@ export class Tir extends Phaser.Physics.Arcade.Image {
 
   readonly degats: number;
   readonly direction: 1 | -1;
+  readonly special: boolean;               // un tir du coup spécial : le choc dure plus longtemps
 
   constructor(scene: Phaser.Scene, groupe: Phaser.Physics.Arcade.Group, plan: PlanDeTir, couleur: number, special: boolean) {
     super(scene, plan.x, plan.y, textureDeTir(scene, couleur, plan.taille));
     this.degats = plan.degats;
+    this.special = special;
     this.direction = plan.direction;
     scene.add.existing(this);
     this.setDepth(PROFONDEUR.tirs);

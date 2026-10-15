@@ -11,12 +11,6 @@ l'équilibrage en jouant. Taille : **S** petit, **M** moyen, **L** gros. Une id�
   corrigé : voir `docs/PIEGES-PHASER.md`).
 - **La pause n'a pas été essayée avec une vraie manette** (les tests simulent l'appui).
 
-### Baston
-- Un appui bref pendant une animation (un tir, un coup encaissé) est perdu : à garder en mémoire jusqu'à
-  ce que le robot ait les mains libres ? À juger en jouant ; l'ordinateur lance peut-être aussi son spécial
-  un peu moins souvent depuis qu'il lui faut un nouvel appui.
-- Au doigt, pas de bouton du son en combat (seulement au titre).
-
 ### Catapulte
 - Le menu ne tient pas plus de 8 niveaux : des pages, quand un 9e arrivera.
 - Un tir s'arrête au calme, ou au bout de 20 s (un bloc qui glisserait sans fin sur la glace) : à juger.
@@ -61,11 +55,6 @@ Le Tamago est une ébauche : on le laisse de côté pour l'instant, ces notes at
 
 ## Baston de robots
 
-**Finition**
-- Arrêt sur coup (hit-stop) (S).
-- Le robot touché flashe en blanc, les dégâts s'envolent (S).
-- Un « 3, 2, 1, Combat ! », des sons de saut et de victoire (M).
-
 **Contenu**
 - Garde / parade (M, à essayer : peut ralentir les parties).
 - Des arènes variées : usine, toit la nuit, pluie (M).
@@ -74,7 +63,6 @@ Le Tamago est une ébauche : on le laisse de côté pour l'instant, ces notes at
 **Au doigt et à la manette**
 - Une touche à part pour le spécial (S).
 - Une aide au premier combat au doigt, sur les zones (S).
-- Vibration au coup et au K.O. (S).
 
 **Modes**
 - Tournoi : les trois robots à la suite (M).
