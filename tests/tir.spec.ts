@@ -1,5 +1,8 @@
 import { test, expect, type Page } from "@playwright/test";
-import { ouvrir, appuyer, attendreScene, scenesActives, versLaPage, toucher, ouvrirLaCarte, manette } from "./outils";
+import {
+  ouvrir, appuyer, attendreScene, scenesActives, versLaPage, toucher, ouvrirLaCarte, manette, manetteAToutes, quitterParLaPause,
+  attendreLaPause,
+} from "./outils";
 
 // Du Hub jusqu'au menu du jeu de tir
 async function menuDuTir(page: Page) {
@@ -176,9 +179,172 @@ test("trois coups : la partie est perdue, le record reste, et Entrée rejoue", a
   expect(await partie(page)).toMatchObject({ score: 0, vies: 3, vague: 1 });
   expect(await scenesActives(page)).toEqual(["tir-partie", "tir-tableau"]);
 
-  // Échap revient au menu, qui montre le record
-  await appuyer(page, "Escape");
+  // La pause, puis « Le menu »
+  await quitterParLaPause(page);
   await attendreScene(page, "tir-menu");
+  sansErreur();
+});
+
+// La pause du socle (socle/pause.ts), vue en détail ici une fois pour toutes ; les autres jeux vérifient
+// seulement qu'elle s'ouvre
+test("la pause : tout s'arrête, une touche lâchée pendant la pause l'est aussi à la reprise, et on en sort", async ({ page }) => {
+  const { sansErreur } = await menuDuTir(page);
+  await appuyer(page, "Enter");
+  await attendreScene(page, "tir-partie");
+  await page.waitForTimeout(300);
+  const enPause = () => page.evaluate(() => {
+    const jeu = (window as any).jeu;
+    return {
+      pause: jeu.scene.isActive("socle-pause") as boolean,
+      partie: jeu.scene.isPaused("tir-partie") as boolean,
+      tableau: jeu.scene.isPaused("tir-tableau") as boolean,
+    };
+  });
+
+  // On tient ← et on appuie sur Échap : la partie et son tableau de bord s'arrêtent, le vaisseau ne bouge plus
+  await page.keyboard.down("ArrowLeft");
+  await page.waitForTimeout(100);
+  await appuyer(page, "Escape");
+  await attendreLaPause(page);
+  expect(await enPause()).toEqual({ pause: true, partie: true, tableau: true });
+  expect(await page.evaluate(() => (window as any).jeu.canvas.style.cursor)).toBe("default");   // la flèche revient
+  const arrete = await partie(page);
+  await page.waitForTimeout(300);
+  expect((await partie(page)).x).toBe(arrete.x);
+
+  // ← lâchée pendant la pause : la partie ne l'a pas entendu. Échap reprend, et le vaisseau ne file pas
+  // tout seul à gauche
+  await page.keyboard.up("ArrowLeft");
+  await appuyer(page, "Escape");
+  await page.waitForFunction(() => (window as any).jeu.scene.isActive("tir-partie"));
+  await page.waitForTimeout(300);
+  expect(await enPause()).toEqual({ pause: false, partie: false, tableau: false });
+  // Au plus une image de mouvement (7 pixels) : à la reprise, la physique fait un pas avec la vitesse d'avant
+  // la pause, avant que la partie ne relise les touches. Une ← restée « tenue », elle, l'emmènerait de 120.
+  expect(Math.abs((await partie(page)).x - arrete.x)).toBeLessThanOrEqual(8);
+
+  // P, et Start à la manette, l'ouvrent aussi ; B la referme
+  await appuyer(page, "p");
+  await attendreLaPause(page);
+  await appuyer(page, "p");
+  await page.waitForFunction(() => (window as any).jeu.scene.isActive("tir-partie"));
+  await page.waitForTimeout(300);
+  await manette(page, "tir-partie", 9);
+  await attendreLaPause(page);
+  await manette(page, "socle-pause", 1);
+  await page.waitForFunction(() => (window as any).jeu.scene.isActive("tir-partie"));
+  await page.waitForTimeout(300);
+
+  // Start valide « Reprendre ». La partie lit la manette avec sa propre copie, restée figée pendant la
+  // pause : réveillée, elle prend le Start encore tenu pour un nouvel appui. Elle ne rouvre pas la pause.
+  await appuyer(page, "Escape");
+  await attendreLaPause(page);
+  await manette(page, "socle-pause", 9);
+  await page.waitForFunction(() => (window as any).jeu.scene.isActive("tir-partie"));
+  await manette(page, "tir-partie", 9);
+  await page.waitForTimeout(200);
+  expect(await enPause()).toEqual({ pause: false, partie: false, tableau: false });
+  await page.waitForTimeout(200);
+
+  // La fenêtre perd la main (un autre onglet, une autre appli) : la pause s'ouvre d'elle-même
+  await page.evaluate(() => window.dispatchEvent(new Event("blur")));
+  await attendreLaPause(page);
+  await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+  expect(await enPause()).toEqual({ pause: true, partie: true, tableau: true });
+
+  // « Le menu », en bas de la liste : retour au menu du tir
+  await appuyer(page, "ArrowDown");
+  await appuyer(page, "Enter");
+  await attendreScene(page, "tir-menu");
+  expect(await scenesActives(page)).toEqual(["tir-menu"]);
+  sansErreur();
+});
+
+// La fin et la partie lisent toutes les deux la manette : Start valide « Rejouer » sur la fin, et la partie,
+// derrière, ne doit rien en faire (avant, elle quittait en même temps)
+test("Start sur l'écran de fin rejoue, sans que la partie derrière s'en aille ni se mette en pause", async ({ page }) => {
+  const { sansErreur } = await menuDuTir(page);
+  await appuyer(page, "Enter");
+  await attendreScene(page, "tir-partie");
+  await page.evaluate(() => {
+    const p = (window as any).jeu.scene.getScene("tir-partie");
+    p.vies = 1;
+    p.toucherLeVaisseau();
+  });
+  await attendreScene(page, "tir-fin");
+  await page.waitForTimeout(700);          // la fin n'écoute qu'après un petit moment
+  await manetteAToutes(page, ["tir-fin", "tir-partie"], 9);
+  await page.waitForFunction(() => (window as any).jeu.scene.getScene("tir-partie").enJeu);
+  await page.waitForTimeout(400);          // le temps d'un fondu vers le menu, s'il était parti
+  expect(await scenesActives(page)).toEqual(["tir-partie", "tir-tableau"]);
+  sansErreur();
+});
+
+test("le lourd qui percute le vaisseau perd 4 points de vie et continue sa route ; il ne retouche pas aussitôt", async ({ page }) => {
+  const { sansErreur } = await menuDuTir(page);
+  await appuyer(page, "Enter");
+  await attendreScene(page, "tir-partie");
+  await commencerALaVague(page, 4);         // deux lourds, qui plongent après une attente
+
+  // On écoute ce que le lourd encaisse. Les balles du vaisseau, collé à lui, le touchent aussi (d'un point
+  // chacune) : on le blinde, pour qu'elles ne l'abattent pas avant la fin du test.
+  await page.waitForFunction(() => {
+    const p = (window as any).jeu.scene.getScene("tir-partie");
+    const lourd = p.ennemis.getChildren().find((e: any) => e.genre === "lourd");
+    if (lourd && !lourd.espion) {
+      lourd.vie = 100;
+      lourd.espion = [];
+      const toucher = lourd.toucher.bind(lourd);
+      lourd.toucher = (degats?: number) => {
+        lourd.espion.push(degats ?? 1);
+        return toucher(degats);
+      };
+      (window as any).__lourd = lourd;
+    }
+    return !!lourd;
+  }, undefined, { timeout: 10_000 });
+
+  // En attendant qu'il plonge, les tirs ennemis ne comptent pas (le vaisseau ne craint rien). Quand il
+  // plonge, le vaisseau se jette dessus, sans balle ennemie autour : le vrai choc de la physique.
+  await page.waitForFunction(() => {
+    const p = (window as any).jeu.scene.getScene("tir-partie");
+    const lourd = (window as any).__lourd;
+    if (lourd.y <= 230) {
+      p.invincibleJusqua = Infinity;
+      return false;
+    }
+    if (p.invincibleJusqua === Infinity) {
+      p.invincibleJusqua = 0;
+      p.vies = 3;
+      p.ballesEnnemies.getMatching("active", true).forEach((b: any) => b.disableBody(true, true));
+    }
+    if (lourd.active && lourd.y < 500) {
+      p.vaisseau.body.reset(lourd.x, lourd.y);
+    }
+    return p.vies < 3;
+  }, undefined, { timeout: 20_000 });
+  const lourd = () => page.evaluate(() => {
+    const p = (window as any).jeu.scene.getScene("tir-partie");
+    const lourd = (window as any).__lourd;
+    return { vies: p.vies, chocs: lourd.espion.filter((d: number) => d === 4).length, vie: lourd.vie, active: lourd.active };
+  });
+  const choc = await lourd();
+  expect(choc).toMatchObject({ vies: 2, chocs: 1, active: true });   // toujours là, sa route continue
+  expect(choc.vie).toBeGreaterThan(0);
+
+  // Le vaisseau reste collé à lui un moment : il clignote et ne craint rien, le lourd ne le retouche pas
+  const fin = Date.now() + 800;
+  while (Date.now() < fin) {
+    await page.evaluate(() => {
+      const p = (window as any).jeu.scene.getScene("tir-partie");
+      const lourd = (window as any).__lourd;
+      if (lourd.active && lourd.y < 500) {
+        p.vaisseau.body.reset(lourd.x, lourd.y);
+      }
+    });
+    await page.waitForTimeout(50);
+  }
+  expect(await lourd()).toMatchObject({ vies: 2, chocs: 1 });
   sansErreur();
 });
 
@@ -197,10 +363,36 @@ test("les bonus : plus de tirs, un bouclier qui prend un coup, une vie de plus",
   await page.waitForFunction(() => (window as any).jeu.scene.getScene("tir-partie").arme === 2);
   await ramasser("bouclier");
   await page.waitForFunction(() => (window as any).jeu.scene.getScene("tir-partie").bouclier);
+
+  // Le bouclier colle au vaisseau qui file (il suit son corps, pas son image, en retard d'un pas)
+  await page.keyboard.down("ArrowLeft");
+  await page.waitForTimeout(150);
+  const ecart = await page.evaluate(() => {
+    const p = (window as any).jeu.scene.getScene("tir-partie");
+    return Math.abs(p.halo.x - p.vaisseau.body.center.x);
+  });
+  await page.keyboard.up("ArrowLeft");
+  expect(ecart).toBeLessThan(0.5);
+
   await page.evaluate(() => (window as any).jeu.scene.getScene("tir-partie").toucherLeVaisseau());
   expect(await partie(page)).toMatchObject({ vies: 3, bouclier: false, arme: 2 });
   await ramasser("vie");
   await page.waitForFunction(() => (window as any).jeu.scene.getScene("tir-partie").vies === 4);
+
+  // Un bonus manqué, qui sort par le bas, s'en va pour de bon, avec son tween
+  await page.evaluate(() => {
+    const p = (window as any).jeu.scene.getScene("tir-partie");
+    p.vaisseau.body.reset(800, 300);
+    p.lacherUnBonus(100, 520, "arme");
+  });
+  await page.waitForFunction(() => {
+    const p = (window as any).jeu.scene.getScene("tir-partie");
+    return p.bonus.getLength() === 0;
+  });
+  expect(await page.evaluate(() => {
+    const p = (window as any).jeu.scene.getScene("tir-partie");
+    return p.tweens.getTweens().filter((t: any) => t.targets.some((c: any) => c.texture?.key?.startsWith("tir-bonus"))).length;
+  })).toBe(0);
   sansErreur();
 });
 
@@ -209,6 +401,8 @@ test("le boss arrive à la vague 5 ; battu, la vague 6 commence", async ({ page 
   await appuyer(page, "Enter");
   await attendreScene(page, "tir-partie");
   await commencerALaVague(page, 5);
+  const chocs = () => page.evaluate(() => (window as any).jeu.scene.getScene("tir-partie").physics.world.colliders.length as number);
+  const avantLeBoss = await chocs();
 
   // Pendant son arrivée, il ne craint rien ; ensuite, sa vie s'affiche au tableau de bord
   await page.waitForFunction(() => (window as any).jeu.scene.getScene("tir-partie").boss?.pret, undefined, { timeout: 10_000 });
@@ -229,6 +423,7 @@ test("le boss arrive à la vague 5 ; battu, la vague 6 commence", async ({ page 
     return p.vague.numero === 6;
   }, undefined, { timeout: 15_000 });
   expect((await partie(page)).score).toBeGreaterThanOrEqual(3000);
+  expect(await chocs()).toBe(avantLeBoss);  // ses chocs sont partis avec lui
   sansErreur();
 });
 
@@ -259,7 +454,7 @@ test("le son : M le coupe et le bouton le remet, c'est gardé, et le retour au H
   await appuyer(page, "m");
 
   // Au Hub, le son revient pour toute l'Arcade, mais le tir s'en souvient
-  await appuyer(page, "Escape");
+  await quitterParLaPause(page);
   await attendreScene(page, "tir-menu");
   await appuyer(page, "Escape");
   await attendreScene(page, "Hub");

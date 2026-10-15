@@ -6,7 +6,8 @@ import Phaser from "phaser";
 import type { Partie } from "./Partie";
 import { ARME_MAX, CYAN } from "../reglages";
 import { LARGEUR, POLICE } from "../../../socle/style";
-import { boutonFermer } from "../../../socle/boutonArcade";
+import { boutonPause } from "../../../socle/pause";
+import { estTactile } from "../../../socle/tactile";
 import { annoncer } from "../../../socle/annonce";
 
 export class Tableau extends Phaser.Scene {
@@ -34,8 +35,10 @@ export class Tableau extends Phaser.Scene {
     this.arme = this.add.text(LARGEUR / 2 + 80, 20, "", { ...style, color: "#ff9a3c" }).setOrigin(0, 0.5);
     this.viesEnPlus = this.add.text(LARGEUR - 72 - 5 * 26 + 6, 20, "", style).setOrigin(1, 0.5);
 
-    // Revenir au menu, en haut à droite
-    boutonFermer(this, LARGEUR - 26, 20, () => this.partie.quitter());
+    // La pause, en haut à droite (elle propose de revenir au menu). Au doigt, le bouton est plus grand
+    // que la barre : il se met dessous.
+    const auDoigt = estTactile();
+    boutonPause(this, LARGEUR - (auDoigt ? 44 : 26), auDoigt ? 80 : 20, () => this.partie.ouvrirLaPause());
 
     // La vie du boss, cachée tant qu'il n'est pas là
     const largeur = 420;

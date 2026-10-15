@@ -17,6 +17,9 @@ export const ENNEMIS = {
   lourd: { vie: 12, points: 500, tir: 1300 },
 } as const;
 export type GenreDEnnemi = keyof typeof ENNEMIS;
+// Le lourd qui percute le vaisseau ne s'écrase pas comme les petits : il perd 4 points de vie (sur 12) et
+// continue sa route. Le vaisseau, lui, perd quand même une vie (ou son bouclier).
+export const CHOC_DU_LOURD = 4;
 
 export const VITESSE_BALLE_ENNEMIE = 260;
 export const BOSS = { vie: 140, points: 3000 };

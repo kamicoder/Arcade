@@ -1,5 +1,7 @@
 import { test, expect, type Page } from "@playwright/test";
-import { ouvrir, appuyer, attendreScene, versLaPage, toucher, toucherLaCarte, ouvrirLaCarte } from "./outils";
+import {
+  ouvrir, appuyer, attendreScene, versLaPage, toucher, toucherLaCarte, ouvrirLaCarte, quitterParLaPause, attendreLaPause,
+} from "./outils";
 
 // Dix mines connues pour le niveau Facile (9 × 9), loin du coin en bas à gauche où l'on commence :
 // (8, 0) n'a aucune mine autour, et la cascade ouvre une belle zone
@@ -251,10 +253,87 @@ test("au clavier : le curseur (flèches ou main gauche à sa place), Espace pour
   expect(await curseur()).toEqual({ r: 3, c: 1 });
   await appuyer(page, "KeyW");
   expect(await curseur()).toEqual({ r: 2, c: 1 });
-  await appuyer(page, "Escape");
+
+  // X plante un drapeau aussi, Entrée creuse
+  await appuyer(page, "x");
+  expect((await partie(page)).etats[2][1]).toBe("drapeau");
+  await appuyer(page, "ArrowRight");
+  await appuyer(page, "Enter");             // (2, 2) : un chiffre
+  expect((await partie(page)).etats[2][2]).toBe("ouverte");
+
+  // L'aide en bas de l'écran cite toutes ces touches
+  const aide = await page.evaluate(() => (window as any).jeu.scene.getScene("demineur-barre").children.list
+    .map((o: any) => o.text).filter(Boolean).join(" "));
+  for (const mot of ["Molette", "Entrée", "F ou X", "Échap ou P : pause", "M : le son"]) {
+    expect(aide).toContain(mot);
+  }
+
+  // La pause, puis « Les niveaux »
+  await quitterParLaPause(page);
   await attendreScene(page, "demineur-menu");
   await appuyer(page, "Escape");
   await attendreScene(page, "Hub");
+  sansErreur();
+});
+
+// La pause (socle/pause.ts, vue en détail dans le tir) : ici, le chrono qui s'arrête avec elle
+test("la pause arrête le chrono, et propose une nouvelle grille", async ({ page }) => {
+  const { sansErreur } = await menuDemineur(page);
+  await partieFacile(page);
+  await cliquer(page, 8, 0);                // le chrono part
+  await page.waitForTimeout(500);
+  await appuyer(page, "Escape");
+  await attendreLaPause(page);
+  const temps = () => page.evaluate(() => (window as any).jeu.scene.getScene("demineur-partie").tempsEcoule() as number);
+  const avant = await temps();
+  await page.waitForTimeout(1000);
+  expect(await temps()).toBe(avant);
+
+  // « Nouvelle grille », au milieu de la liste
+  await appuyer(page, "ArrowDown");
+  await appuyer(page, "Enter");
+  await page.waitForFunction(() => (window as any).jeu.scene.isActive("demineur-partie"));
+  const neuve = await partie(page);
+  expect(neuve.etats.flat().every((e) => e === "cachee")).toBe(true);
+  expect(await temps()).toBe(0);
+  sansErreur();
+});
+
+test("un double clic sur la flèche de la barre : on ne quitte qu'une fois", async ({ page }) => {
+  const { sansErreur } = await menuDemineur(page);
+  await partieFacile(page);
+  // Chaque départ du menu le recrée : on compte ses créations
+  await page.evaluate(() => {
+    (window as any).__menus = 0;
+    (window as any).jeu.scene.getScene("demineur-menu").events.on("create", () => (window as any).__menus++);
+  });
+  const fleche = await page.evaluate(() => {
+    const texte = (window as any).jeu.scene.getScene("demineur-barre").children.list.find((o: any) => o.text === "←");
+    const centre = texte.getCenter();
+    return { x: centre.x as number, y: centre.y as number };
+  });
+  const ici = await versLaPage(page, fleche.x, fleche.y);
+  await page.mouse.dblclick(ici.x, ici.y);
+  await attendreScene(page, "demineur-menu");
+  await page.waitForTimeout(300);
+  expect(await page.evaluate(() => (window as any).__menus)).toBe(1);
+  sansErreur();
+});
+
+test("le son : M le coupe au menu comme en partie, et c'est gardé", async ({ page }) => {
+  const { sansErreur } = await menuDemineur(page);
+  await page.evaluate(() => {
+    (window as any).__muet = false;
+    (window as any).jeu.sound.on("mute", (_sons: unknown, muet: boolean) => { (window as any).__muet = muet; });
+  });
+  const muet = () => page.evaluate(() => (window as any).__muet as boolean);
+  await appuyer(page, "m");
+  expect(await muet()).toBe(true);
+  expect(await page.evaluate(() => localStorage.getItem("demineur/son"))).toBe("false");
+  await partieFacile(page);
+  await appuyer(page, "m");
+  expect(await muet()).toBe(false);
+  expect(await page.evaluate(() => localStorage.getItem("demineur/son"))).toBe("true");
   sansErreur();
 });
 

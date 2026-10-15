@@ -18,12 +18,17 @@ export class TouchesPhysiques {
     clavier.on(Phaser.Input.Keyboard.Events.ANY_KEY_DOWN, (evenement: KeyboardEvent) => this.tenues.add(evenement.code));
     clavier.on(Phaser.Input.Keyboard.Events.ANY_KEY_UP, (evenement: KeyboardEvent) => this.tenues.delete(evenement.code));
 
-    // La fenêtre perd la main (une autre appli, un appel) : on ne saura jamais quelles touches ont
-    // été lâchées pendant ce temps, alors on les lâche toutes. Le jeu n'appartient pas à la scène :
-    // cet écouteur-là, on le retire nous-mêmes quand elle s'arrête.
+    // La fenêtre perd la main (une autre appli, un appel), ou la scène sort d'une pause (elle n'entendait
+    // plus le clavier) : on ne saura jamais quelles touches ont été lâchées pendant ce temps, alors on les
+    // lâche toutes. Le jeu n'appartient pas à la scène, et les écouteurs posés sur ses propres événements
+    // survivent à son arrêt : ceux-là, on les retire nous-mêmes quand elle s'arrête.
     const toutLacher = () => this.tenues.clear();
     scene.game.events.on(Phaser.Core.Events.BLUR, toutLacher);
-    scene.events.once(Phaser.Scenes.Events.SHUTDOWN, () => scene.game.events.off(Phaser.Core.Events.BLUR, toutLacher));
+    scene.events.on(Phaser.Scenes.Events.RESUME, toutLacher);
+    scene.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      scene.game.events.off(Phaser.Core.Events.BLUR, toutLacher);
+      scene.events.off(Phaser.Scenes.Events.RESUME, toutLacher);
+    });
   }
 
   // code : la place de la touche, comme event.code (« ArrowUp », « KeyW », « ShiftRight », « Space »...)

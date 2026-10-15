@@ -90,3 +90,31 @@ export async function manette(page: Page, scene: string, bouton: number, numero?
   }, [scene, bouton, numero] as const);
   await page.waitForTimeout(80);
 }
+
+// Le même bouton raconté à plusieurs scènes dans la même image, comme Phaser le fait : chaque scène lit la
+// manette, de la plus haute à la plus basse (la fin avant la partie qu'elle recouvre)
+export async function manetteAToutes(page: Page, scenes: string[], bouton: number) {
+  await page.evaluate(([scenes, bouton]) => {
+    for (const scene of scenes) {
+      const plugin = (window as any).jeu.scene.getScene(scene).input.gamepad;
+      plugin.emit("down", plugin.pad1 ?? {}, { index: bouton, value: 1 }, 1);
+    }
+  }, [scenes, bouton] as const);
+  await page.waitForTimeout(80);
+}
+
+// La pause (socle/pause.ts) est ouverte, et elle écoute (elle attend un instant avant)
+export async function attendreLaPause(page: Page) {
+  await page.waitForFunction(() => {
+    const jeu = (window as any).jeu;
+    return jeu.scene.isActive("socle-pause") && jeu.scene.getScene("socle-pause").pret;
+  });
+}
+
+// Échap ouvre la pause, et ↑ passe de « Reprendre » au dernier bouton (« Le menu », « Les niveaux »...)
+export async function quitterParLaPause(page: Page) {
+  await appuyer(page, "Escape");
+  await attendreLaPause(page);
+  await appuyer(page, "ArrowUp");
+  await appuyer(page, "Enter");
+}

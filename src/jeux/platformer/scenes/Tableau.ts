@@ -10,7 +10,7 @@ import { OBJECTIF_DUO } from "../reglages";
 import { LARGEUR, HAUTEUR, POLICE } from "../../../socle/style";
 import { estTactile } from "../../../socle/tactile";
 import { BoutonsAuDoigt } from "../../../socle/doigts";
-import { boutonFermer } from "../../../socle/boutonArcade";
+import { boutonPause } from "../../../socle/pause";
 import { annoncer } from "../../../socle/annonce";
 
 type Action = keyof Entrees;
@@ -30,6 +30,7 @@ export class Tableau extends Phaser.Scene {
   private coeurs: Phaser.GameObjects.Image[] = [];
   private viesEnPlus!: Phaser.GameObjects.Text;
   private ronds = new Map<Action, Phaser.GameObjects.Arc>();
+  private doigts?: BoutonsAuDoigt<Action>;
 
   constructor() {
     super("platformer-tableau");
@@ -40,14 +41,17 @@ export class Tableau extends Phaser.Scene {
     this.duo = this.niveau ? null : this.scene.get("platformer-duo") as Duo;
     this.coeurs = [];
     this.ronds.clear();
+    this.doigts = undefined;
 
     this.add.rectangle(0, 0, LARGEUR, 40, 0x000000, 0.45).setOrigin(0);
     const style = { fontFamily: POLICE, fontSize: "19px", fontStyle: "bold", color: "#ffffff" };
     this.texte = this.add.text(16, 20, "", style).setOrigin(0, 0.5);
     this.viesEnPlus = this.add.text(LARGEUR - 66, 20, "", style).setOrigin(1, 0.5);
 
-    // Revenir au menu (ou à l'éditeur), en haut à droite
-    boutonFermer(this, LARGEUR - 26, 20, () => (this.niveau ?? this.duo)!.quitter());
+    // La pause, en haut à droite (elle propose de revenir au menu, ou à l'éditeur). Au doigt, le bouton
+    // est plus grand que la barre : il se met dessous.
+    const auDoigt = estTactile();
+    boutonPause(this, LARGEUR - (auDoigt ? 44 : 26), auDoigt ? 80 : 20, () => (this.niveau ?? this.duo)!.ouvrirLaPause());
 
     if (this.duo) {
       this.add.rectangle(LARGEUR / 2, HAUTEUR / 2, 4, HAUTEUR, 0x14141e);   // le trait entre les deux moitiés
@@ -68,7 +72,7 @@ export class Tableau extends Phaser.Scene {
     if (n.donnees.mode === "aventure") {
       titre = `Niveau ${n.donnees.numero + 1} : ${n.niveau!.nom}`;
     } else if (n.donnees.mode === "test") {
-      titre = estTactile() ? "Test : ✕ pour revenir à l'éditeur" : "Test : Échap pour revenir à l'éditeur";
+      titre = estTactile() ? "Test : ⏸ pour revenir à l'éditeur" : "Test : Échap (la pause) pour revenir à l'éditeur";
     } else {
       titre = "Infini : va le plus loin possible !";
     }
@@ -76,8 +80,14 @@ export class Tableau extends Phaser.Scene {
   }
 
   // Les ronds à tenir au doigt (socle/doigts.ts : quel doigt tient quel bouton)
+  // Après une pause : le tableau, arrêté avec le niveau, n'a pas entendu les doigts se lever
+  lacherLesDoigts() {
+    this.doigts?.toutLacher();
+  }
+
   private creerCommandes() {
     const doigts = new BoutonsAuDoigt<Action>(this, { quandChange: (tenues) => this.recompterLesDoigts(tenues) });
+    this.doigts = doigts;
     for (const commande of COMMANDES) {
       const { x, y, rayon } = commande;
       const rond = this.add.circle(x, y, rayon, 0xffffff, 0.16).setStrokeStyle(3, 0xffffff, 0.6);

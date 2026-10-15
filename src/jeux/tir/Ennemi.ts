@@ -103,9 +103,9 @@ export class Ennemi extends Phaser.GameObjects.PathFollower {
     }
   }
 
-  // Une balle le touche : renvoie vrai s'il est abattu
-  toucher(): boolean {
-    this.vie--;
+  // Une balle le touche (un point de vie), ou le vaisseau le percute : renvoie vrai s'il est abattu
+  toucher(degats = 1): boolean {
+    this.vie -= degats;
     eclairer(this);
     return this.vie <= 0;
   }

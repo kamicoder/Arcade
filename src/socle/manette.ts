@@ -1,8 +1,8 @@
 // La manette : le pendant de surTouche (clavier.ts) pour les boutons d'une manette « standard ».
 //
 // La règle de l'Arcade, pour qu'on s'y retrouve d'un jeu à l'autre : dans les menus, les listes et les
-// fins de partie, A ou Start valide (VALIDER), B revient. En pleine partie, chaque jeu décide (Start met
-// la course en pause, fait quitter le tir...). La croix se lit ici quand on choisit dans un menu ; un
+// fins de partie, A ou Start valide (VALIDER), B revient. En pleine partie, chaque jeu décide ; d'habitude,
+// Start met en pause (la course, et socle/pause.ts pour le tir, le platformer, le démineur). La croix se lit ici quand on choisit dans un menu ; un
 // jeu qui la tient (courir, piloter) lit la manette à chaque image, comme le clavier.
 
 import type Phaser from "phaser";

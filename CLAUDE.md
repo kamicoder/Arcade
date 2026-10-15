@@ -42,7 +42,9 @@ npm run build
 Les tests lisent l'état du jeu à travers `window.jeu`, qui n'existe qu'en développement (`main.ts`).
 Un nouveau jeu ou un nouveau mode vient avec ses tests dans `tests/`. Dans un test, passer par
 `appuyer()` (de `tests/outils.ts`) plutôt que `keyboard.press` enchaînés, et pour ouvrir un jeu au doigt,
-`toucherLaCarte(page, cle)` (les cartes du Hub changent de place quand un jeu arrive). Les tests tournent
+`toucherLaCarte(page, cle)` (les cartes du Hub changent de place quand un jeu arrive). Pour quitter une partie,
+`quitterParLaPause(page)` ; un bouton de manette que plusieurs scènes lisent (la fin et la partie derrière),
+`manetteAToutes(page, scenes, bouton)`, dans l'ordre de Phaser (la scène du dessus d'abord). Les tests tournent
 en parallèle un par un (`fullyParallel`) : après une action, attendre l'état voulu (`waitForFunction`)
 plutôt que le lire tout de suite, une image peut tarder quand dix navigateurs jouent en même temps. Si le
 poste travaille déjà (une autre compilation), des tests qui jouent en temps réel échouent par manque de
@@ -61,8 +63,12 @@ Chaque fichier dit en tête pourquoi il existe.
   menus, listes et fins, A ou Start valide (`VALIDER`), B revient ; en partie, chaque jeu décide.
 - `uneSeuleFois()` (`fin.ts`) : une garde contre un double départ (rejouer OU revenir) ; `ecranDeFin(scene, ...)` :
   l'écran « GAME OVER » à deux boutons (tir, platformer).
+- `mettreEnPause(scene, { quitter, autres, possible, ... })` (`pause.ts`) : la pause par-dessus la partie, « Reprendre »
+  et « Le menu » ; Échap, P, Start, et d'elle-même quand le jeu perd la main. Elle rend la fonction qui l'ouvre, pour
+  le ⏸ (`boutonPause`) du tableau de bord. `possible` la fait taire quand la fin est affichée (tir, platformer,
+  démineur ; la course a la sienne).
 - `ListeDeBoutons` (`listeDeBoutons.ts`) : des boutons les uns sous les autres, au clavier, à la manette, à la souris
-  et au doigt (titre et fin de la baston, menu du platformer).
+  et au doigt (titre et fin de la baston, menu du platformer, la pause).
 - `BoutonsAuDoigt` (`doigts.ts`) : des ronds tenus au doigt, plusieurs à la fois (platformer, course, baston) ;
   chaque jeu dessine et éclaire ses ronds.
 - `boutonDuSon(scene, cle)`, `toucheDuSon`, `appliquerLeSon` (`son.ts`) : le son coupé ou remis (M), rangé sous

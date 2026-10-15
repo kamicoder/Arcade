@@ -1,5 +1,8 @@
 import { test, expect, type Page } from "@playwright/test";
-import { ouvrir, appuyer, attendreScene, scenesActives, versLaPage, toucher, toucherLaCarte, ouvrirLaCarte } from "./outils";
+import {
+  ouvrir, appuyer, attendreScene, scenesActives, versLaPage, toucher, toucherLaCarte, ouvrirLaCarte, manette, manetteAToutes,
+  attendreLaPause,
+} from "./outils";
 
 // Du Hub jusqu'au menu du platformer
 async function menuPlatformer(page: Page) {
@@ -110,6 +113,47 @@ test("mourir : tomber coûte une vie, et la dernière, c'est la fin", async ({ p
 
   await page.waitForTimeout(700);          // la fin attend un peu avant d'écouter
   await appuyer(page, "Escape");
+  await attendreScene(page, "platformer-menu");
+  expect(await scenesActives(page)).toEqual(["platformer-menu"]);
+  sansErreur();
+});
+
+// La pause (socle/pause.ts, vue en détail dans le tir) : ici, qu'elle s'ouvre, et qu'elle se tait sur la fin
+test("Échap met le niveau en pause ; sur la fin, Start rejoue sans que le niveau derrière ne réagisse", async ({ page }) => {
+  const { sansErreur } = await menuPlatformer(page);
+  await choisirLeMode(page, 0, "platformer-niveau");
+  await appuyer(page, "Escape");
+  await attendreLaPause(page);
+  expect(await page.evaluate(() => {
+    const jeu = (window as any).jeu;
+    return [jeu.scene.isPaused("platformer-niveau"), jeu.scene.isPaused("platformer-tableau")];
+  })).toEqual([true, true]);
+  await appuyer(page, "Escape");
+  await page.waitForFunction(() => (window as any).jeu.scene.isActive("platformer-niveau"));
+
+  // La dernière vie perdue : la fin. Start (la manette) la lit, et le niveau aussi, dans la même image
+  await page.evaluate(() => {
+    const n = (window as any).jeu.scene.getScene("platformer-niveau");
+    n.donnees.vies = 1;
+    n.mourir();
+  });
+  await attendreScene(page, "platformer-fin");
+  await page.waitForTimeout(700);          // la fin attend un peu avant d'écouter
+  await manetteAToutes(page, ["platformer-fin", "platformer-niveau"], 9);
+  await attendreLeNiveau(page, "n.donnees.vies === 3 && n.enJeu");
+  await page.waitForTimeout(400);          // le temps d'un fondu vers le menu, s'il était parti
+  expect(await scenesActives(page)).toEqual(["platformer-niveau", "platformer-tableau"]);
+  sansErreur();
+});
+
+test("à deux, à la manette : Start met en pause, et « Le menu » ramène au menu", async ({ page }) => {
+  const { sansErreur } = await menuPlatformer(page);
+  await choisirLeMode(page, 2, "platformer-duo");
+  await manette(page, "platformer-duo", 9);
+  await attendreLaPause(page);
+  expect(await page.evaluate(() => (window as any).jeu.scene.isPaused("platformer-duo"))).toBe(true);
+  await manette(page, "socle-pause", 13);  // la croix, vers le bas : « Le menu »
+  await manette(page, "socle-pause", 0);
   await attendreScene(page, "platformer-menu");
   expect(await scenesActives(page)).toEqual(["platformer-menu"]);
   sansErreur();
@@ -495,6 +539,43 @@ test.describe("au doigt", () => {
     await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
     await page.waitForTimeout(200);
     expect((await niveau(page)).tactile).toMatchObject({ droite: false, saut: false });
+    sansErreur();
+  });
+
+  // Le tableau de bord, arrêté avec le niveau, n'entend pas le doigt se lever pendant la pause
+  test("le ⏸ met en pause ; un doigt levé pendant la pause ne fait plus courir au retour", async ({ page }) => {
+    const { sansErreur } = await ouvrir(page);
+    await toucherLaCarte(page, "platformer");
+    await attendreScene(page, "platformer-menu");
+    await toucher(page, 480, 150);         // « Aventure »
+    await attendreScene(page, "platformer-niveau");
+    await page.waitForTimeout(400);
+
+    // Le ⏸, en haut à droite, sous la barre ; « Reprendre », le premier bouton de la pause
+    await toucher(page, 916, 80);
+    await attendreLaPause(page);
+    await toucher(page, 480, 230);
+    await page.waitForFunction(() => (window as any).jeu.scene.isActive("platformer-niveau"));
+    await page.waitForTimeout(300);        // la pause ne se rouvre pas aussitôt fermée
+
+    // Un doigt tient ▶ quand la pause s'ouvre (la fenêtre perd la main), et se lève pendant la pause
+    const cdp = await page.context().newCDPSession(page);
+    const droite = await versLaPage(page, 236, 452);
+    await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x: droite.x, y: droite.y, id: 1 }] });
+    await page.waitForTimeout(200);
+    await page.evaluate(() => window.dispatchEvent(new Event("blur")));
+    await attendreLaPause(page);
+    await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+    expect((await niveau(page)).tactile.droite).toBe(true);
+    await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+    await page.waitForTimeout(100);
+    await toucher(page, 480, 230);
+    await page.waitForFunction(() => (window as any).jeu.scene.isActive("platformer-niveau"));
+    await page.waitForTimeout(100);
+    const arret = await niveau(page);
+    expect(arret.tactile).toMatchObject({ droite: false, gauche: false, saut: false });
+    await page.waitForTimeout(300);
+    expect((await niveau(page)).x).toBeCloseTo(arret.x, 0);
     sansErreur();
   });
 });

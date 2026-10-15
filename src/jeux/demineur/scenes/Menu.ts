@@ -10,6 +10,7 @@ import { surManette, MANETTE, VALIDER } from "../../../socle/manette";
 import { estTactile } from "../../../socle/tactile";
 import { retourAuHub, fonduPuis } from "../../../socle/retour";
 import { boutonArcade } from "../../../socle/boutonArcade";
+import { appliquerLeSon, boutonDuSon } from "../../../socle/son";
 
 const CARTE_L = 270;
 const CARTE_H = 340;
@@ -35,13 +36,14 @@ export class Menu extends Phaser.Scene {
     this.cartes = [];
     this.parti = false;
     this.cameras.main.setBackgroundColor(COULEURS.fond).fadeIn(250);
+    appliquerLeSon(this, "demineur");      // le son tel que le joueur l'a laissé (socle/son.ts)
 
     this.creerDecor();
     NIVEAUX.forEach((niveau, i) => this.creerCarte(niveau, i));
 
     const aide = estTactile()
       ? "Touche un niveau pour jouer !"
-      : "◀ ▶ : choisir    Entrée : jouer    1 2 3 : niveau direct    Échap : l'Arcade";
+      : "◀ ▶ : choisir    Entrée : jouer    1 2 3 : niveau direct    M : le son    Échap : l'Arcade";
     this.add.text(LARGEUR / 2, HAUTEUR - 22, aide, { fontFamily: POLICE, fontSize: "16px", color: "#a59fc0" })
       .setOrigin(0.5);
 
@@ -81,6 +83,7 @@ export class Menu extends Phaser.Scene {
     this.tweens.add({ targets: mine, angle: 360, duration: 6000, repeat: -1 });
 
     boutonArcade(this);
+    boutonDuSon(this, "demineur");
   }
 
   private creerCarte(niveau: Niveau, i: number) {

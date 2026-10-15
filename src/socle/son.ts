@@ -1,6 +1,6 @@
-// Le son allumé ou coupé, pour les jeux qui n'ont que ce réglage (le tir, le platformer, le Tamago ; la
-// course a le sien, avec la musique à part). La touche M, partout dans le jeu, et le bouton du son en
-// haut à droite des menus. Chaque jeu range son choix sous sa clé : « tir/son », « platformer/son »...
+// Le son allumé ou coupé, pour les jeux qui n'ont que ce réglage (le tir, le platformer, le démineur, le
+// Tamago ; la course a le sien, avec la musique à part). La touche M, partout dans le jeu, et le bouton du
+// son en haut à droite des menus (et dans la pause). Chaque jeu range son choix sous sa clé : « tir/son », « platformer/son »...
 //
 // Couper, c'est scene.sound.mute : il coupe toute l'Arcade. retourAuHub (retour.ts) le remet en partant,
 // pour qu'aucun jeu ne puisse l'oublier.

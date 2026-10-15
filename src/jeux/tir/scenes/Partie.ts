@@ -11,14 +11,13 @@ import { Ennemi, Boss, type Terrain } from "../Ennemi";
 import { vague, type Vague } from "../vagues";
 import {
   VITESSE, CADENCE, VITESSE_BALLE, ARME_MAX, INVINCIBLE, VIES, HAUT_DU_VAISSEAU, ENNEMIS, BOSS,
-  VITESSE_BALLE_ENNEMIE, CHANCE_DE_BONUS, VITESSE_BONUS, FOND, SAUVEGARDE,
+  VITESSE_BALLE_ENNEMIE, CHANCE_DE_BONUS, VITESSE_BONUS, FOND, SAUVEGARDE, CHOC_DU_LOURD,
 } from "../reglages";
 import { LARGEUR, HAUTEUR } from "../../../socle/style";
 import { lire, ecrire } from "../../../socle/sauvegarde";
-import { surTouche } from "../../../socle/clavier";
-import { surManette, MANETTE } from "../../../socle/manette";
 import { fonduPuis } from "../../../socle/retour";
 import { toucheDuSon } from "../../../socle/son";
+import { mettreEnPause } from "../../../socle/pause";
 
 export type GenreDeBonus = "arme" | "bouclier" | "vie";
 
@@ -28,13 +27,13 @@ export function lireLeRecord(): number {
   return lire<number>(RECORD) ?? 0;
 }
 
-// Une image de physique dont le corps bouge (les types de Phaser, eux, admettent aussi un corps immobile, ou aucun)
 // Ce que la partie reçoit au départ : la vague par laquelle elle commence (la première, sauf pour
 // les tests, qui veulent voir le boss sans jouer quatre vagues)
 export interface DonneesDePartie {
   vague?: number;
 }
 
+// Une image de physique dont le corps bouge (les types de Phaser, eux, admettent aussi un corps immobile, ou aucun)
 type Mobile = Phaser.Physics.Arcade.Image & { body: Phaser.Physics.Arcade.Body };
 
 export class Partie extends Phaser.Scene implements Terrain {
@@ -46,6 +45,7 @@ export class Partie extends Phaser.Scene implements Terrain {
   arme = 1;
   bouclier = false;
   enJeu = false;
+  ouvrirLaPause: () => void = () => {};    // pour le ⏸ du tableau de bord
   vague!: Vague;
   boss: Boss | null = null;
   ennemis!: Phaser.GameObjects.Group;
@@ -55,6 +55,8 @@ export class Partie extends Phaser.Scene implements Terrain {
   private restants = 0;                    // les ennemis de la vague pas encore abattus ni partis
   private invincibleJusqua = 0;
   private quitte = false;
+  private fini = false;                    // la fin est affichée : elle a ses boutons, la pause n'a plus de sens
+  private collisionsDuBoss: Phaser.Physics.Arcade.Collider[] = [];
   private halo!: Phaser.GameObjects.Image;
   private etoiles: Phaser.GameObjects.TileSprite[] = [];
   private explosions!: Phaser.GameObjects.Particles.ParticleEmitter;
@@ -75,6 +77,8 @@ export class Partie extends Phaser.Scene implements Terrain {
     this.bouclier = false;
     this.boss = null;
     this.quitte = false;
+    this.fini = false;
+    this.collisionsDuBoss = [];
     this.invincibleJusqua = 0;
     this.enJeu = true;
 
@@ -121,7 +125,12 @@ export class Partie extends Phaser.Scene implements Terrain {
       }
     });
     this.surUnDe(this.vaisseau, this.ennemis, (ennemi: Ennemi) => {
-      if (ennemi.active && this.toucherLeVaisseau()) {
+      if (!ennemi.active || !this.toucherLeVaisseau()) {
+        return;
+      }
+      // Les petits s'écrasent ; le lourd encaisse le choc et continue sa route. Il ne retouche pas le
+      // vaisseau aussitôt : après un coup, le vaisseau clignote et ne craint rien.
+      if (ennemi.genre !== "lourd" || ennemi.toucher(CHOC_DU_LOURD)) {
         this.abattre(ennemi, false);
       }
     });
@@ -131,12 +140,20 @@ export class Partie extends Phaser.Scene implements Terrain {
     this.time.addEvent({ delay: CADENCE, loop: true, callback: () => this.tirerDuVaisseau() });
 
     this.commandes = new Commandes(this, () => this.vaisseau.body.center.clone());
-    surTouche(this, "ESC", () => this.quitter());
     toucheDuSon(this, "tir");
     // À la souris, le vaisseau est le curseur : la flèche se cache pendant la partie, et revient à la fin
+    // (et pendant la pause)
     this.input.setDefaultCursor("none");
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.input.setDefaultCursor("default"));
-    surManette(this, [MANETTE.START, MANETTE.SELECT], () => this.quitter());   // en partie, Start ou Select : on s'en va
+    // Échap, P, Start, le ⏸ du tableau de bord, ou le jeu qui perd la main : la pause (socle/pause.ts)
+    this.ouvrirLaPause = mettreEnPause(this, {
+      autres: ["tir-tableau"],
+      quitter: () => this.quitter(),
+      possible: () => !this.fini && !this.quitte,
+      apresReprise: () => this.input.setDefaultCursor(this.enJeu ? "none" : "default"),
+      son: "tir",
+      couleur: 0x5ff0ff,
+    });
 
     this.scene.launch("tir-tableau");
     this.commencerLaVague(donnees.vague ?? 1);
@@ -147,7 +164,7 @@ export class Partie extends Phaser.Scene implements Terrain {
   // l'objet seul, et l'action reçoit l'autre. Sinon, un ennemi qui percute le vaisseau détruisait le
   // vaisseau à sa place, et le jeu s'arrêtait net.
   private surUnDe<T>(seul: Phaser.GameObjects.GameObject, groupe: Phaser.GameObjects.Group, action: (autre: T) => void) {
-    this.physics.add.overlap(seul, groupe, (a, b) => action((a === seul ? b : a) as T));
+    return this.physics.add.overlap(seul, groupe, (a, b) => action((a === seul ? b : a) as T));
   }
 
   update(_temps: number, delta: number) {
@@ -155,15 +172,25 @@ export class Partie extends Phaser.Scene implements Terrain {
     for (const couche of this.etoiles) {
       couche.tilePositionY -= couche.getData("vitesse") * secondes;
     }
-    // Ce qui sort de l'écran retourne dans sa réserve
-    for (const groupe of [this.balles, this.ballesEnnemies, this.bonus]) {
-      for (const objet of groupe.getMatching("active", true) as Mobile[]) {
-        if (objet.y < -30 || objet.y > HAUTEUR + 30 || objet.x < -30 || objet.x > LARGEUR + 30) {
-          this.ranger(objet);
+    // Ce qui sort de l'écran : une balle retourne dans sa réserve, un bonus manqué s'en va pour de bon
+    const dehors = (objet: Phaser.GameObjects.Image) =>
+      objet.y < -30 || objet.y > HAUTEUR + 30 || objet.x < -30 || objet.x > LARGEUR + 30;
+    for (const groupe of [this.balles, this.ballesEnnemies]) {
+      for (const balle of groupe.getMatching("active", true) as Mobile[]) {
+        if (dehors(balle)) {
+          this.ranger(balle);
         }
       }
     }
-    this.halo.setPosition(this.vaisseau.x, this.vaisseau.y + 2);
+    for (const bonus of this.bonus.getChildren() as Phaser.Physics.Arcade.Image[]) {
+      if (dehors(bonus)) {
+        this.oublierLeBonus(bonus);
+      }
+    }
+    // Le bouclier suit le corps du vaisseau : l'image a un pas de physique de retard, et au doigt, où le
+    // vaisseau va vite, le bouclier traînait derrière
+    const centre = this.vaisseau.body.center;
+    this.halo.setPosition(centre.x, centre.y + 2);
     if (!this.enJeu) {
       return;
     }
@@ -200,8 +227,10 @@ export class Partie extends Phaser.Scene implements Terrain {
       this.time.delayedCall(annonce, () => {
         if (this.enJeu) {
           this.boss = new Boss(this, this, this.vague.serie);
-          this.surUnDe(this.boss, this.balles, (balle: Mobile) => this.balleSurBoss(balle));
-          this.physics.add.overlap(this.boss, this.vaisseau, () => this.toucherLeVaisseau());
+          this.collisionsDuBoss = [
+            this.surUnDe(this.boss, this.balles, (balle: Mobile) => this.balleSurBoss(balle)),
+            this.physics.add.overlap(this.boss, this.vaisseau, () => this.toucherLeVaisseau()),
+          ];
         }
       });
       return;
@@ -326,6 +355,9 @@ export class Partie extends Phaser.Scene implements Terrain {
     // Battu : il tremble, explose en plusieurs fois, et la série suivante commence
     boss.arreter();
     this.boss = null;
+    // Ses chocs ne servent plus : on les retire, sinon ils s'empilent d'un boss à l'autre
+    this.collisionsDuBoss.forEach((collision) => collision.destroy());
+    this.collisionsDuBoss = [];
     this.ballesEnnemies.getMatching("active", true).forEach((b) => this.ranger(b as Mobile));
     this.marquer(BOSS.points * (this.vague.serie + 1), boss.x, boss.y);
     this.cameras.main.shake(900, 0.01);
@@ -363,7 +395,7 @@ export class Partie extends Phaser.Scene implements Terrain {
     }
     const bonus = this.bonus.create(x, y, "tir-bonus-" + genre) as Phaser.Physics.Arcade.Image;
     bonus.setData("genre", genre).setDepth(2).setVelocityY(VITESSE_BONUS);
-    // Il tourne doucement sur lui-même, pour qu'on le remarque
+    // Il bat doucement (il grossit et revient), pour qu'on le remarque
     this.tweens.add({ targets: bonus, scale: 1.15, duration: 400, yoyo: true, repeat: -1, ease: "Sine.InOut" });
   }
 
@@ -372,8 +404,7 @@ export class Partie extends Phaser.Scene implements Terrain {
       return;
     }
     const genre = bonus.getData("genre") as GenreDeBonus;
-    this.tweens.killTweensOf(bonus);
-    bonus.destroy();
+    this.oublierLeBonus(bonus);
     this.sound.play("tir-bonus");
     if (genre === "arme") {
       if (this.arme < ARME_MAX) {
@@ -387,6 +418,12 @@ export class Partie extends Phaser.Scene implements Terrain {
       this.vies++;
     }
     this.halo.setVisible(this.bouclier);
+  }
+
+  // Un bonus ramassé ou manqué : il s'en va avec son tween, qui tournerait sinon sans fin
+  private oublierLeBonus(bonus: Phaser.Physics.Arcade.Image) {
+    this.tweens.killTweensOf(bonus);
+    bonus.destroy();
   }
 
   // —— Être touché ——
@@ -435,6 +472,7 @@ export class Partie extends Phaser.Scene implements Terrain {
       this.record = this.score;
       ecrire(RECORD, this.score);
     }
+    this.fini = true;
     this.physics.pause();
     this.tweens.pauseAll();
     this.scene.launch("tir-fin", { nouveauRecord });
@@ -450,7 +488,7 @@ export class Partie extends Phaser.Scene implements Terrain {
 
   quitter() {
     if (this.quitte) {
-      return;                              // Échap pendant la fin : la fin et la partie l'entendent toutes les deux
+      return;                              // déjà en route (la fin et la pause n'ont pas la même garde)
     }
     this.quitte = true;
     fonduPuis(this, () => {

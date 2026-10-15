@@ -11,9 +11,9 @@ import { Generateur } from "../generateur";
 import { Genres } from "../genres";
 import { FOND, ZOOM, HAUTEUR_MONDE, OBJECTIF_DUO, SAUVEGARDE } from "../reglages";
 import { LARGEUR, HAUTEUR } from "../../../socle/style";
-import { surTouche } from "../../../socle/clavier";
 import { toucheDuSon } from "../../../socle/son";
 import { fonduPuis } from "../../../socle/retour";
+import { mettreEnPause } from "../../../socle/pause";
 
 const DECALAGE = 1000;                     // le monde du joueur 2 est rangé sous celui du joueur 1
 const INFINI = 10_000_000;
@@ -31,7 +31,8 @@ interface Coureur {
 
 export class Duo extends Phaser.Scene {
   coureurs: Coureur[] = [];
-  enJeu = false;
+  enJeu = false;                           // faux une fois la course gagnée : la fin est affichée
+  ouvrirLaPause: () => void = () => {};    // pour le ⏸ du tableau de bord
   private quitte = false;
 
   constructor() {
@@ -70,8 +71,15 @@ export class Duo extends Phaser.Scene {
       this.preparer(coureur);
     });
 
-    surTouche(this, "ESC", () => this.quitter());
     toucheDuSon(this, SAUVEGARDE);
+    // Échap, P, Start sur l'une ou l'autre manette, le ⏸, ou le jeu qui perd la main : la pause
+    this.ouvrirLaPause = mettreEnPause(this, {
+      autres: ["platformer-tableau"],
+      quitter: () => this.quitter(),
+      possible: () => this.enJeu && !this.quitte,
+      son: SAUVEGARDE,
+      couleur: 0x5fd068,
+    });
     this.scene.launch("platformer-tableau");
   }
 

@@ -45,9 +45,24 @@ bugs de Phaser : c'est sa façon de faire, logique une fois qu'on la connaît, m
 - Les sons ne sont pas des objets de la scène : les détruire à son `SHUTDOWN`. Idem pour les écouteurs
   posés sur une **autre** scène, ou sur les événements de la scène elle-même (`this.events`), qui
   survivent à son arrêt : préférer sa méthode `update()`.
-- Une scène en pause n'entend plus le clavier : une touche lâchée pendant la pause reste « tenue ». Ni
-  les doigts : un pouce levé pendant la pause reste posé sur son bouton (`BoutonsAuDoigt.toutLacher()`
-  à l'événement `PAUSE` de la scène, comme le tableau de bord de la course).
+- Une scène en pause n'entend plus le clavier, ni les doigts : une touche ou un bouton au doigt lâché pendant
+  la pause reste « tenu ». `TouchesPhysiques` se lâche toute seule à la reprise (l'événement `RESUME` de la
+  scène) ; les `BoutonsAuDoigt`, c'est au jeu de les lâcher (`toutLacher`, à la reprise comme `socle/pause.ts`, ou à
+  l'événement `PAUSE` de la scène, comme le tableau de bord de la course).
+- `this.time.now` continue pendant la pause : c'est l'heure du jeu entier, pas celle de la scène. Un chrono
+  qui s'en sert compte le temps de la pause. Une minuterie de la scène (`this.time.addEvent`, puis
+  `getElapsed()`), elle, s'arrête avec la scène : c'est le chrono du démineur.
+- Par `this.scene` (le ScenePlugin), tout attend l'image suivante : `start`, `launch`, `stop`, `restart`,
+  mais aussi `pause` et `resume` (seul `game.scene`, le gestionnaire lui-même, agit tout de suite). Phaser
+  fait lire un appui aux scènes l'une après l'autre, de la plus haute à la plus basse, dans la même image :
+  une fin arrêtée par Start est encore active quand la partie, dessous, lit ce même Start. C'est ce qui
+  permet à la partie de se taire (le `possible` de `socle/pause.ts`).
+- Chaque scène lit la manette avec sa **propre copie** des boutons (son `GamepadPlugin`), qui ne bouge pas
+  quand la scène est arrêtée ou en pause. Une scène qui arrive, ou qui sort d'une pause, prend un bouton
+  encore tenu pour un nouvel appui : le Start qui ouvre la pause validerait aussitôt « Reprendre », celui
+  qui la ferme la rouvrirait. D'où le petit moment avant d'écouter (`ecranDeFin`, `socle/pause.ts`).
+- Une scène ajoutée en cours de route (`scene.add`) se met au-dessus des autres... et sous celles ajoutées
+  après elle (les jeux chargés ensuite) : une scène qui doit tout recouvrir se remonte (`scene.bringToTop`).
 
 **Le son**
 

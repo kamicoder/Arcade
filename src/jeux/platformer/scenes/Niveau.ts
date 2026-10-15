@@ -16,14 +16,14 @@ import { Genres } from "../genres";
 import { chargerTous } from "../niveaux";
 import { creerLeDecor, defilerLeDecor } from "../decor";
 import type { Boss } from "../Ennemis";
+import type { Tableau } from "./Tableau";
 import {
   FOND, ZOOM, HAUTEUR_MONDE, LARGEUR_VUE, PIECES_POUR_UNE_VIE, VIES, SAUVEGARDE, SAUT,
 } from "../reglages";
 import { lire, ecrire } from "../../../socle/sauvegarde";
-import { surTouche } from "../../../socle/clavier";
-import { surManette, MANETTE } from "../../../socle/manette";
 import { toucheDuSon } from "../../../socle/son";
 import { fonduPuis } from "../../../socle/retour";
+import { mettreEnPause } from "../../../socle/pause";
 
 export type Mode = "aventure" | "infini" | "test";
 
@@ -54,7 +54,9 @@ export class Niveau extends Phaser.Scene {
   enJeu = false;                           // faux pendant une chute mortelle, et une fois la partie finie
   distance = 0;                            // l'Infini : le plus loin atteint, en mètres
   record = 0;
+  ouvrirLaPause: () => void = () => {};    // pour le ⏸ du tableau de bord
   private quitte = false;
+  private fini = false;                    // la fin est affichée : elle a ses boutons, la pause n'a plus de sens
   private auDebut = { score: 0, pieces: 0 };   // le score et les pièces au début du niveau
   private viesGagnees = 0;                 // les vies gagnées avec les pièces de ce niveau
   private generateur: Generateur | null = null;
@@ -74,6 +76,7 @@ export class Niveau extends Phaser.Scene {
     this.viesGagnees = 0;
     this.enJeu = true;
     this.quitte = false;
+    this.fini = false;
     this.distance = 0;
     this.record = lireLeRecord();
     this.generateur = null;
@@ -132,9 +135,17 @@ export class Niveau extends Phaser.Scene {
     camera.fadeIn(300);
 
     this.commandes = new Commandes(this, "seul");
-    surTouche(this, "ESC", () => this.quitter());
     toucheDuSon(this, SAUVEGARDE);
-    surManette(this, [MANETTE.START, MANETTE.SELECT], () => this.quitter());   // en partie, Start ou Select : on s'en va
+    // Échap, P, Start, le ⏸ du tableau de bord, ou le jeu qui perd la main : la pause (socle/pause.ts)
+    this.ouvrirLaPause = mettreEnPause(this, {
+      autres: ["platformer-tableau"],
+      quitter: () => this.quitter(),
+      ailleurs: this.donnees.mode === "test" ? "L'éditeur" : "Le menu",
+      possible: () => !this.fini && !this.quitte,
+      apresReprise: () => (this.scene.get("platformer-tableau") as Tableau).lacherLesDoigts(),
+      son: SAUVEGARDE,
+      couleur: 0x5fd068,
+    });
 
     this.scene.launch("platformer-tableau");
   }
@@ -288,6 +299,7 @@ export class Niveau extends Phaser.Scene {
       ecrire(MEILLEUR_SCORE, d.score);
       nouveauRecord = true;
     }
+    this.fini = true;
     this.physics.pause();
     this.scene.launch("platformer-fin", { fin, nouveauRecord });
   }
@@ -309,7 +321,7 @@ export class Niveau extends Phaser.Scene {
   // Le menu, ou l'éditeur si on testait un de ses niveaux
   quitter() {
     if (this.quitte) {
-      return;                              // Échap pendant la fin : la fin et le niveau l'entendent tous les deux
+      return;                              // déjà en route (la fin et la pause n'ont pas la même garde)
     }
     this.quitte = true;
     fonduPuis(this, () => {

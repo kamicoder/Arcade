@@ -8,6 +8,8 @@ import type { Niveau } from "../niveaux";
 import { COULEURS } from "../textures";
 import { LARGEUR, HAUTEUR, POLICE } from "../../../socle/style";
 import { estTactile } from "../../../socle/tactile";
+import { boutonPause } from "../../../socle/pause";
+import { etiquette } from "../../../socle/touchesPhysiques";
 
 const BOUTON_MODE = { x: LARGEUR - 66, y: HAUTEUR - 66, rayon: 48 };
 
@@ -62,14 +64,22 @@ export class Barre extends Phaser.Scene {
     this.smiley.on("pointerout", () => this.smiley.setScale(1.25));
     this.smiley.on("pointerup", () => this.partie.nouvellePartie());
 
+    // La pause, à droite de la barre (au doigt, aussi grande que la barre le permet)
+    boutonPause(this, LARGEUR - 40, HAUT_BARRE / 2, () => this.partie.ouvrirLaPause(), estTactile() ? 52 : 34);
+
     if (estTactile()) {
       this.creerBoutonDuMode();
       this.bulle("Touche : creuser    Appui long : drapeau    Glisse ou pince : bouger la grille");
     } else {
-      this.add.text(LARGEUR / 2, HAUTEUR - BAS_AIDE / 2,
-        "Clic : creuser   Clic droit : drapeau   Flèches + Espace / F   R : rejouer   1 2 3 : niveau   Échap : niveaux", {
-          fontFamily: POLICE, fontSize: "14px", color: "#a59fc0",
-        }).setOrigin(0.5);
+      // Toutes les touches, sur deux lignes. Les lettres du curseur reconnues à leur place : Z Q S D sur un
+      // AZERTY, W A S D sur un QWERTY
+      const lettres = ["KeyW", "KeyA", "KeyS", "KeyD"].map(etiquette).join(" ");
+      this.add.text(LARGEUR / 2, HAUTEUR - BAS_AIDE / 2, [
+        "Clic : creuser    Clic droit : drapeau    Molette : zoomer    R : rejouer    1 2 3 : niveau    Échap ou P : pause    M : le son",
+        `Flèches ou ${lettres} : le curseur    Espace ou Entrée : creuser    F ou X : drapeau`,
+      ], {
+        fontFamily: POLICE, fontSize: "14px", color: "#a59fc0", align: "center", lineSpacing: 2,
+      }).setOrigin(0.5);
     }
 
     // On écoute la partie. Ces écouteurs sont posés sur une AUTRE scène : on les retire nous-mêmes

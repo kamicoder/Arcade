@@ -16,9 +16,12 @@ import { surTouche, surChaqueTouche } from "../../../socle/clavier";
 import { surManette, MANETTE } from "../../../socle/manette";
 import { estTactile } from "../../../socle/tactile";
 import { fonduPuis } from "../../../socle/retour";
+import { uneSeuleFois } from "../../../socle/fin";
+import { mettreEnPause } from "../../../socle/pause";
+import { toucheDuSon } from "../../../socle/son";
 
 export const HAUT_BARRE = 56;              // la barre du haut ; la grille se montre en dessous
-export const BAS_AIDE = 24;                // la ligne d'aide du clavier, en bas (pas au doigt)
+export const BAS_AIDE = 40;                // les deux lignes d'aide du clavier, en bas (pas au doigt)
 const MARGE = 10;                          // un peu d'air autour de la grille, dans le monde
 const DOIGT = 38;                          // la plus petite case au doigt, en pixels CSS (un bon centimètre)
 const APPUI_LONG = 350;                    // ms : un doigt qui reste posé plante un drapeau
@@ -47,11 +50,15 @@ export class Partie extends Phaser.Scene {
   niveau!: Niveau;
   grille!: Grille;
   modeDrapeau = false;                     // au doigt : un toucher plante un drapeau au lieu de creuser
+  ouvrirLaPause: () => void = () => {};    // pour le ⏸ de la barre
   private numeroNiveau = 0;
   private tuiles: Tuile[][] = [];
   private calque!: Phaser.GameObjects.Container;   // toutes les tuiles : on les jette d'un coup
-  private debut: number | null = null;
-  private fin: number | null = null;
+  // Le chrono : une minuterie de la scène, qui s'arrête avec elle pendant la pause (this.time.now, lui,
+  // continue : c'est l'heure du jeu entier). Elle part au premier clic, et s'arrête à la fin.
+  private chrono?: Phaser.Time.TimerEvent;
+  private partir = uneSeuleFois();         // quitter une seule fois : la barre, la fin et B peuvent s'y croiser
+  private quitte = false;
   private minuterieFin?: Phaser.Time.TimerEvent;   // la fin de partie qui attend la fin des animations
   private curseur!: Phaser.GameObjects.Image;
   private posCurseur: Position = { r: 0, c: 0 };
@@ -77,6 +84,9 @@ export class Partie extends Phaser.Scene {
     this.modeDrapeau = false;
     this.geste = { type: "rien" };
     this.enfoncee = null;
+    this.chrono = undefined;
+    this.partir = uneSeuleFois();
+    this.quitte = false;
   }
 
   create() {
@@ -90,6 +100,19 @@ export class Partie extends Phaser.Scene {
     this.creerEffets();
     this.ecouterLaSourisEtLesDoigts();
     this.ecouterLeClavierEtLaManette();
+    toucheDuSon(this, "demineur");
+    // Échap, P, Start, le ⏸ de la barre, ou le jeu qui perd la main : la pause (socle/pause.ts). Le chrono
+    // s'arrête avec elle.
+    this.ouvrirLaPause = mettreEnPause(this, {
+      autres: ["demineur-barre"],
+      quitter: () => this.quitter(),
+      ailleurs: "Les niveaux",
+      plus: [{ nom: "Nouvelle grille", action: () => this.nouvellePartie() }],
+      possible: () => this.enPartie(),
+      apresReprise: () => this.annulerLeGeste(),
+      son: "demineur",
+      couleur: 0x4fb3ff,
+    });
 
     this.scene.launch("demineur-barre");
     this.nouvellePartie(this.numeroNiveau);
@@ -104,8 +127,8 @@ export class Partie extends Phaser.Scene {
     const graine = this.registry.get(GRAINE) as number | undefined;
     this.grille = new Grille(this.niveau.rangees, this.niveau.colonnes, this.niveau.mines,
       graine === undefined ? Math.random : hasardAvecGraine(graine));
-    this.debut = null;
-    this.fin = null;
+    this.chrono?.remove();
+    this.chrono = undefined;
     // Rejouer pendant l'explosion : la fin de l'ancienne partie ne doit pas tomber sur la nouvelle
     this.minuterieFin?.remove();
     this.minuterieFin = undefined;
@@ -135,10 +158,7 @@ export class Partie extends Phaser.Scene {
 
   // Le temps de jeu, en millisecondes : depuis le premier clic, arrêté à la fin
   tempsEcoule(): number {
-    if (this.debut === null) {
-      return 0;
-    }
-    return (this.fin ?? this.time.now) - this.debut;
+    return this.chrono?.getElapsed() ?? 0;
   }
 
   basculerLeMode() {
@@ -147,11 +167,14 @@ export class Partie extends Phaser.Scene {
   }
 
   quitter() {
-    fonduPuis(this, () => {
-      this.scene.stop("demineur-barre");
-      this.scene.stop("demineur-fin");
-      this.scene.start("demineur-menu");
-    });
+    this.partir(() => {
+      this.quitte = true;
+      fonduPuis(this, () => {
+        this.scene.stop("demineur-barre");
+        this.scene.stop("demineur-fin");
+        this.scene.start("demineur-menu");
+      });
+    })();
   }
 
   // Pour les tests : où est le centre d'une case, en pixels du jeu (960 × 540)
@@ -170,7 +193,8 @@ export class Partie extends Phaser.Scene {
     const imposees = this.registry.get(MINES_IMPOSEES) as Position[] | undefined;
     const coup = this.grille.clic(r, c, imposees);
     if (coup.premier) {
-      this.debut = this.time.now;          // le chrono part au premier clic
+      // Le chrono part au premier clic : une minuterie qui ne sonne jamais, dont on lit le temps écoulé
+      this.chrono = this.time.addEvent({ delay: 24 * 3600 * 1000 });
     }
     if (coup.ouvertes.length === 0) {
       return;
@@ -219,7 +243,7 @@ export class Partie extends Phaser.Scene {
   }
 
   private exploser(boum: Position) {
-    this.fin = this.time.now;
+    this.arreterLeChrono();
     this.events.emit("visage", "smiley_perdu");
     const ici = this.centreDeCase(boum.r, boum.c);
     this.sound.play("demineur-boum");
@@ -239,8 +263,14 @@ export class Partie extends Phaser.Scene {
     this.minuterieFin = this.time.delayedCall(finDesMines + 700, () => this.finir(false));
   }
 
+  private arreterLeChrono() {
+    if (this.chrono) {
+      this.chrono.paused = true;
+    }
+  }
+
   private gagner(derniere: Position) {
-    this.fin = this.time.now;
+    this.arreterLeChrono();
     this.events.emit("visage", "smiley_gagne");
     this.sound.play("demineur-victoire");
     // Les mines restantes reçoivent leur drapeau, et toute la grille sautille depuis la dernière case
@@ -513,10 +543,15 @@ export class Partie extends Phaser.Scene {
 
   // ===== Le clavier et la manette
 
+  // Joue-t-on ? Pas pendant la fin de partie (et la saisie du nom) : c'est elle qui écoute le clavier et
+  // la manette. Ni quand on s'en va déjà.
+  private enPartie(): boolean {
+    return !this.scene.isActive("demineur-fin") && !this.quitte;
+  }
+
   private ecouterLeClavierEtLaManette() {
     const action = (faire: () => void) => () => {
-      // Pendant la fin de partie (et la saisie du nom), c'est elle qui écoute le clavier
-      if (!this.scene.isActive("demineur-fin")) {
+      if (this.enPartie()) {
         faire();
       }
     };
@@ -542,23 +577,16 @@ export class Partie extends Phaser.Scene {
     surTouche(this, "ONE", action(() => this.nouvellePartie(0)));
     surTouche(this, "TWO", action(() => this.nouvellePartie(1)));
     surTouche(this, "THREE", action(() => this.nouvellePartie(2)));
-    surTouche(this, "ESC", action(() => this.quitter()));
 
-    // La manette : la croix déplace, A creuse, X ou Y plante un drapeau, B revient aux niveaux
-    // La manette (sauf quand la fin est affichée : elle a ses boutons). En partie, Start relance.
-    const enPartie = (action: () => void) => () => {
-      if (!this.scene.isActive("demineur-fin")) {
-        action();
-      }
-    };
-    surManette(this, MANETTE.HAUT, enPartie(() => this.deplacerLeCurseur(-1, 0)));
-    surManette(this, MANETTE.BAS, enPartie(() => this.deplacerLeCurseur(1, 0)));
-    surManette(this, MANETTE.GAUCHE, enPartie(() => this.deplacerLeCurseur(0, -1)));
-    surManette(this, MANETTE.DROITE, enPartie(() => this.deplacerLeCurseur(0, 1)));
-    surManette(this, MANETTE.A, enPartie(() => this.agirAuCurseur(false)));
-    surManette(this, [MANETTE.X, MANETTE.Y], enPartie(() => this.agirAuCurseur(true)));
-    surManette(this, MANETTE.B, enPartie(() => this.quitter()));
-    surManette(this, MANETTE.START, enPartie(() => this.nouvellePartie()));
+    // La manette : la croix déplace, A creuse, X ou Y plante un drapeau, B revient aux niveaux. Start met
+    // en pause (mettreEnPause), et la pause propose une nouvelle grille.
+    surManette(this, MANETTE.HAUT, action(() => this.deplacerLeCurseur(-1, 0)));
+    surManette(this, MANETTE.BAS, action(() => this.deplacerLeCurseur(1, 0)));
+    surManette(this, MANETTE.GAUCHE, action(() => this.deplacerLeCurseur(0, -1)));
+    surManette(this, MANETTE.DROITE, action(() => this.deplacerLeCurseur(0, 1)));
+    surManette(this, MANETTE.A, action(() => this.agirAuCurseur(false)));
+    surManette(this, [MANETTE.X, MANETTE.Y], action(() => this.agirAuCurseur(true)));
+    surManette(this, MANETTE.B, action(() => this.quitter()));
   }
 
   private deplacerLeCurseur(dr: number, dc: number) {
