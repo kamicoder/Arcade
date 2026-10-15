@@ -17,6 +17,8 @@ import {
   CHANCE_DE_BONUS, VITESSE_BONUS, DUREE_LARGE, DUREE_FEU, DUREE_LENTE, LENTE, POINTS_PAR_VIE, COMBO_MAX, SAUVEGARDE, VIOLET,
 } from "../reglages";
 import { LARGEUR, HAUTEUR } from "../../../socle/style";
+import { elargir } from "../../../socle/largeur";
+import { vibrer } from "../../../socle/vibration";
 import { surTouche } from "../../../socle/clavier";
 import { toucheDuSon } from "../../../socle/son";
 import { surManette, MANETTE } from "../../../socle/manette";
@@ -34,16 +36,17 @@ type Etat = "tenue" | "jeu" | "fini";      // la balle attend sur la raquette, r
 const HAUT_DU_MONDE = 44;                  // sous le tableau de bord
 const HAUT_DES_BRIQUES = 78;
 const PAS = { x: BRIQUE.largeur + 4, y: BRIQUE.hauteur + 4 };
-const GAUCHE_DES_BRIQUES = (LARGEUR - COLONNES * PAS.x) / 2;
+const GAUCHE_DES_BRIQUES = (LARGEUR - COLONNES * PAS.x) / 2;   // sur 960 de large ; plus large, le mur reste au milieu
 const Y_RAQUETTE = HAUTEUR - 40;
 const POINTS: Record<GenreDeBrique, number> = { simple: 10, argent: 20, or: 30, explosive: 15, metal: 0 };
 const DUREES: Partial<Record<GenreDeBonus, number>> = { large: DUREE_LARGE, feu: DUREE_FEU, lente: DUREE_LENTE };
 
-// Une brique du mur : son image, son corps immobile, et ce que dit la grille d'elle
+// Une brique du mur : son image, son corps immobile, et ce que dit la grille d'elle. decalage : de combien
+// le jeu, élargi au doigt, dépasse 960 de chaque côté
 export class BriqueDuMur extends Phaser.Physics.Arcade.Image {
-  constructor(scene: Phaser.Scene, readonly brique: Brique) {
+  constructor(scene: Phaser.Scene, readonly brique: Brique, decalage: number) {
     super(scene,
-      GAUCHE_DES_BRIQUES + brique.colonne * PAS.x + PAS.x / 2,
+      decalage + GAUCHE_DES_BRIQUES + brique.colonne * PAS.x + PAS.x / 2,
       HAUT_DES_BRIQUES + brique.ligne * PAS.y + PAS.y / 2,
       imageDeBrique(brique.couleur));
   }
@@ -68,6 +71,7 @@ export class Partie extends Phaser.Scene {
   bonus!: Phaser.Physics.Arcade.Group;
   private commandes!: Commandes;
   private quitte = false;
+  private decalage = 0;                    // au doigt, le jeu élargi : le mur reste au milieu
   ouvrirLaPause!: () => void;              // pour le ⏸ du tableau de bord
   private eclats!: Phaser.GameObjects.Particles.ParticleEmitter;
   private trainee!: Phaser.GameObjects.Particles.ParticleEmitter;
@@ -100,15 +104,20 @@ export class Partie extends Phaser.Scene {
     this.quitte = false;
     this.effets.clear();
 
+    // Au doigt, la partie prend la proportion du téléphone (socle/largeur.ts) : le mur reste au milieu, la
+    // raquette et la balle ont toute la largeur. Elle la garde jusqu'à la fin de la partie.
+    elargir(this);
+    const largeur = this.scale.width;
+    this.decalage = (largeur - LARGEUR) / 2;
     this.cameras.main.fadeIn(300);
-    this.add.image(0, 0, "briques-fond").setOrigin(0).setDepth(-10);
+    this.add.tileSprite(0, 0, largeur, HAUTEUR, "briques-fond").setOrigin(0).setDepth(-10);
 
     // Le monde : ses bords renvoient la balle, sauf en bas, où elle tombe
-    this.physics.world.setBounds(0, HAUT_DU_MONDE, LARGEUR, HAUTEUR - HAUT_DU_MONDE + 200);
+    this.physics.world.setBounds(0, HAUT_DU_MONDE, largeur, HAUTEUR - HAUT_DU_MONDE + 200);
     this.physics.world.setBoundsCollision(true, true, true, false);
     this.physics.world.on(Phaser.Physics.Arcade.Events.WORLD_BOUNDS, () => this.sound.play("briques-mur", { volume: 0.25 }));
 
-    this.raquette = this.physics.add.image(LARGEUR / 2, Y_RAQUETTE, "briques-raquette").setDepth(5) as Mobile;
+    this.raquette = this.physics.add.image(largeur / 2, Y_RAQUETTE, "briques-raquette").setDepth(5) as Mobile;
     this.raquette.setImmovable(true).setCollideWorldBounds(true);
 
     // Un groupe de physique règle lui-même chaque balle qu'il crée : rebond parfait, bords du monde
@@ -173,7 +182,7 @@ export class Partie extends Phaser.Scene {
     this.briques.clear(true, true);
     this.vitesse = Math.min(VITESSE + (this.sansFin ? (this.mur - 1) * VITESSE_PAR_MUR : 0), VITESSE_MAX);
     for (const brique of lireLaGrille(this.grille())) {
-      const image = new BriqueDuMur(this, brique);
+      const image = new BriqueDuMur(this, brique, this.decalage);
       this.add.existing(image);
       this.briques.add(image);
       // Le corps immobile est déjà placé : on n'anime que l'image (un corps immobile ne suit pas l'échelle)
@@ -277,6 +286,10 @@ export class Partie extends Phaser.Scene {
     balle.body.setVelocity(v.x, v.y);
     this.combo = 0;
     this.sound.play("briques-rebond", { volume: 0.6 });
+    // La raquette s'écrase un instant sous la balle (scaleY seulement : scaleX est à la raquette large). Depuis
+    // 1, pas depuis sa hauteur du moment : deux balles coup sur coup la laisseraient sinon aplatie pour de bon
+    // (et son corps avec)
+    this.tweens.add({ targets: this.raquette, scaleY: { from: 1, to: 0.7 }, duration: 60, yoyo: true, ease: "Quad.Out" });
     this.raquette.setTint(0xffffff).setTintMode(Phaser.TintModes.FILL);
     this.time.delayedCall(70, () => this.raquette.clearTint());
   }
@@ -287,6 +300,7 @@ export class Partie extends Phaser.Scene {
     this.finirLesEffets();
     this.bonus.clear(true, true);
     this.sound.play("briques-perdu");
+    vibrer(this, this.vies <= 0 ? "fort" : "moyen");     // la dernière balle : la partie est perdue
     this.cameras.main.shake(250, 0.01);
     if (this.vies <= 0) {
       this.finir(false);
@@ -354,6 +368,7 @@ export class Partie extends Phaser.Scene {
   // L'explosive casse ses huit voisines (le métal résiste) ; une voisine explosive explose à son tour
   private exploser(brique: BriqueDuMur) {
     this.sound.play("briques-boum");
+    vibrer(this, "leger");
     this.cameras.main.shake(180, 0.008);
     this.eclats.particleTint = 0xffd23f;
     this.eclats.explode(30, brique.x, brique.y);
@@ -456,6 +471,7 @@ export class Partie extends Phaser.Scene {
     this.finirLesEffets();
     this.sound.play("briques-victoire");
     this.cameras.main.flash(250, 255, 255, 255);
+    this.feterLeMur();
     if (this.sansFin) {
       // Le mur suivant, un peu plus dur ; la balle repart de la raquette
       this.time.delayedCall(1200, () => {
@@ -466,6 +482,17 @@ export class Partie extends Phaser.Scene {
     }
     this.score += this.vies * POINTS_PAR_VIE;
     this.time.delayedCall(900, () => this.finir(true));
+  }
+
+  // Un mur tombé : des confettis de toutes les couleurs des briques, un peu partout où il était
+  private feterLeMur() {
+    const couleurs = Object.values(COULEURS_DES_BRIQUES).map((c) => c.corps);
+    for (let i = 0; i < 8; i++) {
+      this.time.delayedCall(i * 70, () => {
+        this.eclats.particleTint = Phaser.Utils.Array.GetRandom(couleurs);
+        this.eclats.explode(18, this.decalage + Phaser.Math.Between(140, LARGEUR - 140), Phaser.Math.Between(90, 260));
+      });
+    }
   }
 
   private finir(gagne: boolean) {

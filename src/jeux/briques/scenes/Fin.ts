@@ -7,7 +7,7 @@ import type { Partie } from "./Partie";
 import type { RecordSansFin } from "../progression";
 import { NIVEAUX } from "../niveaux";
 import { VIOLET } from "../reglages";
-import { LARGEUR, HAUTEUR, POLICE } from "../../../socle/style";
+import { HAUTEUR, POLICE } from "../../../socle/style";
 import { surTouche } from "../../../socle/clavier";
 import { surManette, MANETTE } from "../../../socle/manette";
 import { ListeDeBoutons, type Choix } from "../../../socle/listeDeBoutons";
@@ -27,9 +27,9 @@ export class Fin extends Phaser.Scene {
 
   create(donnees: DonneesDeFin) {
     const partie = this.scene.get("briques-partie") as Partie;
-    this.add.rectangle(0, 0, LARGEUR, HAUTEUR, 0x000000, 0.6).setOrigin(0);
+    this.add.rectangle(0, 0, this.scale.width, HAUTEUR, 0x000000, 0.6).setOrigin(0);
     const titre = (y: number, texte: string, taille: number, couleur: string) =>
-      this.add.text(LARGEUR / 2, y, texte, {
+      this.add.text(this.scale.width / 2, y, texte, {
         fontFamily: POLICE, fontSize: taille + "px", fontStyle: "bold", color: couleur, stroke: "#14121c", strokeThickness: 7,
       }).setOrigin(0.5);
 
@@ -44,7 +44,7 @@ export class Fin extends Phaser.Scene {
       // Les étoiles arrivent une par une, en tournant
       for (let e = 0; e < 3; e++) {
         const pleine = e < donnees.etoiles;
-        const etoile = this.add.text(LARGEUR / 2 + (e - 1) * 80, 150, "★", {
+        const etoile = this.add.text(this.scale.width / 2 + (e - 1) * 80, 150, "★", {
           fontFamily: POLICE, fontSize: "72px", color: pleine ? "#ffd23f" : "#4a4560", stroke: "#14121c", strokeThickness: 6,
         }).setOrigin(0.5).setScale(0).setAngle(-90);
         this.tweens.add({
@@ -71,7 +71,7 @@ export class Fin extends Phaser.Scene {
     choix.push({ nom: "Les niveaux", action: () => partie.quitter() });
     // On attend un peu avant d'écouter : le joueur avait peut-être encore le doigt sur l'écran
     this.time.delayedCall(700, () => {
-      new ListeDeBoutons(this, choix, { x: LARGEUR / 2, y: 320, largeur: 320, hauteur: 56, ecart: 70 }, { couleur: VIOLET });
+      new ListeDeBoutons(this, choix, { x: this.scale.width / 2, y: 320, largeur: 320, hauteur: 56, ecart: 70 }, { couleur: VIOLET });
       surTouche(this, "ESC", () => partie.quitter());
       surManette(this, MANETTE.B, () => partie.quitter());
     });

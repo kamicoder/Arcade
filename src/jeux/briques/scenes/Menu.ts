@@ -6,12 +6,13 @@ import Phaser from "phaser";
 import { NIVEAUX } from "../niveaux";
 import { resultats, ouvert, sansFinOuvert, recordSansFin } from "../progression";
 import { TEXTE, SAUVEGARDE } from "../reglages";
-import { LARGEUR, HAUTEUR, POLICE } from "../../../socle/style";
+import { HAUTEUR, POLICE } from "../../../socle/style";
 import { surTouche } from "../../../socle/clavier";
 import { surManette, MANETTE, VALIDER } from "../../../socle/manette";
 import { estTactile } from "../../../socle/tactile";
 import { retourAuHub, fonduPuis } from "../../../socle/retour";
 import { boutonArcade } from "../../../socle/boutonArcade";
+import { elargir, suivreLaLargeur } from "../../../socle/largeur";
 import { appliquerLeSon, boutonDuSon } from "../../../socle/son";
 
 const PAR_RANGEE = 5;
@@ -37,14 +38,18 @@ export class Menu extends Phaser.Scene {
   create() {
     this.cartes = [];
     this.parti = false;
+    // Au doigt, le menu prend la proportion du téléphone (socle/largeur.ts) : tout se place d'après
+    // this.scale.width ; le téléphone tourné, il recommence à la nouvelle largeur
+    elargir(this);
+    suivreLaLargeur(this);
     this.cameras.main.fadeIn(250);
     appliquerLeSon(this, SAUVEGARDE);
-    this.add.image(0, 0, "briques-fond").setOrigin(0);
+    this.add.tileSprite(0, 0, this.scale.width, HAUTEUR, "briques-fond").setOrigin(0);
 
-    this.add.text(LARGEUR / 2, 62, "Casse-briques", {
+    this.add.text(this.scale.width / 2, 62, "Casse-briques", {
       fontFamily: POLICE, fontSize: "56px", fontStyle: "bold", color: "#c8a8ff", stroke: "#14121c", strokeThickness: 8,
     }).setOrigin(0.5);
-    this.add.text(LARGEUR / 2, 112, "Vise avec la raquette, casse tout le mur !", {
+    this.add.text(this.scale.width / 2, 112, "Vise avec la raquette, casse tout le mur !", {
       fontFamily: POLICE, fontSize: "19px", color: TEXTE,
     }).setOrigin(0.5);
 
@@ -60,7 +65,7 @@ export class Menu extends Phaser.Scene {
     boutonArcade(this, () => this.quitter());
     boutonDuSon(this, SAUVEGARDE);
     const aide = estTactile() ? "Touche un niveau pour jouer !" : "Flèches : choisir    Entrée : jouer    M : le son    Échap : l'Arcade";
-    this.add.text(LARGEUR / 2, HAUTEUR - 20, aide, { fontFamily: POLICE, fontSize: "16px", color: TEXTE }).setOrigin(0.5);
+    this.add.text(this.scale.width / 2, HAUTEUR - 20, aide, { fontFamily: POLICE, fontSize: "16px", color: TEXTE }).setOrigin(0.5);
 
     surTouche(this, "LEFT", () => this.allerA(this.choisi - 1));
     surTouche(this, "RIGHT", () => this.allerA(this.choisi + 1));
@@ -81,7 +86,7 @@ export class Menu extends Phaser.Scene {
   private creerCarte(i: number, nom: string, etoiles: number, score: number | undefined, ouverte: boolean) {
     const rangee = Math.floor(i / PAR_RANGEE);
     const colonne = i % PAR_RANGEE;
-    const x = LARGEUR / 2 + (colonne - (PAR_RANGEE - 1) / 2) * (CARTE.largeur + CARTE.ecart);
+    const x = this.scale.width / 2 + (colonne - (PAR_RANGEE - 1) / 2) * (CARTE.largeur + CARTE.ecart);
     const y = CARTE.haut + rangee * (CARTE.hauteur + CARTE.ecart);
     const fond = this.add.rectangle(0, 0, CARTE.largeur, CARTE.hauteur, ouverte ? 0x2a2148 : 0x1c1830, 0.95)
       .setRounded(14).setStrokeStyle(3, BORD);
@@ -114,7 +119,7 @@ export class Menu extends Phaser.Scene {
       this.add.text(0, -12, "∞  Sans fin", { fontFamily: POLICE, fontSize: "24px", fontStyle: "bold", color: ouverte ? "#ffffff" : "#5a5470" }).setOrigin(0.5),
       this.add.text(0, 16, sousTitre, { fontFamily: POLICE, fontSize: "14px", color: "#a59fc0" }).setOrigin(0.5),
     ];
-    this.ajouter(this.add.container(LARGEUR / 2, 436, contenu), fond, ouverte, SANS_FIN);
+    this.ajouter(this.add.container(this.scale.width / 2, 436, contenu), fond, ouverte, SANS_FIN);
   }
 
   private ajouter(boite: Phaser.GameObjects.Container, fond: Phaser.GameObjects.Rectangle, ouverte: boolean, i: number) {

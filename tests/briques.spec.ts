@@ -1,6 +1,7 @@
 import { test, expect, type Page } from "@playwright/test";
 import {
   ouvrir, appuyer, attendreScene, scenesActives, ouvrirLaCarte, toucherLaCarte, toucher, versLaPage, manette, attendreLaPause,
+  tailleDuJeu,
   quitterParLaPause,
 } from "./outils";
 
@@ -342,6 +343,17 @@ test.describe("au doigt", () => {
     await toucher(page, carte.x, carte.y);
     await attendreScene(page, "briques-partie");
     await page.waitForTimeout(500);
+
+    // Le téléphone en 20/9 : le jeu s'élargit, le mur reste au milieu, la raquette part du milieu
+    const { largeur } = await tailleDuJeu(page);
+    expect(largeur).toBeGreaterThan(1100);
+    const placees = await page.evaluate(() => {
+      const p = (window as any).jeu.scene.getScene("briques-partie");
+      const xs = p.briquesRestantes().map((b: any) => b.x);
+      return { gauche: Math.min(...xs), droite: Math.max(...xs), raquette: p.raquette.x as number };
+    });
+    expect(placees.gauche + placees.droite).toBeCloseTo(largeur, 0);
+    expect(placees.raquette).toBeCloseTo(largeur / 2, 0);
 
     // Le doigt glisse de 200 pixels vers la gauche : la raquette fait de même, et la balle ne part pas
     const depart = await partie(page);

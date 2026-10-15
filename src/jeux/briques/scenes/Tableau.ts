@@ -7,7 +7,7 @@ import Phaser from "phaser";
 import type { Partie } from "./Partie";
 import type { GenreDeBonus } from "../textures";
 import { TEXTE } from "../reglages";
-import { LARGEUR, HAUTEUR, POLICE } from "../../../socle/style";
+import { HAUTEUR, POLICE } from "../../../socle/style";
 import { estTactile } from "../../../socle/tactile";
 import { boutonPause } from "../../../socle/pause";
 import { annoncer } from "../../../socle/annonce";
@@ -37,21 +37,21 @@ export class Tableau extends Phaser.Scene {
     this.vies = [];
     this.titreAnnonce = "";
 
-    this.add.rectangle(0, 0, LARGEUR, 40, 0x000000, 0.45).setOrigin(0);
+    this.add.rectangle(0, 0, this.scale.width, 40, 0x000000, 0.45).setOrigin(0);
     const style = { fontFamily: POLICE, fontSize: "18px", fontStyle: "bold", color: "#ffffff" };
     this.gauche = this.add.text(16, 20, "", style).setOrigin(0, 0.5);
-    this.score = this.add.text(LARGEUR / 2 + 70, 20, "", { ...style, color: "#ffd23f" }).setOrigin(0.5);
-    this.viesEnPlus = this.add.text(LARGEUR - 72 - 5 * 32 + 8, 20, "", style).setOrigin(1, 0.5);
-    this.effets = this.add.text(LARGEUR / 2, 56, "", { fontFamily: POLICE, fontSize: "15px", fontStyle: "bold" }).setOrigin(0.5);
+    this.score = this.add.text(this.scale.width / 2 + 70, 20, "", { ...style, color: "#ffd23f" }).setOrigin(0.5);
+    this.viesEnPlus = this.add.text(this.scale.width - 72 - 5 * 32 + 8, 20, "", style).setOrigin(1, 0.5);
+    this.effets = this.add.text(this.scale.width / 2, 56, "", { fontFamily: POLICE, fontSize: "15px", fontStyle: "bold" }).setOrigin(0.5);
     // La pause, en haut à droite (Échap, P ou Start font pareil) ; au doigt, plus grande, sous la barre, à
     // côté du mur
     const auDoigt = estTactile();
-    boutonPause(this, LARGEUR - (auDoigt ? 44 : 26), auDoigt ? 80 : 20, () => this.partie.ouvrirLaPause());
+    boutonPause(this, this.scale.width - (auDoigt ? 44 : 26), auDoigt ? 80 : 20, () => this.partie.ouvrirLaPause());
 
     const aide = estTactile()
       ? "Glisse le doigt pour bouger la raquette, touche l'écran pour lancer"
       : "Souris, ← → ou Q D : bouger    Clic, Espace ou ↑ : lancer    M : le son    Échap : pause";
-    this.aide = this.add.text(LARGEUR / 2, HAUTEUR - 12, aide, { fontFamily: POLICE, fontSize: "14px", color: TEXTE }).setOrigin(0.5);
+    this.aide = this.add.text(this.scale.width / 2, HAUTEUR - 12, aide, { fontFamily: POLICE, fontSize: "14px", color: TEXTE }).setOrigin(0.5);
   }
 
   update() {
@@ -78,7 +78,7 @@ export class Tableau extends Phaser.Scene {
   private montrerLesVies(vies: number) {
     const montrees = Math.min(vies, 5);
     while (this.vies.length < montrees) {
-      const vie = this.add.image(LARGEUR - 72 - this.vies.length * 32, 20, "briques-vie").setScale(0);
+      const vie = this.add.image(this.scale.width - 72 - this.vies.length * 32, 20, "briques-vie").setScale(0);
       this.tweens.add({ targets: vie, scale: 1, duration: 300, ease: "Back.Out" });
       this.vies.push(vie);
     }
