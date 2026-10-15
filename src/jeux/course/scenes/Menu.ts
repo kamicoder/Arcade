@@ -224,8 +224,10 @@ export class Menu extends Phaser.Scene {
     });
     surManette(this, MANETTE.HAUT, () => this.choisir(this.choisi - 1));
     surManette(this, MANETTE.BAS, () => this.choisir(this.choisi + 1));
-    surManette(this, MANETTE.GAUCHE, () => this.changerVehicule(0, -1));
-    surManette(this, MANETTE.DROITE, () => this.changerVehicule(0, 1));
+    // La croix de chaque manette règle le véhicule de son joueur : la deuxième manette, celui du joueur 2
+    const joueurDe = (manette: Phaser.Input.Gamepad.Gamepad) => (manette.index === 1 ? 1 : 0);
+    surManette(this, MANETTE.GAUCHE, (m) => this.changerVehicule(joueurDe(m), -1));
+    surManette(this, MANETTE.DROITE, (m) => this.changerVehicule(joueurDe(m), 1));
     surManette(this, VALIDER, () => this.valider());
     surManette(this, MANETTE.B, () => retourAuHub(this));
   }

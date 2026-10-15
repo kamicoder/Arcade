@@ -19,6 +19,7 @@ import { jouer, musicien } from "../son";
 import { TouchesPhysiques } from "../../../socle/touchesPhysiques";
 import { surChaqueTouche } from "../../../socle/clavier";
 import { estTactile } from "../../../socle/tactile";
+import { surManette, MANETTE } from "../../../socle/manette";
 import { LARGEUR, HAUTEUR } from "../../../socle/style";
 
 export type Mode = "grandprix" | "course" | "duo" | "chrono";
@@ -42,8 +43,8 @@ const COMMANDES = [
 const TURBO_J1 = ["Enter", "NumpadEnter", "ShiftRight", "ControlRight"];
 const TURBO_SEUL = ["Space", "ShiftLeft"];           // le turbo de J1 quand il est seul, celui de J2 sinon
 
-// Une manette « standard » : A accélérer, B freiner, X ou RB le turbo, Start la pause
-const MANETTE = { avancer: 0, reculer: 1, turbo: [2, 5], pause: 9 };
+// À la manette : A accélère, B freine (ou les gâchettes), X ou RB le turbo, Start la pause
+const TURBO_MANETTE = [MANETTE.X, MANETTE.RB];
 
 export class Piste extends Phaser.Scene implements Monde {
   theme!: Theme;
@@ -59,6 +60,7 @@ export class Piste extends Phaser.Scene implements Monde {
   decor!: DecorDeCourse;
 
   enCourse = false;                        // faux pendant le compte à rebours, et une fois la course finie
+  private moteursEnRoute = false;          // depuis le 3 du compte à rebours : une pause les coupe, la reprise les relance
   finie = false;
   arrivees = 0;
   // Le contre-la-montre : le record du circuit et son fantôme
@@ -66,6 +68,7 @@ export class Piste extends Phaser.Scene implements Monde {
   fantome: Instant[] = [];
   fantomeIndex = 0;
   nouveauRecord = false;
+  premierTemps = false;                    // le tout premier tour chronométré du circuit : il n'y avait pas de record
   ombre?: ReturnType<DecorDeCourse["fantome"]>;
   // Les doigts sur les commandes : le tableau de bord les met à jour
   tactile = { gauche: false, droite: false, reculer: false };
@@ -92,10 +95,12 @@ export class Piste extends Phaser.Scene implements Monde {
     this.vues = [];
     this.objets = [];
     this.moteurs = [];
+    this.moteursEnRoute = false;
     this.enCourse = false;
     this.finie = false;
     this.arrivees = 0;
     this.nouveauRecord = false;
+    this.premierTemps = false;
     this.fantomeIndex = 0;
     this.tactile = { gauche: false, droite: false, reculer: false };
     this.ombre = undefined;
@@ -211,14 +216,14 @@ export class Piste extends Phaser.Scene implements Monde {
     this.game.events.on(Phaser.Core.Events.BLUR, mettreDeCote);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.game.events.off(Phaser.Core.Events.BLUR, mettreDeCote));
 
-    this.input.gamepad?.on("down", (manette: Phaser.Input.Gamepad.Gamepad, bouton: Phaser.Input.Gamepad.Button) => {
+    // Chaque manette mène son joueur : la première le joueur 1, la deuxième le joueur 2
+    surManette(this, TURBO_MANETTE, (manette) => {
       const joueur = this.joueurs[manette.index];
-      if (MANETTE.turbo.includes(bouton.index) && joueur && this.enCourse) {
+      if (joueur && this.enCourse) {
         joueur.lancerTurbo();
-      } else if (bouton.index === MANETTE.pause) {
-        this.mettreEnPause();
       }
     });
+    surManette(this, MANETTE.START, () => this.mettreEnPause());
   }
 
   // Échap et P se reconnaissent à leur lettre ; le turbo, à la place de la touche
@@ -250,6 +255,7 @@ export class Piste extends Phaser.Scene implements Monde {
     let reste = 3;
     this.events.emit("compte", reste);
     jouer(this, "bip");
+    this.moteursEnRoute = true;
     this.moteurs.forEach((m) => m.demarrer());
     this.time.addEvent({
       delay: 1000,
@@ -328,8 +334,8 @@ export class Piste extends Phaser.Scene implements Monde {
     e.droite = t.tenue(touches.droite);
     const manette = this.input.gamepad?.getPad(j);
     if (manette) {
-      e.avancer ||= manette.isButtonDown(MANETTE.avancer) || manette.R2 > 0.2;
-      e.reculer ||= manette.isButtonDown(MANETTE.reculer) || manette.L2 > 0.2;
+      e.avancer ||= manette.isButtonDown(MANETTE.A) || manette.R2 > 0.2;
+      e.reculer ||= manette.isButtonDown(MANETTE.B) || manette.L2 > 0.2;
       e.gauche ||= manette.left || manette.leftStick.x < -0.3;
       e.droite ||= manette.right || manette.leftStick.x > 0.3;
     }
@@ -349,6 +355,8 @@ export class Piste extends Phaser.Scene implements Monde {
         this.nouveauRecord = true;
         this.annoncer("Nouveau record !", couleurs.record);
         jouer(this, "record");
+      } else {
+        this.premierTemps = true;
       }
       this.meilleurTour = c.tempsTour;
       this.fantome = c.enregistrement;
@@ -404,6 +412,7 @@ export class Piste extends Phaser.Scene implements Monde {
     }
     this.finie = true;
     this.enCourse = false;
+    this.moteursEnRoute = false;
     this.moteurs.forEach((m) => m.arreter());
     const enGrandPrix = this.donnees.mode === "grandprix";
     const resultats = resultatsDeCourse(this.coureurs, TOURS * this.circuit.longueur, enGrandPrix ? POINTS_GRAND_PRIX : []);
@@ -436,7 +445,8 @@ export class Piste extends Phaser.Scene implements Monde {
     this.scene.stop("course-pause");
     this.scene.resume("course-tableau");
     this.scene.resume();
-    if (this.enCourse) {
+    // Pendant le 3, 2, 1 aussi, les moteurs tournaient déjà : ils reviennent
+    if (this.moteursEnRoute) {
       this.moteurs.forEach((m) => m.demarrer());
     }
   }

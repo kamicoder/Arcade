@@ -9,7 +9,7 @@ import type Phaser from "phaser";
 
 // Les numéros des boutons d'une manette « standard » (la disposition d'une manette Xbox)
 export const MANETTE = {
-  A: 0, B: 1, X: 2, Y: 3, SELECT: 8, START: 9, HAUT: 12, BAS: 13, GAUCHE: 14, DROITE: 15,
+  A: 0, B: 1, X: 2, Y: 3, LB: 4, RB: 5, SELECT: 8, START: 9, HAUT: 12, BAS: 13, GAUCHE: 14, DROITE: 15,
 } as const;
 
 export const VALIDER = [MANETTE.A, MANETTE.START];

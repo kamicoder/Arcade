@@ -81,10 +81,12 @@ export async function ouvrirLaCarte(page: Page, cle: string) {
 
 // Un bouton de manette pressé, tel que Phaser le raconte à une scène (0 = A, 1 = B, 9 = Start... : voir
 // socle/manette.ts). Les tests n'ont pas de vraie manette : on émet l'événement que Phaser émettrait.
-export async function manette(page: Page, scene: string, bouton: number) {
-  await page.evaluate(([scene, bouton]) => {
+// « numero » : quelle manette appuie (0 la première, 1 la deuxième), pour les jeux à deux.
+export async function manette(page: Page, scene: string, bouton: number, numero?: number) {
+  await page.evaluate(([scene, bouton, numero]) => {
     const plugin = (window as any).jeu.scene.getScene(scene).input.gamepad;
-    plugin.emit("down", plugin.pad1 ?? {}, { index: bouton, value: 1 }, 1);
-  }, [scene, bouton] as const);
+    const pad = numero === undefined ? plugin.pad1 ?? {} : { index: numero };
+    plugin.emit("down", pad, { index: bouton, value: 1 }, 1);
+  }, [scene, bouton, numero] as const);
   await page.waitForTimeout(80);
 }

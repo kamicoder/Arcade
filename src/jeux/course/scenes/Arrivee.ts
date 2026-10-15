@@ -29,7 +29,12 @@ export class Arrivee extends Phaser.Scene {
     }
     this.add.rectangle(0, 0, LARGEUR, HAUTEUR, c.voile, c.alphaVoile).setOrigin(0);
     const fete = theme.habillage.fete(this, 0);
-    if (resultats.some((r) => r.coureur.humain && r.rang === 1)) {
+    // La fête salue une victoire ; contre la montre, on est seul (toujours 1er) : elle salue un nouveau record,
+    // ou le tout premier temps du circuit
+    const victoire = course.enChrono
+      ? course.nouveauRecord || course.premierTemps
+      : resultats.some((r) => r.coureur.humain && r.rang === 1);
+    if (victoire) {
       fete.explode(90);
       fete.frequency = 100;                // puis encore quelques-uns, tant qu'on reste là
       fete.start();

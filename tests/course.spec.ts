@@ -2,7 +2,7 @@
 // Le code est le même pour les deux thèmes : chaque scénario n'est joué qu'une fois, dans l'un ou l'autre.
 // Seul le premier test passe par les deux, pour faire tourner le décor, les dessins et le pilote de chacun.
 import { test, expect, type Page } from "@playwright/test";
-import { ouvrir, appuyer, attendreScene, scenesActives, versLaPage, toucher, toucherLaCarte } from "./outils";
+import { ouvrir, appuyer, attendreScene, scenesActives, versLaPage, toucher, toucherLaCarte, manette } from "./outils";
 
 type IdTheme = "voitures" | "licornes";
 const CARTE: Record<IdTheme, number> = { voitures: 0, licornes: 1 };
@@ -373,6 +373,65 @@ test.describe("les voitures", () => {
     sansErreur();
   });
 
+  test("une pause pendant le 3, 2, 1 : le moteur revient à la reprise", async ({ page }) => {
+    const { sansErreur } = await menu(page, "voitures");
+    await mode(page, "chrono");
+    await attendreScene(page, "course-circuits");
+    await appuyer(page, "Enter");
+    await attendreScene(page, "course-tableau");
+    const moteur = () => page.evaluate(() =>
+      (window as any).jeu.sound.getAll("voiture-moteur").some((s: any) => s.isPlaying) as boolean);
+    await page.waitForFunction(() => (window as any).jeu.sound.getAll("voiture-moteur").some((s: any) => s.isPlaying));
+    await appuyer(page, "p");
+    await attendreScene(page, "course-pause");
+    expect(await page.evaluate(() => (window as any).jeu.scene.getScene("course-piste").enCourse)).toBe(false);
+    expect(await moteur()).toBe(false);
+    await appuyer(page, "p");
+    await page.waitForFunction(() => (window as any).jeu.sound.getAll("voiture-moteur").some((s: any) => s.isPlaying));
+    await attendreLeDepart(page);
+    expect(await moteur()).toBe(true);
+    sansErreur();
+  });
+
+  // Les boutons d'une manette « standard » : voir socle/manette.ts
+  const CROIX_DROITE = 15, X = 2, START = 9;
+
+  test("deux manettes : chacune règle la voiture de son joueur au menu, et lance son turbo ; Start met en pause", async ({ page }) => {
+    const { sansErreur } = await menu(page, "voitures");
+    const noms = () => page.evaluate(() => {
+      const m = (window as any).jeu.scene.getScene("course-menu");
+      return [m.cartes[0].nom.text, m.cartes[1].nom.text] as string[];
+    });
+    const avant = await noms();
+    await manette(page, "course-menu", CROIX_DROITE, 1);   // la deuxième manette
+    const apres = await noms();
+    expect(apres[0]).toBe(avant[0]);
+    expect(apres[1]).not.toBe(avant[1]);
+    await manette(page, "course-menu", CROIX_DROITE, 0);   // la première
+    const encore = await noms();
+    expect(encore[0]).not.toBe(apres[0]);
+    expect(encore[1]).toBe(apres[1]);
+
+    await mode(page, "duo");
+    await attendreScene(page, "course-circuits");
+    await appuyer(page, "Enter");
+    await attendreLeDepart(page);
+    await page.evaluate(() => {
+      for (const j of (window as any).jeu.scene.getScene("course-piste").joueurs) {
+        j.reserve = 1;
+      }
+    });
+    const turbos = () => page.evaluate(() =>
+      (window as any).jeu.scene.getScene("course-piste").joueurs.map((j: any) => j.turbo > 0) as boolean[]);
+    await manette(page, "course-piste", X, 1);             // X : le turbo, ici celui du joueur 2
+    expect(await turbos()).toEqual([false, true]);
+    await manette(page, "course-piste", X, 0);
+    expect(await turbos()).toEqual([true, true]);
+    await manette(page, "course-piste", START, 0);
+    await attendreScene(page, "course-pause");
+    sansErreur();
+  });
+
   test("le garage : une voiture personnalisée, décalco comprise, en course et après un rechargement", async ({ page }) => {
     const { sansErreur } = await menu(page, "voitures");
     await mode(page, "atelier");
@@ -597,6 +656,69 @@ test.describe("les licornes", () => {
     sansErreur();
   });
 
+  // Un record déjà là, et son fantôme, avant d'ouvrir la course
+  const poserUnRecord = (page: Page, temps: number, fantome: { t: number; x: number; y: number; angle: number }[] = []) =>
+    page.evaluate(([temps, fantome]) =>
+      localStorage.setItem("course/licornes/record/coeur", JSON.stringify({ temps, fantome })), [temps, fantome] as const);
+
+  test("contre la montre : les confettis saluent un nouveau record ou le premier temps, pas une course plus lente", async ({ page }) => {
+    const { sansErreur } = await menu(page, "licornes");
+    const confettis = () => page.evaluate(() => (window as any).jeu.scene.getScene("course-arrivee").children.list
+      .filter((o: any) => typeof o.getAliveParticleCount === "function")
+      .reduce((n: number, o: any) => n + o.getAliveParticleCount(), 0) as number);
+
+    // Un record imbattable : pas de fête
+    await poserUnRecord(page, 0.01);
+    await mode(page, "chrono");
+    await attendreScene(page, "course-circuits");
+    await appuyer(page, "Enter");
+    await attendreLeDepart(page);
+    await finirLaCourse(page);
+    await attendreScene(page, "course-arrivee");
+    await page.waitForTimeout(400);
+    expect(await confettis()).toBe(0);
+
+    // Un record facile à battre : la fête
+    await poserUnRecord(page, 999);
+    await page.waitForTimeout(1100);
+    await appuyer(page, "r");
+    await attendreLeDepart(page);
+    await finirLaCourse(page);
+    await attendreScene(page, "course-arrivee");
+    expect(await page.evaluate(() => (window as any).jeu.scene.getScene("course-piste").nouveauRecord)).toBe(true);
+    await page.waitForFunction(() => (window as any).jeu.scene.getScene("course-arrivee").children.list
+      .some((o: any) => typeof o.getAliveParticleCount === "function" && o.getAliveParticleCount() > 0));
+
+    // Pas encore de record sur ce circuit : le premier temps est fêté aussi
+    await page.evaluate(() => localStorage.removeItem("course/licornes/record/coeur"));
+    await page.waitForTimeout(1100);
+    await appuyer(page, "r");
+    await attendreLeDepart(page);
+    await finirLaCourse(page);
+    await attendreScene(page, "course-arrivee");
+    expect(await page.evaluate(() => (window as any).jeu.scene.getScene("course-piste").premierTemps)).toBe(true);
+    await page.waitForFunction(() => (window as any).jeu.scene.getScene("course-arrivee").children.list
+      .some((o: any) => typeof o.getAliveParticleCount === "function" && o.getAliveParticleCount() > 0));
+    sansErreur();
+  });
+
+  test("contre la montre : le point du fantôme quitte la petite carte quand son tour est fini", async ({ page }) => {
+    const { sansErreur } = await menu(page, "licornes");
+    // Un fantôme qui ne court qu'une seconde
+    await poserUnRecord(page, 1, [{ t: 0, x: 500, y: 500, angle: 0 }, { t: 1, x: 600, y: 500, angle: 0 }]);
+    await mode(page, "chrono");
+    await attendreScene(page, "course-circuits");
+    await appuyer(page, "Enter");
+    await attendreLeDepart(page);
+    const pointVisible = () => page.evaluate(() => (window as any).jeu.scene.getScene("course-tableau").points
+      .find((p: any) => p.coureur === null).rond.visible as boolean);
+    expect(await pointVisible()).toBe(true);
+    await page.waitForFunction(() => !(window as any).jeu.scene.getScene("course-tableau").points
+      .find((p: any) => p.coureur === null).rond.visible, null, { timeout: 10_000 });
+    expect(await page.evaluate(() => (window as any).jeu.scene.getScene("course-piste").enCourse)).toBe(true);
+    sansErreur();
+  });
+
   test("les bonus : l'étoile et son turbo, l'orage qui étourdit, le bonbon qui rend géante", async ({ page }) => {
     const { sansErreur } = await menu(page, "licornes");
     await mode(page, "chrono");
@@ -735,8 +857,23 @@ test.describe("les licornes", () => {
       await page.waitForTimeout(200);
       expect((await course(page)).tactile.droite).toBe(false);
 
-      await toucher(page, 480, 32);        // la pause
+      // Le pouce reste sur ▶ pendant qu'un autre doigt touche la pause, et se lève pendant la pause
+      const pause = await versLaPage(page, 480, 32);
+      await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x: droite.x, y: droite.y, id: 1 }] });
+      await page.waitForTimeout(200);
+      await cdp.send("Input.dispatchTouchEvent", {
+        type: "touchStart", touchPoints: [{ x: droite.x, y: droite.y, id: 1 }, { x: pause.x, y: pause.y, id: 2 }],
+      });
+      await page.waitForTimeout(100);
+      // Le deuxième doigt se lève, seul : la pause
+      await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [{ x: pause.x, y: pause.y, id: 2 }] });
       await attendreScene(page, "course-pause");
+      await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+      await page.waitForTimeout(200);
+      await toucher(page, 375, 305);       // « Reprendre »
+      await page.waitForFunction(() => !(window as any).jeu.scene.isPaused("course-piste"));
+      await page.waitForTimeout(300);
+      expect((await course(page)).tactile.droite).toBe(false);   // la licorne ne tourne pas toute seule
       sansErreur();
     });
   });

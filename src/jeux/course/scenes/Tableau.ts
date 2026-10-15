@@ -186,6 +186,11 @@ export class Tableau extends Phaser.Scene {
         }
       },
     });
+    // En pause, la scène n'entend plus les doigts : un pouce levé pendant la pause resterait posé.
+    // On lâche tout à la pause ; au retour, on ne tient que ce qu'on touche à nouveau.
+    const toutLacher = () => doigts.toutLacher();
+    this.events.on(Phaser.Scenes.Events.PAUSE, toutLacher);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.events.off(Phaser.Scenes.Events.PAUSE, toutLacher));
     for (const commande of COMMANDES) {
       const { x, y, rayon } = commande;
       const rond = this.add.circle(x, y, rayon, 0xffffff, c.alphaCommande).setStrokeStyle(3, 0xffffff, 0.9);
@@ -282,7 +287,8 @@ export class Tableau extends Phaser.Scene {
         rond.setPosition(this.carte.x + coureur.x * this.carte.echelleX, this.carte.y + coureur.y * this.carte.echelleY);
       } else {
         const ombre = course.fantome[course.fantomeIndex];
-        rond.setVisible(course.enCourse && ombre !== undefined);
+        // Le fantôme a fini son tour quand il disparaît de la piste : son point aussi
+        rond.setVisible(course.enCourse && ombre !== undefined && course.ombre?.objet.visible === true);
         if (ombre) {
           rond.setPosition(this.carte.x + ombre.x * this.carte.echelleX, this.carte.y + ombre.y * this.carte.echelleY);
         }

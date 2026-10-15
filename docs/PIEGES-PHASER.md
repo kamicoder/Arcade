@@ -45,7 +45,9 @@ bugs de Phaser : c'est sa façon de faire, logique une fois qu'on la connaît, m
 - Les sons ne sont pas des objets de la scène : les détruire à son `SHUTDOWN`. Idem pour les écouteurs
   posés sur une **autre** scène, ou sur les événements de la scène elle-même (`this.events`), qui
   survivent à son arrêt : préférer sa méthode `update()`.
-- Une scène en pause n'entend plus le clavier : une touche lâchée pendant la pause reste « tenue ».
+- Une scène en pause n'entend plus le clavier : une touche lâchée pendant la pause reste « tenue ». Ni
+  les doigts : un pouce levé pendant la pause reste posé sur son bouton (`BoutonsAuDoigt.toutLacher()`
+  à l'événement `PAUSE` de la scène, comme le tableau de bord de la course).
 
 **Le son**
 
