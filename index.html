@@ -14,8 +14,17 @@
   <link rel="apple-touch-icon" href="icones/icone-180.png">
   <style>
     html, body { margin: 0; height: 100%; background: #14121c; overflow: hidden; }
-    /* Phaser met son canvas dans #jeu et l'agrandit lui-même (voir scale dans main.ts) */
-    #jeu { width: 100vw; height: 100vh; height: 100dvh; }
+    /* Phaser met son canvas dans #jeu et l'agrandit lui-même (voir scale dans main.ts).
+       Collé aux bords de l'écran plutôt qu'en 100vh / 100dvh : installée en plein écran sur Android,
+       la page reçoit des vh plus hauts que l'écran et le bas du jeu était coupé. Les env() laissent
+       libres l'encoche de la caméra et la barre des gestes (viewport-fit=cover les rend non nulles). */
+    #jeu {
+      position: fixed;
+      top: env(safe-area-inset-top, 0px);
+      right: env(safe-area-inset-right, 0px);
+      bottom: env(safe-area-inset-bottom, 0px);
+      left: env(safe-area-inset-left, 0px);
+    }
     /* Un téléphone tenu debout : on demande de le tourner */
     #tourne {
       display: none; position: fixed; inset: 0; z-index: 10;
