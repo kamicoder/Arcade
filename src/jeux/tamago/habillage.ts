@@ -45,3 +45,29 @@ export const habillage = NEON;
 export const CONSOLE = { x: 480, y: 284, rx: 340, ry: 262 };
 export const ECRAN = { x: 280, y: 92, largeur: 400, hauteur: 252 };
 export const CENTRE_ECRAN = { x: ECRAN.x + ECRAN.largeur / 2, y: ECRAN.y + ECRAN.hauteur / 2 };
+
+// La place qu'il faut de chaque côté de la console pour y mettre les boutons
+const COTES_AU_DOIGT = 230;
+// L'écran agrandi, quand les boutons sont sur les côtés : il prend la place libérée en bas de la
+// console, sans sortir de l'œuf (plus étroit en haut), et tout ce qu'il montre grandit d'autant
+const GRAND_ECRAN = { y: 100, largeur: 480, hauteur: 330 };
+const GRANDE_ECHELLE = 1.2;
+
+// Les mêmes, au milieu d'un jeu élargi au doigt (socle/largeur.ts) : chaque scène les demande d'après
+// this.scale.width. La console garde sa taille. Si les côtés gagnés sont assez larges, les boutons y
+// passent (Ecran.ts) et l'écran de la console grandit (« cotes » ; « echelle » : la taille de ce qu'il montre).
+export function places(largeur: number) {
+  const dx = Math.round((largeur - 960) / 2);
+  const console = { ...CONSOLE, x: CONSOLE.x + dx };
+  const cotes = console.x - console.rx >= COTES_AU_DOIGT;
+  const ecran = cotes
+    ? { ...GRAND_ECRAN, x: console.x - GRAND_ECRAN.largeur / 2 }
+    : { ...ECRAN, x: ECRAN.x + dx };
+  return {
+    console,
+    ecran,
+    centre: { x: ecran.x + ecran.largeur / 2, y: ecran.y + ecran.hauteur / 2 },
+    cotes,
+    echelle: cotes ? GRANDE_ECHELLE : 1,
+  };
+}

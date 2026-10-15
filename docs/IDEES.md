@@ -60,6 +60,11 @@ qui ne va pas suffit, on ajuste.
 - Les mines en chaîne : une douzaine de « boum » aigus et doux. Un par mine, ou des clics ?
 - Un drapeau posé à la manette fait-il vibrer la manette ?
 
+**Tamago**
+- Le rythme : 1 an pour 3 min 45 (quatre fois plus vite qu'avant), un adulte à 16 min, une vie de 45 min à 1 h 15. Encore plus vite, ou les stades plus courts que la vie ?
+- Avec ce rythme, une surprise arrive toutes les 30 s à 1 min 15 (les appels, eux, attendent toujours 1 min avant l'oubli). Des surprises plus rares ?
+- Sans jouer souvent, la maladie « trop de friandises » est presque inévitable (à rejuger avec le nouveau rythme).
+
 ## Les défauts repérés (à vérifier, puis corriger)
 
 ### Communs à plusieurs jeux
@@ -75,18 +80,6 @@ qui ne va pas suffit, on ajuste.
 - Le menu ne tient pas plus de 8 niveaux : des pages, quand un 9e arrivera.
 - Un tir s'arrête au calme, ou au bout de 20 s (un bloc qui glisserait sans fin sur la glace) : à juger.
 
-### Tamago (et écarts avec `REGLES.md`)
-Le Tamago est une ébauche : on le laisse de côté pour l'instant, ces notes attendent qu'on y revienne.
-- La variante gentille : REGLES.md dit 75 % de discipline, le code veut 0 %, 75 % puis 100 %.
-- La maladie épargne le bébé, les surprises aussi : REGLES.md ne le dit pas, et se contredit sur leur fréquence.
-- Le jeu ne fait pas perdre de poids sous le poids de base, et donne des points Joyeux même perdu.
-- REGLES.md dit de taper le ROI CACA : il n'est pas touchable.
-- Le Carnet peut annoncer une autre lignée que celle qui gagnera (égalité).
-- Le journal et l'album peuvent déborder en bas de l'écran.
-- Un caprice qui glisse après la fin du stade est perdu.
-- Revenir pendant l'éclosion : « Encore un peu ! » et l'œuf ne tremble plus.
-- M ne coupe pas le son pendant le Carnet ou le jeu (l'écran est en pause).
-- À juger en jouant : sans jouer souvent, la maladie « trop de friandises » est presque inévitable.
 
 ## Course (voitures et licornes)
 
@@ -180,8 +173,7 @@ Le Tamago est une ébauche : on le laisse de côté pour l'instant, ces notes at
 ## Tamago
 
 **Finition**
-- Un cœur perdu se voit (S).
-- Son humeur sur lui : malade, fatigué, comblé (S/M).
+- Son humeur sur lui : fatigué (il bâille), et pas seulement malade ou comblé (S).
 - Une évolution façon silhouette (S).
 
 **Contenu**
@@ -190,18 +182,7 @@ Le Tamago est une ébauche : on le laisse de côté pour l'instant, ces notes at
 - Des répliques par caractère (S).
 - Un second petit jeu (M).
 
-**Au doigt et à la manette**
-- Pendant un appel, le bon bouton bat (S).
-- Toucher les crottes et le ROI CACA (S).
-- Des boutons plus grands au téléphone (M).
-- Une aide des touches (S).
-
 **Modes**
 - Le thème Rétro, prévu dans REGLES.md (L).
 - Des surprises à jouer : l'aigle, les bonbons (M).
 - Une vie express (M).
-
-## Plusieurs jeux à la fois
-
-Des idées revenues d'un jeu à l'autre, qui iraient au socle :
-- **`elargir` là où il manque** : Tamago.

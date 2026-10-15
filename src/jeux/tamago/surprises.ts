@@ -2,7 +2,7 @@
 // Leurs effets se comptent en cœurs, comme le reste. Un visiteur rejoint le carnet d'amis.
 
 import type { Etat } from "./vie";
-import { COEURS } from "./reglages";
+import { COEURS, CROTTES_MAX } from "./reglages";
 
 export interface Surprise {
   id: string;
@@ -35,7 +35,7 @@ export const SURPRISES: Surprise[] = [
   {
     id: "invasion", emoji: "💩", annonce: "Invasion de cacas !", replique: "Ce n'est pas moi. Enfin, pas tout.",
     effet: (e) => {
-      for (let i = 0; i < 2 && e.crottes.length < 4 && e.roiCaca === null; i++) {
+      for (let i = 0; i < 2 && e.crottes.length < CROTTES_MAX && e.roiCaca === null; i++) {
         e.crottes.push(0);
       }
     },

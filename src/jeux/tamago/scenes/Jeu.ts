@@ -6,8 +6,9 @@
 import Phaser from "phaser";
 import type { Ecran } from "./Ecran";
 import { formeDe } from "../vie";
-import { habillage as h, ECRAN, CENTRE_ECRAN } from "../habillage";
+import { habillage as h, places } from "../habillage";
 import { surTouche } from "../../../socle/clavier";
+import { toucheDuSon } from "../../../socle/son";
 import { surManette, MANETTE } from "../../../socle/manette";
 import { boutonFermer } from "../../../socle/boutonArcade";
 
@@ -21,6 +22,7 @@ export class Jeu extends Phaser.Scene {
   private creature!: Phaser.GameObjects.Text;
   private titre!: Phaser.GameObjects.Text;
   private score!: Phaser.GameObjects.Text;
+  private centre = places(960).centre;     // le milieu de l'écran de la console (le jeu peut être élargi)
 
   constructor() {
     super("tamago-jeu");
@@ -32,22 +34,25 @@ export class Jeu extends Phaser.Scene {
     this.gagnees = 0;
     this.attend = false;
     this.fini = false;
+    const { ecran: ECRAN, centre: CENTRE_ECRAN, echelle } = places(this.scale.width);
+    const taille = (n: number) => Math.round(n * echelle) + "px";
+    this.centre = CENTRE_ECRAN;
 
     // Un fond qui recouvre l'écran de la console
     this.add.rectangle(ECRAN.x + 3, ECRAN.y + 3, ECRAN.largeur - 6, ECRAN.hauteur - 6, h.ecran.fond).setOrigin(0);
     this.titre = this.add.text(CENTRE_ECRAN.x, ECRAN.y + 26, "", {
-      fontFamily: h.pixel, fontSize: "11px", color: h.ecran.texte, align: "center",
+      fontFamily: h.pixel, fontSize: taille(11), color: h.ecran.texte, align: "center",
     }).setOrigin(0.5);
     this.score = this.add.text(CENTRE_ECRAN.x, ECRAN.y + ECRAN.hauteur - 22, "", {
-      fontFamily: h.police, fontSize: "18px", color: h.ecran.texte,
+      fontFamily: h.police, fontSize: taille(18), color: h.ecran.texte,
     }).setOrigin(0.5);
-    this.creature = this.add.text(CENTRE_ECRAN.x, CENTRE_ECRAN.y + 40, formeDe(ecran.etat).emoji, { fontSize: "72px", padding: { top: 10 } })
+    this.creature = this.add.text(CENTRE_ECRAN.x, CENTRE_ECRAN.y + 40, formeDe(ecran.etat).emoji, { fontSize: taille(72), padding: { top: 10 } })
       .setOrigin(0.5, 1);
 
     // Les deux flèches : à toucher, ou ← →
     for (const [cote, x] of [["gauche", ECRAN.x + 60], ["droite", ECRAN.x + ECRAN.largeur - 60]] as const) {
       const fleche = this.add.text(x, CENTRE_ECRAN.y + 10, cote === "gauche" ? "◀" : "▶", {
-        fontFamily: h.police, fontSize: "54px", color: h.accent,
+        fontFamily: h.police, fontSize: taille(54), color: h.accent,
       }).setOrigin(0.5).setPadding(16).setInteractive({ useHandCursor: true });
       fleche.on("pointerup", () => this.deviner(cote));
     }
@@ -58,13 +63,15 @@ export class Jeu extends Phaser.Scene {
     surManette(this, MANETTE.GAUCHE, () => this.deviner("gauche"));
     surManette(this, MANETTE.DROITE, () => this.deviner("droite"));
     surManette(this, MANETTE.B, () => this.arreter());
+    // M coupe le son ici aussi : l'écran, en pause dessous, n'entend plus le clavier
+    toucheDuSon(this, "tamago", () => ecran.montrerLeSon());
     this.mancheSuivante();
   }
 
   private mancheSuivante() {
     this.manche++;
     this.attend = true;
-    this.creature.setX(CENTRE_ECRAN.x).setFlipX(false);
+    this.creature.setX(this.centre.x).setFlipX(false);
     this.titre.setText(`MANCHE ${this.manche}/${MANCHES}\nGAUCHE OU DROITE ?`);
     this.score.setText("Gagnées : " + "⭐".repeat(this.gagnees) + "▫️".repeat(MANCHES - this.gagnees));
   }
@@ -82,7 +89,7 @@ export class Jeu extends Phaser.Scene {
       this.gagnees++;
     }
     this.creature.setFlipX(regarde === "droite");
-    this.tweens.add({ targets: this.creature, x: CENTRE_ECRAN.x + (regarde === "gauche" ? -50 : 50), duration: 200 });
+    this.tweens.add({ targets: this.creature, x: this.centre.x + (regarde === "gauche" ? -50 : 50), duration: 200 });
     this.sound.play(gagne ? "tamago-joie" : "tamago-non", { volume: 0.6 });
     this.titre.setText(gagne ? "GAGNÉ !" : "RATÉ !");
     this.score.setText("Gagnées : " + "⭐".repeat(this.gagnees) + "▫️".repeat(MANCHES - this.gagnees));

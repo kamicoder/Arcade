@@ -11,6 +11,7 @@ export interface Souvenir {
   emoji: string;
   caractere: string;
   ans: number;
+  age?: number;                            // son âge en temps de jeu (absent des souvenirs d'avant les mois)
   fin: Fin;
   date: string;                            // le jour de son départ, « 14/10/2026 »
 }
@@ -32,7 +33,7 @@ export function album(): Souvenir[] {
 export function garderEnSouvenir(e: Etat) {
   const forme = formeDe(e);
   const souvenir: Souvenir = {
-    nom: forme.nom, emoji: forme.emoji, caractere: forme.caractere, ans: ageEnAnnees(e), fin: e.fin ?? "vieillesse",
+    nom: forme.nom, emoji: forme.emoji, caractere: forme.caractere, ans: ageEnAnnees(e), age: e.age, fin: e.fin ?? "vieillesse",
     date: new Date().toLocaleDateString("fr-FR"),
   };
   ecrire(ALBUM, [souvenir, ...album()]);

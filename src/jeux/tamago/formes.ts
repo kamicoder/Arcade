@@ -72,10 +72,14 @@ export function forme(stade: Stade, lignee: Lignee | null, variante: Variante | 
 // La lignée d'après les points du stade : la plus nourrie l'emporte. À égalité, celle d'avant reste si
 // elle en est ; sinon, le hasard choisit (un Tamago dont on ne s'est pas occupé n'est pas toujours Gourmand).
 export function ligneeGagnante(points: Record<Lignee, number>, avant: Lignee | null, hasard: () => number): Lignee {
+  const possibles = penchants(points, avant);
+  return possibles[Math.floor(hasard() * possibles.length)];
+}
+
+// Les lignées qu'il peut encore prendre, d'après les points d'aujourd'hui : une seule si c'est joué, plusieurs
+// si le hasard devra choisir entre elles. Le Carnet le montre tel quel (« hésite entre... »).
+export function penchants(points: Record<Lignee, number>, avant: Lignee | null): Lignee[] {
   const meilleur = Math.max(...LIGNEES.map((lignee) => points[lignee]));
   const aEgalite = LIGNEES.filter((lignee) => points[lignee] === meilleur);
-  if (avant && aEgalite.includes(avant)) {
-    return avant;
-  }
-  return aEgalite[Math.floor(hasard() * aEgalite.length)];
+  return avant && aEgalite.includes(avant) ? [avant] : aEgalite;
 }

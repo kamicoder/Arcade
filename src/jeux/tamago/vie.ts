@@ -11,7 +11,7 @@ import {
   MALADE_DES_CROTTES, ROI_CACA_APRES, ROI_CACA_VIE, OUBLI_APRES, CAPRICE_DUREE, DOSES_MIN, DOSES_MAX,
   PART_SI_MALADE, PART_SI_VENTRE_VIDE, OEUF_TAPES, OEUF_ECLOSION, DUREE_STADE, LEGENDE_A, VIE_MAX, VIE_MIN,
   OUBLI_RACCOURCIT, CAPRICES, DISCIPLINE_GENTIL, OUBLIS_GENTIL, POIDS, SURPRISE_MIN, SURPRISE_MAX,
-  CARESSE_COMPTE, JOURNAL_MAX, MINUTE, SECONDE, UN_AN,
+  CARESSE_COMPTE, JOURNAL_MAX, SECONDE, UN_AN, UN_MOIS, BIENTOT, MALADIE_ADULTE_DANS, DISCIPLINE_MAX,
 } from "./reglages";
 import { forme, ligneeGagnante, LIGNEES, type Stade, type Lignee, type Variante, type Forme } from "./formes";
 import { SURPRISES, type Surprise } from "./surprises";
@@ -21,7 +21,7 @@ export type RaisonDAppel = "ventre" | "moral" | "caprice";
 export type Fin = "vieillesse" | "faim" | "maladie";
 
 export interface Etat {
-  version: 1;
+  version: 2;                              // 2 : le rythme ×4 (octobre 2026) ; une version 1 est convertie (relire)
   stade: Stade;
   lignee: Lignee | null;
   variante: Variante | null;
@@ -78,7 +78,7 @@ const pointsAZero = (): Record<Lignee, number> => ({ gourmand: 0, joyeux: 0, pro
 
 export function nouvelEtat(hasard: Hasard = Math.random): Etat {
   return {
-    version: 1, stade: "oeuf", lignee: null, variante: null, legende: false, tapes: 0, eclosion: null,
+    version: 2, stade: "oeuf", lignee: null, variante: null, legende: false, tapes: 0, eclosion: null,
     age: 0, dansLeStade: 0, ventre: 0, moral: 0, avantPerteVentre: PERTE_VENTRE, avantPerteMoral: PERTE_MORAL,
     discipline: 0, poids: POIDS.bebe, crottes: [], avantCrotte: entre(hasard, CROTTE_MIN, CROTTE_MAX),
     roiCaca: null, quatreCrottesDepuis: 0, saleDepuis: 0, malade: 0, maladeDepuis: 0, maladieDuStade: null,
@@ -94,6 +94,29 @@ export function formeDe(e: Etat): Forme {
 
 export function ageEnAnnees(e: Etat): number {
   return Math.floor(e.age / UN_AN);
+}
+
+// L'âge à lire : en mois la première année (« 3 mois »), puis en ans (« 1 an », « 2 ans »)
+export function ageEnTexte(age: number): string {
+  if (age < UN_AN) {
+    const mois = Math.floor(age / UN_MOIS);
+    return mois === 0 ? "nouveau-né" : `${mois} mois`;
+  }
+  const ans = Math.floor(age / UN_AN);
+  return ans > 1 ? `${ans} ans` : "1 an";
+}
+
+// Où il en est de son stade : la part déjà faite (de 0 à 1), et s'il grandit bientôt. L'œuf compte
+// ses tapes (puis éclot bientôt) ; l'adulte a fini de grandir : rien.
+export function avantDeGrandir(e: Etat): { fait: number; bientot: boolean } | null {
+  if (e.stade === "oeuf") {
+    return { fait: e.eclosion !== null ? 1 : e.tapes / OEUF_TAPES, bientot: e.eclosion !== null };
+  }
+  if (e.stade === "adulte") {
+    return null;
+  }
+  const fait = Math.min(1, e.dansLeStade / DUREE_STADE[e.stade]);
+  return { fait, bientot: fait >= BIENTOT };
 }
 
 // L'âge où il repartira sur sa planète : chaque oubli raccourcit sa vie
@@ -223,7 +246,7 @@ function unPas(e: Etat, pas: number, hasard: Hasard, ev: Evenement[]) {
     grandir(e, hasard);
     ev.push({ type: "evolution", forme: formeDe(e) });
   }
-  if (e.stade === "adulte" && !e.legende && e.oublis === 0 && e.discipline === 4 && e.age >= LEGENDE_A) {
+  if (e.stade === "adulte" && !e.legende && e.oublis === 0 && e.discipline === DISCIPLINE_MAX && e.age >= LEGENDE_A) {
     e.legende = true;
     noter(e, `🌟 Il est devenu une légende : ${formeDe(e).nom} !`);
     ev.push({ type: "evolution", forme: formeDe(e) });
@@ -297,10 +320,13 @@ function commencerLeStade(e: Etat, stade: Stade, hasard: Hasard) {
   e.oublisDuStade = 0;
   e.points = pointsAZero();
   e.poids = Math.max(e.poids, poidsDeBase(stade));
-  // Les caprices et la maladie du stade tombent à des moments au hasard, pas dans les premières minutes
-  const duree = stade === "adulte" ? 60 * MINUTE : DUREE_STADE[stade as keyof typeof DUREE_STADE];
-  e.caprices = Array.from({ length: CAPRICES[stade as keyof typeof CAPRICES] ?? 0 }, () => entre(hasard, 0.15, 0.85) * duree)
-    .sort((a, b) => a - b);
+  // Les caprices et la maladie du stade tombent à des moments au hasard, pas dès le début du stade
+  const duree = stade === "adulte" ? MALADIE_ADULTE_DANS : DUREE_STADE[stade as keyof typeof DUREE_STADE];
+  // Un caprice du stade d'avant qui n'a pas pu venir (il appelait déjà, ou il était malade) n'est pas
+  // perdu : il vient tôt dans le nouveau stade, sinon sa discipline serait fichue sans qu'on y puisse rien
+  const enRetard = e.caprices.map(() => entre(hasard, 0.05, 0.15) * duree);
+  const nouveaux = Array.from({ length: CAPRICES[stade as keyof typeof CAPRICES] ?? 0 }, () => entre(hasard, 0.15, 0.85) * duree);
+  e.caprices = [...enRetard, ...nouveaux].sort((a, b) => a - b);
   e.maladieDuStade = stade === "bebe" ? null : entre(hasard, 0.2, 0.8) * duree;
 }
 
@@ -402,12 +428,26 @@ export function nettoyer(e: Etat): Reponse {
     return { ok: true, detail: "roi-vaincu" };
   }
   if (e.crottes.length === 0) return { ok: false, refus: "rien-a-nettoyer" };
-  // Une crotte nettoyée vite compte double pour la lignée Propre
   for (const age of e.crottes) {
-    e.points.propre += age < CROTTE_FRAICHE ? 2 : 1;
+    pointsDeLaCrotte(e, age);
   }
   e.crottes = [];
   return { ok: true };
+}
+
+// Une seule crotte, la n° i (on l'a touchée)
+export function nettoyerUne(e: Etat, i: number): Reponse {
+  const non = vivant(e);
+  if (non) return non;
+  if (i < 0 || i >= e.crottes.length) return { ok: false, refus: "rien-a-nettoyer" };
+  pointsDeLaCrotte(e, e.crottes[i]);
+  e.crottes.splice(i, 1);
+  return { ok: true };
+}
+
+// Une crotte nettoyée vite compte double pour la lignée Propre
+function pointsDeLaCrotte(e: Etat, age: number) {
+  e.points.propre += age < CROTTE_FRAICHE ? 2 : 1;
 }
 
 export function soigner(e: Etat): Reponse {
@@ -427,7 +467,7 @@ export function gronder(e: Etat): Reponse {
   if (non) return non;
   if (e.appel?.raison === "caprice") {
     e.appel = null;
-    e.discipline = Math.min(4, e.discipline + 1);
+    e.discipline = Math.min(DISCIPLINE_MAX, e.discipline + 1);
     return { ok: true };
   }
   e.moral = Math.max(0, e.moral - 1);    // grondé pour rien : il est vexé
@@ -452,14 +492,37 @@ export function relire(sauvegarde: unknown): Etat | null {
   if (!sauvegarde || typeof sauvegarde !== "object") {
     return null;
   }
-  const e = sauvegarde as Partial<Etat>;
-  if (e.version !== 1 || typeof e.stade !== "string" || !Array.isArray(e.crottes) || !e.points || e.fin) {
+  const lu = sauvegarde as Omit<Partial<Etat>, "version"> & { version?: number };
+  if ((lu.version !== 1 && lu.version !== 2) || typeof lu.stade !== "string" || !Array.isArray(lu.crottes) || !lu.points || lu.fin) {
     return null;
   }
   for (const lignee of LIGNEES) {
-    if (typeof e.points[lignee] !== "number") {
+    if (typeof lu.points[lignee] !== "number") {
       return null;
     }
   }
-  return { ...nouvelEtat(), ...e, derniereCaresse: e.derniereCaresse ?? -Infinity } as Etat;
+  const e = (lu.version === 1 ? auNouveauRythme(lu as Partial<Etat>) : lu) as Partial<Etat>;
+  // derniereCaresse vaut -Infinity, que JSON écrit null
+  return { ...nouvelEtat(), ...e, version: 2, derniereCaresse: e.derniereCaresse ?? -Infinity } as Etat;
+}
+
+// Une sauvegarde de la version 1 a vécu au premier rythme, quatre fois plus lent : toutes les durées de
+// sa vie sont divisées par 4, pour qu'il continue là où il en était (le même âge affiché, le même
+// moment du stade). L'éclosion, à la vitesse de celui qui regarde, ne change pas.
+const ANCIEN_RYTHME = 4;
+
+function auNouveauRythme(e: Partial<Etat>): Partial<Etat> {
+  const d = (duree: number | undefined) => (typeof duree === "number" ? duree / ANCIEN_RYTHME : duree);
+  return {
+    ...e,
+    age: d(e.age), dansLeStade: d(e.dansLeStade), avantPerteVentre: d(e.avantPerteVentre),
+    avantPerteMoral: d(e.avantPerteMoral), avantCrotte: d(e.avantCrotte), quatreCrottesDepuis: d(e.quatreCrottesDepuis),
+    saleDepuis: d(e.saleDepuis), maladeDepuis: d(e.maladeDepuis), ventreVideDepuis: d(e.ventreVideDepuis),
+    derniereCaresse: d(e.derniereCaresse ?? undefined), avantSurprise: d(e.avantSurprise),
+    maladieDuStade: e.maladieDuStade === null ? null : d(e.maladieDuStade),
+    crottes: e.crottes?.map((age) => age / ANCIEN_RYTHME),
+    caprices: e.caprices?.map((moment) => moment / ANCIEN_RYTHME),
+    appel: e.appel ? { ...e.appel, depuis: e.appel.depuis / ANCIEN_RYTHME } : e.appel,
+    journal: e.journal?.map((ligne) => ({ ...ligne, age: ligne.age / ANCIEN_RYTHME })),
+  };
 }
