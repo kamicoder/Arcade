@@ -1,11 +1,11 @@
 import { test, expect, type Page } from "@playwright/test";
 import {
   ouvrir, appuyer, attendreScene, scenesActives, versLaPage, toucher, toucherLaCarte, ouvrirLaCarte, manette, manetteAToutes,
-  attendreLaPause, quitterParLaPause,
+  attendreLaPause, quitterParLaPause, tailleDuJeu,
 } from "./outils";
 import { faisable } from "./faisable";
 import { Generateur } from "../src/jeux/platformer/generateur";
-import { SAUT_MEMORISE } from "../src/jeux/platformer/reglages";
+import { SAUT_MEMORISE, ZOOM } from "../src/jeux/platformer/reglages";
 import type { Niveau as DonneesDuNiveau, Element } from "../src/jeux/platformer/elements";
 
 // Les niveaux de l'Aventure, dans l'ordre
@@ -84,13 +84,14 @@ test("l'Aventure : on court, on finit le premier niveau au drapeau, et le deuxi�
   expect(await scenesActives(page)).toEqual(["platformer-niveau", "platformer-tableau"]);
   expect(await niveau(page)).toMatchObject({ mode: "aventure", numero: 0, nom: "Premiers pas", vies: 3 });
 
-  // Espace fait sauter (une frappe brève suffit), la flèche fait courir.
+  // Espace fait sauter (tenu : le saut entier), la flèche fait courir.
   // On saute au départ : un peu plus loin, la première plateforme est juste au-dessus de la tête.
   await page.waitForTimeout(400);
   const depart = await niveau(page);
-  await page.keyboard.press("Space");
+  await page.keyboard.down("Space");
   await page.waitForTimeout(150);
   expect((await niveau(page)).y).toBeLessThan(depart.y - 30);
+  await page.keyboard.up("Space");
   await page.keyboard.down("ArrowRight");
   await page.waitForTimeout(400);
   await page.keyboard.up("ArrowRight");
@@ -771,7 +772,8 @@ test.describe("au doigt", () => {
     await toucherLaCarte(page, "platformer");
     await attendreScene(page, "platformer-menu");
     expect(await page.evaluate(() => (window as any).jeu.scene.getScene("platformer-menu").boutons[3].possible)).toBe(false);
-    await toucher(page, 480, 150);         // « Aventure »
+    const { largeur } = await tailleDuJeu(page);
+    await toucher(page, largeur / 2, 150); // « Aventure »
     await attendreScene(page, "platformer-niveau");
     await page.waitForTimeout(400);
     const depart = await niveau(page);
@@ -785,7 +787,7 @@ test.describe("au doigt", () => {
     expect((await niveau(page)).x).toBeGreaterThan(depart.x + 60);
 
     // Un deuxième doigt sur ▲ : il saute, sans lâcher ▶
-    const saut = await versLaPage(page, 862, 440);
+    const saut = await versLaPage(page, largeur - 98, 440);   // ▲, sous le pouce droit
     await cdp.send("Input.dispatchTouchEvent", {
       type: "touchStart", touchPoints: [{ x: droite.x, y: droite.y, id: 1 }, { x: saut.x, y: saut.y, id: 2 }],
     });
@@ -803,14 +805,15 @@ test.describe("au doigt", () => {
     const { sansErreur } = await ouvrir(page);
     await toucherLaCarte(page, "platformer");
     await attendreScene(page, "platformer-menu");
-    await toucher(page, 480, 150);         // « Aventure »
+    const { largeur } = await tailleDuJeu(page);
+    await toucher(page, largeur / 2, 150); // « Aventure »
     await attendreScene(page, "platformer-niveau");
     await page.waitForTimeout(400);
 
     // Le ⏸, en haut à droite, sous la barre ; « Reprendre », le premier bouton de la pause
-    await toucher(page, 916, 80);
+    await toucher(page, largeur - 44, 80);
     await attendreLaPause(page);
-    await toucher(page, 480, 230);
+    await toucher(page, largeur / 2, 230);
     await page.waitForFunction(() => (window as any).jeu.scene.isActive("platformer-niveau"));
     await page.waitForTimeout(300);        // la pause ne se rouvre pas aussitôt fermée
 
@@ -825,7 +828,7 @@ test.describe("au doigt", () => {
     expect((await niveau(page)).tactile.droite).toBe(true);
     await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
     await page.waitForTimeout(100);
-    await toucher(page, 480, 230);
+    await toucher(page, largeur / 2, 230);
     await page.waitForFunction(() => (window as any).jeu.scene.isActive("platformer-niveau"));
     await page.waitForTimeout(100);
     const arret = await niveau(page);
@@ -834,7 +837,60 @@ test.describe("au doigt", () => {
     expect((await niveau(page)).x).toBeCloseTo(arret.x, 0);
     sansErreur();
   });
+
+  // socle/largeur.ts : sur un téléphone en 20/9, plus de bandes noires, on voit plus de niveau
+  test("au doigt, le platformer prend toute la largeur du téléphone : le menu, le niveau, le tableau, l'éditeur", async ({ page }) => {
+    const { sansErreur } = await ouvrir(page);
+    expect(await tailleDuJeu(page)).toEqual({ largeur: 960, hauteur: 540 });
+    await toucherLaCarte(page, "platformer");
+    await attendreScene(page, "platformer-menu");
+    const largeur = Math.round(540 * 844 / 390);
+    expect((await tailleDuJeu(page)).largeur).toBe(largeur);
+    expect((await page.locator("canvas").boundingBox())!.width).toBeCloseTo(844, 0);
+    expect(await page.evaluate(() => (window as any).jeu.scene.getScene("platformer-menu").boutons[0].fond.x)).toBe(largeur / 2);
+
+    await toucher(page, largeur / 2, 150); // « Aventure »
+    await attendreScene(page, "platformer-niveau");
+    await attendreScene(page, "platformer-tableau");
+    const vu = await page.evaluate(() => {
+      const jeu = (window as any).jeu;
+      const n = jeu.scene.getScene("platformer-niveau");
+      const t = jeu.scene.getScene("platformer-tableau");
+      return {
+        camera: n.cameras.main.width as number,
+        monde: n.cameras.main.worldView.width as number,
+        tableau: t.cameras.main.width as number,
+        saut: t.ronds.get("saut").x as number,
+        gauche: t.ronds.get("gauche").x as number,
+      };
+    });
+    expect(vu.camera).toBe(largeur);
+    expect(vu.monde).toBeCloseTo(largeur / ZOOM, 0);   // plus que 960 / ZOOM : on voit plus loin
+    expect(vu.tableau).toBe(largeur);
+    expect(vu.saut).toBe(largeur - 98);    // ▲ au bord droit, sous le pouce ; ◀ au bord gauche
+    expect(vu.gauche).toBe(88);
+
+    // Une vie perdue au doigt : le téléphone vibrerait (ici, rien ne plante)
+    await page.evaluate(() => (window as any).jeu.scene.getScene("platformer-niveau").mourir());
+    await attendreLeNiveau(page, "n.enJeu && n.donnees.vies === 2");
+
+    // L'éditeur aussi : sa zone du niveau prend la largeur en plus
+    await quitterParLaPause(page);
+    await attendreScene(page, "platformer-menu");
+    await toucher(page, largeur / 2, 380); // « Éditeur de niveaux »
+    await attendreScene(page, "platformer-editeur");
+    expect(await page.evaluate(() => (window as any).jeu.scene.getScene("platformer-editeur").cameras.main.width)).toBe(largeur - 212);
+
+    // De retour à l'Arcade, le jeu reprend ses 960 de large
+    await page.evaluate(() => (window as any).jeu.scene.getScene("platformer-editeur").scene.start("platformer-menu"));
+    await attendreScene(page, "platformer-menu");
+    await appuyer(page, "Escape");
+    await attendreScene(page, "Hub");
+    expect(await tailleDuJeu(page)).toEqual({ largeur: 960, hauteur: 540 });
+    sansErreur();
+  });
 });
+
 
 // Un niveau d'essai, joué comme le bouton Tester de l'éditeur le ferait
 async function jouerUnEssai(page: Page, elements: Element[], largeur = 2000) {
@@ -950,6 +1006,11 @@ test("le saut qui pardonne : un appui juste avant de toucher le sol fait sauter 
     expect(appui).toBeLessThan(saut);      // l'appui, entendu en l'air, sans saut possible...
     expect(notes[appui]).toMatchObject({ sol: false, sauts: 0 });
     expect(notes[saut].sol).toBe(true);    // ... fait sauter en touchant le sol, sans nouvel appui
+    // La touche était lâchée bien avant : c'est quand même un saut entier, pas le petit bond d'une frappe
+    // (le saut court ne raccourcit qu'un saut dont la touche est encore là)
+    await page.waitForFunction(() => (window as any).jeu.scene.getScene("platformer-niveau").heros.body.velocity.y >= 0);
+    const sommet = await page.evaluate(() => (window as any).jeu.scene.getScene("platformer-niveau").heros.body.bottom as number);
+    expect(440 - sommet).toBeGreaterThan(100);
     break;
   }
   sansErreur();
@@ -988,4 +1049,113 @@ test("l'Infini : pièces et ennemis seulement sur les plateformes qui ne bougent
   for (const e of poses) {
     expect(sousLui(e)).toMatchObject({ sorte: "plateforme", genre: "normale" });
   }
+});
+
+// ================================================================ La pause et les décomptes
+
+// this.time.now continue pendant la pause : un décompte qui s'en servait finissait pendant qu'on ne jouait pas
+test("la pause arrête aussi l'invincibilité du boss, qui reprend avec le jeu", async ({ page }) => {
+  const { sansErreur } = await menuPlatformer(page);
+  await choisirLeMode(page, 0, "platformer-niveau");
+  await page.evaluate(() => {
+    const n = (window as any).jeu.scene.getScene("platformer-niveau");
+    n.scene.restart({ ...n.donnees, numero: n.donnees.niveaux.length - 1 });
+  });
+  await attendreLeNiveau(page, "n.monde.boss !== null && n.enJeu");
+
+  // Un coup sur la tête : il devient invincible un court instant (500 ms)...
+  await page.evaluate(() => {
+    const n = (window as any).jeu.scene.getScene("platformer-niveau");
+    const b = n.monde.boss;
+    n.heros.body.reset(b.x, b.body.top - 40);
+    n.heros.body.setVelocityY(300);
+  });
+  await page.waitForFunction(() => (window as any).jeu.scene.getScene("platformer-niveau").monde.boss.invincible);
+  // ... et la pause s'ouvre aussitôt (Échap), pour deux fois ce temps
+  await appuyer(page, "Escape");
+  await attendreLaPause(page);
+  await page.waitForTimeout(1000);
+  expect(await page.evaluate(() => (window as any).jeu.scene.getScene("platformer-niveau").monde.boss.invincible)).toBe(true);
+
+  // La reprise : le reste de son invincibilité s'écoule, puis il redevient vulnérable
+  await appuyer(page, "Escape");
+  await page.waitForFunction(() => (window as any).jeu.scene.isActive("platformer-niveau"));
+  await page.waitForFunction(() => {
+    const boss = (window as any).jeu.scene.getScene("platformer-niveau").monde.boss;
+    return !boss || !boss.invincible;
+  });
+  sansErreur();
+});
+
+test("la pause arrête aussi le clignotement de la deuxième chance (l'Infini)", async ({ page }) => {
+  const { sansErreur } = await menuPlatformer(page);
+  await choisirLeMode(page, 2, "platformer-niveau");
+  await page.evaluate(() => {
+    (window as any).jeu.scene.getScene("platformer-niveau").donnees.vies = 3;
+  });
+  await poserLeHeros(page, 300, 600);      // tombé dans le vide : une deuxième chance, intouchable une seconde
+  await attendreLeNiveau(page, "n.enJeu && n.donnees.vies === 2 && n.intouchable");
+  await appuyer(page, "Escape");
+  await attendreLaPause(page);
+  await page.waitForTimeout(1500);
+  expect(await page.evaluate(() => (window as any).jeu.scene.getScene("platformer-niveau").intouchable)).toBe(true);
+  await appuyer(page, "Escape");
+  await page.waitForFunction(() => (window as any).jeu.scene.isActive("platformer-niveau"));
+  await page.waitForFunction(() => !(window as any).jeu.scene.getScene("platformer-niveau").intouchable);
+  sansErreur();
+});
+
+// ================================================================ Les sensations
+
+// La plus grande hauteur atteinte par le héros, mesurée à chaque image, pendant un saut fait par « sauter »
+async function hauteurDuSaut(page: Page, sauter: () => Promise<void>): Promise<number> {
+  await page.evaluate(() => {
+    const n = (window as any).jeu.scene.getScene("platformer-niveau");
+    n.depart = n.heros.body.y;
+    n.plusHaut = n.heros.body.y;
+    if (!n.mesurer) {
+      n.mesurer = () => (n.plusHaut = Math.min(n.plusHaut, n.heros.body.y));
+      n.events.on("postupdate", n.mesurer);
+    }
+  });
+  await sauter();
+  // Il est parti, puis il est retombé
+  await page.waitForFunction(() => {
+    const n = (window as any).jeu.scene.getScene("platformer-niveau");
+    return n.plusHaut < n.depart - 5 && n.heros.getData("auSol");
+  });
+  return page.evaluate(() => {
+    const n = (window as any).jeu.scene.getScene("platformer-niveau");
+    return n.depart - n.plusHaut;
+  });
+}
+
+test("le saut court : lâcher la touche tôt saute moins haut que la tenir", async ({ page }) => {
+  const { sansErreur } = await menuPlatformer(page);
+  await jouerUnEssai(page, [sol(0, 2000), { sorte: "depart", x: 300, y: 400 }, { sorte: "drapeau", x: 1950, y: 400 }]);
+
+  // Tenue jusqu'au haut du saut : le saut entier (environ 130 pixels)
+  const entier = await hauteurDuSaut(page, async () => {
+    await page.keyboard.down("Space");
+    await page.waitForFunction(() => (window as any).jeu.scene.getScene("platformer-niveau").heros.body.velocity.y > 0);
+    await page.keyboard.up("Space");
+  });
+  // Une frappe brève : un petit bond
+  const court = await hauteurDuSaut(page, () => page.keyboard.press("Space"));
+  expect(entier).toBeGreaterThan(115);
+  expect(court).toBeGreaterThan(10);
+  expect(court).toBeLessThan(entier * 0.6);
+  sansErreur();
+});
+
+test("gagner, c'est une fête : des confettis au drapeau, et la caméra s'approche", async ({ page }) => {
+  const { sansErreur } = await menuPlatformer(page);
+  await jouerUnEssai(page, [sol(0, 2000), { sorte: "depart", x: 300, y: 400 }, { sorte: "drapeau", x: 600, y: 400 }]);
+  await allerAuDrapeau(page);
+  await page.waitForFunction((zoom) => {
+    const n = (window as any).jeu.scene.getScene("platformer-niveau");
+    return n.confettis.getAliveParticleCount() > 20 && n.cameras.main.zoom > zoom * 1.05;
+  }, ZOOM);
+  await attendreScene(page, "platformer-fin");
+  sansErreur();
 });

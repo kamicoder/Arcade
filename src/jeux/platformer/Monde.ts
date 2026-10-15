@@ -37,7 +37,10 @@ export interface Reactions {
   touche?: () => void;                     // un ennemi, le boss, la lave : aïe
   bossTouche?: (boss: Boss) => void;
   drapeau?: () => void;
+  rebond?: () => void;                     // un ressort l'a lancé
 }
+
+const CHUTE_QUI_SONNE = 700;               // une arrivée au sol plus rapide que ça (pixels par seconde) s'entend
 
 export class Monde {
   largeur = 0;
@@ -48,6 +51,7 @@ export class Monde {
   readonly ennemis: Phaser.GameObjects.Group;
   boss: Boss | null = null;
   drapeau: Phaser.Types.Physics.Arcade.ImageWithStaticBody | null = null;
+  drapeauVu: Phaser.GameObjects.Image | null = null;   // l'image du drapeau, qui ondule (voir ajouterUnObjet)
   private zones: Zone[] = [];
   private qui: { heros: Heros; reactions: Reactions } | null = null;
   private dejaTeleporte = false;           // arrivé sur un téléporteur, on attend d'en être sorti pour repartir
@@ -136,10 +140,16 @@ export class Monde {
       case "boss":
         this.boss = new Boss(this.scene, e, this.dy);
         break;
-      case "drapeau":
+      case "drapeau": {
+        // Le corps et l'image à part : l'image ondule (elle s'étire depuis son mât), le corps ne bouge pas
         this.drapeau = this.scene.physics.add.staticImage(e.x + 8, y + 20, "platformer-drapeau");
-        this.drapeau.setDisplaySize(16, 40).refreshBody();
+        this.drapeau.setDisplaySize(16, 40).refreshBody().setVisible(false);
+        const mat = 2.5 / 16;              // le mât, à gauche de l'image
+        const vu = this.scene.add.image(e.x + 16 * mat, y + 40, "platformer-drapeau").setOrigin(mat, 1).setDisplaySize(16, 40);
+        this.scene.tweens.add({ targets: vu, scaleX: vu.scaleX * 0.8, duration: 550, yoyo: true, repeat: -1, ease: "Sine.InOut" });
+        this.drapeauVu = vu;
         break;
+      }
       case "depart":
         this.depart = { x: e.x, y: e.y };
         break;
@@ -182,7 +192,7 @@ export class Monde {
     // Il tombe, et ses pieds arrivent par le haut de l'ennemi : écrasé ! Sinon, c'est le héros qui est touché.
     if (corps.velocity.y > 0 && corps.bottom - ennemi.body.top < ECRASER + corps.velocity.y / IMAGES) {
       ennemi.ecraser();
-      corps.setVelocityY(REBOND_ECRASE);
+      heros.lance(REBOND_ECRASE);
       this.qui!.reactions.ecrase?.(ennemi);
     } else {
       this.qui!.reactions.touche?.();
@@ -197,7 +207,7 @@ export class Monde {
     }
     if (corps.velocity.y > 0 && corps.bottom - boss.body.top < ECRASER_BOSS + corps.velocity.y / IMAGES) {
       boss.toucher();
-      corps.setVelocityY(SAUT);            // sur le boss, un vrai saut : on s'en éloigne
+      this.qui!.heros.lance(SAUT);         // sur le boss, un vrai saut : on s'en éloigne
       this.qui!.reactions.bossTouche?.(boss);
     } else {
       this.qui!.reactions.touche?.();
@@ -260,6 +270,9 @@ export class Monde {
     const etaitEnLAir = !heros.getData("auSol");
     terrain.atterrit = etaitEnLAir && sol !== null;
     heros.setData("auSol", sol !== null);
+    // Sa vitesse à l'image d'avant : posé, il ne tombe plus, c'est avant qu'il tombait vite
+    const chute = heros.getData("chute") ?? 0;
+    heros.setData("chute", c.velocity.y);
 
     if (sol && this.mobiles.contains(sol)) {
       terrain.poussee = (sol.body as Phaser.Physics.Arcade.Body).velocity.x;   // une plateforme mobile le porte
@@ -282,6 +295,7 @@ export class Monde {
         c.setVelocityY(REBONDS[zone.force]);   // boing !
         terrain.rebond = true;
         this.scene.sound.play("platformer-saut", { rate: 0.8 });
+        this.qui?.reactions.rebond?.();
         this.scene.tweens.add({ targets: zone.objet, scaleY: 0.7, duration: 70, yoyo: true });
       } else if (dessus && zone.effet === "tapis") {
         terrain.poussee += TAPIS[zone.force] * zone.sens;
@@ -302,6 +316,10 @@ export class Monde {
     }
     if (terrain.atterrit && c.velocity.y >= 0) {
       this.poussiere.explode(8, c.center.x, c.bottom);   // un nuage de poussière sous ses pieds
+      if (chute > CHUTE_QUI_SONNE && !terrain.rebond) {
+        // Un « poc » sourd : le son du boss, plus aigu et tout bas (on n'entend pas chaque petit pas)
+        this.scene.sound.play("platformer-boss", { rate: 1.5, volume: 0.25 });
+      }
     }
     return terrain;
   }
@@ -314,7 +332,10 @@ export class Monde {
     zone.objet.setData("ecroule", true);
     const x = zone.objet.x;
     this.scene.tweens.add({ targets: zone.objet, x: x + 2, duration: 40, yoyo: true, repeat: -1 });
+    // Elle craque (le « aïe », bien plus aigu et bref), puis tombe dans un bruit sourd
+    this.scene.sound.play("platformer-aie", { rate: 2.6, volume: 0.35 });
     this.scene.time.delayedCall(ECROULEMENTS[zone.force], () => {
+      this.scene.sound.play("platformer-boss", { rate: 0.8, volume: 0.3 });
       this.scene.tweens.killTweensOf(zone.objet);
       zone.objet.x = x;
       zone.objet.body.enable = false;
@@ -381,5 +402,7 @@ export class Monde {
     this.boss = null;
     this.drapeau?.destroy();
     this.drapeau = null;
+    this.drapeauVu?.destroy();
+    this.drapeauVu = null;
   }
 }

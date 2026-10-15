@@ -86,7 +86,9 @@ export class Ennemi extends Phaser.Physics.Arcade.Sprite {
 export class Boss extends Phaser.Physics.Arcade.Sprite {
   declare body: Phaser.Physics.Arcade.Body;
   hp: number;
-  private invincibleJusqua = 0;
+  // Juste après un coup, il ne craint rien. Une minuterie de la scène, pas l'heure (time.now) : elle
+  // attend pendant la pause, avec la scène.
+  invincible = false;
   private xmin: number;
   private xmax: number;
   private barres: Phaser.GameObjects.Image[] = [];
@@ -108,10 +110,6 @@ export class Boss extends Phaser.Physics.Arcade.Sprite {
     scene.tweens.add({ targets: this, scaleX: 1.06, scaleY: 0.94, duration: 400, yoyo: true, repeat: -1, ease: "Sine.InOut" });
   }
 
-  get invincible(): boolean {
-    return this.scene.time.now < this.invincibleJusqua;
-  }
-
   avancer() {
     const c = this.body;
     if (c.left <= this.xmin) {
@@ -125,7 +123,8 @@ export class Boss extends Phaser.Physics.Arcade.Sprite {
   // Un coup sur la tête : une vie de moins, et un court instant d'invincibilité où il clignote
   toucher() {
     this.hp--;
-    this.invincibleJusqua = this.scene.time.now + INVINCIBLE_BOSS;
+    this.invincible = true;
+    this.scene.time.delayedCall(INVINCIBLE_BOSS, () => (this.invincible = false));
     this.barres.pop()?.destroy();
     this.setTint(0xffffff).setTintMode(Phaser.TintModes.FILL);
     this.scene.tweens.add({

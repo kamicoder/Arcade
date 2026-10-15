@@ -54,6 +54,11 @@ export class Commandes {
     });
   }
 
+  // La manette de ce joueur (celle qui vibre quand il est touché), s'il en a une
+  get manette(): Phaser.Input.Gamepad.Gamepad | null {
+    return (this.joueur === "j2" ? this.scene.input.gamepad?.pad2 : this.scene.input.gamepad?.pad1) ?? null;
+  }
+
   lire(): Entrees {
     const tenue = (codes: string[]) => codes.some((code) => this.tenues.tenue(code));
     const e: Entrees = {
@@ -64,7 +69,7 @@ export class Commandes {
     };
     this.appuiEnAttente = false;
     // La manette : la croix ou le stick gauche pour courir, A (ou B) pour sauter
-    const manette = this.joueur === "j2" ? this.scene.input.gamepad?.pad2 : this.scene.input.gamepad?.pad1;
+    const manette = this.manette;
     if (manette) {
       e.gauche ||= manette.left || manette.leftStick.x < -0.4;
       e.droite ||= manette.right || manette.leftStick.x > 0.4;

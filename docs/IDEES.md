@@ -70,18 +70,11 @@ Le Tamago est une ébauche : on le laisse de côté pour l'instant, ces notes at
 
 ## Platformer
 
-**Finition**
-- Un saut court si on lâche la touche tôt (S).
-- Gagner, c'est une fête : confettis, drapeau qui ondule, zoom (S).
-- Une caméra qui regarde devant (S).
-- Les sons qui manquent : atterrissage, fragile, drapeau, double saut (S).
-
 **Contenu**
 - Un Infini qui se transforme avec la distance (M).
 - Un boss qui change quand il est blessé (M).
 
 **Au doigt et à la manette**
-- Le téléphone en entier avec `elargir` (M).
 - Toute la moitié droite de l'écran pour sauter (S).
 
 **Modes**
@@ -165,5 +158,5 @@ Le Tamago est une ébauche : on le laisse de côté pour l'instant, ces notes at
 ## Plusieurs jeux à la fois
 
 Des idées revenues d'un jeu à l'autre, qui iraient au socle :
-- **Les vibrations** (manette et téléphone) : baston, course, catapulte.
-- **`elargir` là où il manque** : platformer, catapulte, course, démineur, Tamago.
+- **Les vibrations** (manette et téléphone) : course.
+- **`elargir` là où il manque** : course, démineur, Tamago.

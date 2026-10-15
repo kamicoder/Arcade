@@ -3,6 +3,9 @@
 // les plafonds (seuls les murs qui barrent le passage). Les sauts, eux, suivent la physique du héros
 // (reglages.ts), simulée ici pas à pas. La difficulté se juge en jouant ; ceci vérifie seulement qu'un
 // niveau de départ n'est pas impossible.
+// Les sauts sont des sauts complets : la touche tenue (lâchée tôt, le saut court monte moins, SAUT_COURT).
+// Pour le double saut, le joueur la lâche puis la renfonce : le saut d'avant n'est raccourci que pendant
+// ce bref instant, que le nouveau saut efface (il repart à pleine vitesse). On n'en tient pas compte.
 
 import { VITESSE, GRAVITE, SAUT, REBONDS, CHUTE_MAX } from "../src/jeux/platformer/reglages";
 import type { Element, Niveau, Rect } from "../src/jeux/platformer/elements";

@@ -1,13 +1,14 @@
 // Le tableau de bord : une scène lancée par-dessus le niveau (ou le duo). Sa caméra ne bouge pas :
 // le score, les vies et les commandes au doigt restent à leur place pendant que le monde défile.
 // Il lit l'état du jeu à chaque image (update), plutôt que d'écouter chaque changement.
+// Tout se place d'après la largeur du jeu (this.scale.width) : au doigt, elle dépasse 960 (socle/largeur.ts).
 
 import Phaser from "phaser";
 import type { Niveau } from "./Niveau";
 import type { Duo } from "./Duo";
 import type { Entrees } from "../Heros";
 import { OBJECTIF_DUO } from "../reglages";
-import { LARGEUR, HAUTEUR, POLICE } from "../../../socle/style";
+import { HAUTEUR, POLICE } from "../../../socle/style";
 import { estTactile } from "../../../socle/tactile";
 import { BoutonsAuDoigt } from "../../../socle/doigts";
 import { boutonPause } from "../../../socle/pause";
@@ -15,11 +16,12 @@ import { annoncer } from "../../../socle/annonce";
 
 type Action = keyof Entrees;
 
-// Les commandes au doigt, en paysage : courir avec le pouce gauche, sauter avec le pouce droit
-const COMMANDES: { action: Action; x: number; y: number; rayon: number; icone: string }[] = [
+// Les commandes au doigt, en paysage : courir avec le pouce gauche, sauter avec le pouce droit. Chacune se
+// compte depuis son bord (« droite » : x depuis le bord droit), pour rester sous le pouce quelle que soit la largeur.
+const COMMANDES: { action: Action; x: number; y: number; rayon: number; icone: string; aDroite?: boolean }[] = [
   { action: "gauche", x: 88, y: 452, rayon: 62, icone: "◀" },
   { action: "droite", x: 236, y: 452, rayon: 62, icone: "▶" },
-  { action: "saut", x: 862, y: 440, rayon: 74, icone: "▲" },
+  { action: "saut", x: 98, y: 440, rayon: 74, icone: "▲", aDroite: true },
 ];
 
 export class Tableau extends Phaser.Scene {
@@ -43,19 +45,20 @@ export class Tableau extends Phaser.Scene {
     this.ronds.clear();
     this.doigts = undefined;
 
-    this.add.rectangle(0, 0, LARGEUR, 40, 0x000000, 0.45).setOrigin(0);
+    const largeur = this.scale.width;
+    this.add.rectangle(0, 0, largeur, 40, 0x000000, 0.45).setOrigin(0);
     const style = { fontFamily: POLICE, fontSize: "19px", fontStyle: "bold", color: "#ffffff" };
     this.texte = this.add.text(16, 20, "", style).setOrigin(0, 0.5);
-    this.viesEnPlus = this.add.text(LARGEUR - 66, 20, "", style).setOrigin(1, 0.5);
+    this.viesEnPlus = this.add.text(largeur - 66, 20, "", style).setOrigin(1, 0.5);
 
     // La pause, en haut à droite (elle propose de revenir au menu, ou à l'éditeur). Au doigt, le bouton
     // est plus grand que la barre : il se met dessous.
     const auDoigt = estTactile();
-    boutonPause(this, LARGEUR - (auDoigt ? 44 : 26), auDoigt ? 80 : 20, () => (this.niveau ?? this.duo)!.ouvrirLaPause());
+    boutonPause(this, largeur - (auDoigt ? 44 : 26), auDoigt ? 80 : 20, () => (this.niveau ?? this.duo)!.ouvrirLaPause());
 
     if (this.duo) {
-      this.add.rectangle(LARGEUR / 2, HAUTEUR / 2, 4, HAUTEUR, 0x14141e);   // le trait entre les deux moitiés
-      this.texte2 = this.add.text(LARGEUR / 2 + 16, 20, "", { ...style, color: "#ffb070" }).setOrigin(0, 0.5);
+      this.add.rectangle(largeur / 2, HAUTEUR / 2, 4, HAUTEUR, 0x14141e);   // le trait entre les deux moitiés
+      this.texte2 = this.add.text(largeur / 2 + 16, 20, "", { ...style, color: "#ffb070" }).setOrigin(0, 0.5);
       this.texte.setColor("#8cc8ff");
     } else {
       this.annoncer();
@@ -89,7 +92,8 @@ export class Tableau extends Phaser.Scene {
     const doigts = new BoutonsAuDoigt<Action>(this, { quandChange: (tenues) => this.recompterLesDoigts(tenues) });
     this.doigts = doigts;
     for (const commande of COMMANDES) {
-      const { x, y, rayon } = commande;
+      const { y, rayon } = commande;
+      const x = commande.aDroite ? this.scale.width - commande.x : commande.x;
       const rond = this.add.circle(x, y, rayon, 0xffffff, 0.16).setStrokeStyle(3, 0xffffff, 0.6);
       this.add.text(x, y, commande.icone, { fontFamily: POLICE, fontSize: Math.round(rayon * 0.7) + "px", color: "#ffffff" })
         .setOrigin(0.5).setAlpha(0.85);
@@ -127,8 +131,9 @@ export class Tableau extends Phaser.Scene {
 
   // Un cœur par vie, de droite à gauche ; au-delà de 6, « + n »
   private montrerLesVies(vies: number) {
+    const droite = this.scale.width - 72;
     while (this.coeurs.length < Math.min(vies, 6)) {
-      const coeur = this.add.image(LARGEUR - 72 - this.coeurs.length * 28, 20, "platformer-coeur");
+      const coeur = this.add.image(droite - this.coeurs.length * 28, 20, "platformer-coeur");
       // Une vie gagnée : le cœur arrive en grossissant
       coeur.setScale(0);
       this.tweens.add({ targets: coeur, scale: 1, duration: 300, ease: "Back.Out" });
@@ -137,6 +142,6 @@ export class Tableau extends Phaser.Scene {
     while (this.coeurs.length > Math.min(vies, 6)) {
       this.coeurs.pop()!.destroy();
     }
-    this.viesEnPlus.setText(vies > 6 ? "+" + (vies - 6) : "").setX(LARGEUR - 72 - 6 * 28 + 10);
+    this.viesEnPlus.setText(vies > 6 ? "+" + (vies - 6) : "").setX(droite - 6 * 28 + 10);
   }
 }

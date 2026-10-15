@@ -62,5 +62,10 @@ export function fabriquerTextures(scene: Phaser.Scene) {
   // Une barre de vie du boss
   g.fillStyle(0xffd246).fillRect(0, 0, 18, 8);
   g.generateTexture("platformer-vie-boss", 18, 8);
+  g.clear();
+
+  // Un confetti : un petit rectangle blanc, que les particules teintent (la fête du drapeau)
+  g.fillStyle(0xffffff).fillRect(0, 0, 8, 4);
+  g.generateTexture("platformer-confetti", 8, 4);
   g.destroy();
 }

@@ -4,7 +4,7 @@
 
 import Phaser from "phaser";
 import type { Rect } from "./elements";
-import { VITESSE, SAUT, NAGE, GRAVITE, CHUTE_DANS_L_EAU, CHUTE_MAX, SAUT_MEMORISE } from "./reglages";
+import { VITESSE, SAUT, SAUT_COURT, NAGE, GRAVITE, CHUTE_DANS_L_EAU, CHUTE_MAX, SAUT_MEMORISE } from "./reglages";
 
 export interface Entrees {
   gauche: boolean;
@@ -26,6 +26,8 @@ export class Heros extends Phaser.Physics.Arcade.Sprite {
   declare body: Phaser.Physics.Arcade.Body;
   sauts = 2;                               // les sauts qui lui restent : le double saut
   aSaute = false;                          // vient-il de sauter ? (le son, la poussière)
+  doubleSaut = false;                      // ... et c'était son dernier saut, en l'air (un son à part)
+  private sautEnCours = false;             // il monte d'un saut à lui : lâcher la touche le raccourcit
   private sautAvant = false;               // le saut était-il déjà tenu à l'image d'avant ?
   private elan = 0;                        // sa vitesse de côté (sur la glace, elle change doucement)
   envieDeSauter = 0;                       // un appui de saut encore valable pendant tant de secondes (le saut mémorisé)
@@ -43,6 +45,7 @@ export class Heros extends Phaser.Physics.Arcade.Sprite {
   avancer(entrees: Entrees, terrain: Terrain, duree: number) {
     const corps = this.body;
     this.aSaute = false;
+    this.doubleSaut = false;
     if (terrain.auSol) {
       this.sauts = 2;                      // au sol, on récupère ses deux sauts
     }
@@ -84,12 +87,28 @@ export class Heros extends Phaser.Physics.Arcade.Sprite {
         corps.setVelocityY(SAUT);
         this.sauts--;
         this.aSaute = true;
+        this.doubleSaut = this.sauts === 0;
+        // Raccourcissable seulement si la touche est encore là (tenue, ou une frappe de cette image). Un saut
+        // mémorisé dont la touche est déjà lâchée part entier : sinon, l'appui un peu trop tôt qu'il
+        // pardonne ne donnerait plus qu'un petit bond.
+        this.sautEnCours = entrees.saut || !!entrees.appui;
       }
       if (this.aSaute) {
         this.envieDeSauter = 0;
       }
     }
     this.sautAvant = entrees.saut;
+
+    // Le saut court : la touche lâchée pendant la montée, il monte moins vite, donc moins haut. Tenue, le
+    // saut reste entier. On attend l'image d'après le saut : une frappe plus brève qu'une image fait un petit bond.
+    if (this.sautEnCours) {
+      if (corps.velocity.y >= 0 || terrain.eau || terrain.rebond) {
+        this.sautEnCours = false;          // il redescend, ou autre chose l'a lancé
+      } else if (!entrees.saut && !this.aSaute) {
+        corps.velocity.y = Math.max(corps.velocity.y, SAUT_COURT);
+        this.sautEnCours = false;
+      }
+    }
 
     // Dans l'eau, on coule doucement : la moitié de la gravité, et jamais vite
     if (terrain.eau) {
@@ -110,6 +129,14 @@ export class Heros extends Phaser.Physics.Arcade.Sprite {
   poserA(x: number, y: number) {
     this.body.reset(x, y - this.body.height / 2);
     this.elan = 0;
+    this.sautEnCours = false;
+  }
+
+  // Lancé vers le haut par autre chose que son saut (un ennemi ou le boss écrasé) : lâcher la touche ne
+  // raccourcit pas ce rebond
+  lance(vitesse: number) {
+    this.body.setVelocityY(vitesse);
+    this.sautEnCours = false;
   }
 }
 

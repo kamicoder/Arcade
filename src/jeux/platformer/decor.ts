@@ -27,12 +27,14 @@ function dessinerDesCollines(scene: Phaser.Scene, cle: string, couleur: number, 
   g.destroy();
 }
 
+// Elles ont la largeur du jeu (plus de 960 au doigt, voir socle/largeur.ts)
 export function creerLeDecor(scene: Phaser.Scene): Phaser.GameObjects.TileSprite[] {
+  const largeur = scene.scale.width;
   dessinerDesCollines(scene, "platformer-collines-loin", 0x30364a, 260, 2);
   dessinerDesCollines(scene, "platformer-collines-pres", 0x363e56, 200, 3);
   return [
-    scene.add.tileSprite(0, 250, 960, 264, "platformer-collines-loin").setOrigin(0).setScrollFactor(0).setDepth(-10).setData("vitesse", 0.15),
-    scene.add.tileSprite(0, 330, 960, 204, "platformer-collines-pres").setOrigin(0).setScrollFactor(0).setDepth(-9).setData("vitesse", 0.35),
+    scene.add.tileSprite(0, 250, largeur, 264, "platformer-collines-loin").setOrigin(0).setScrollFactor(0).setDepth(-10).setData("vitesse", 0.15),
+    scene.add.tileSprite(0, 330, largeur, 204, "platformer-collines-pres").setOrigin(0).setScrollFactor(0).setDepth(-9).setData("vitesse", 0.35),
   ];
 }
 

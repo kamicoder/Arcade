@@ -10,6 +10,7 @@ import Phaser from "phaser";
 import type { Niveau as DonneesDuNiveau } from "../elements";
 import { Monde } from "../Monde";
 import { Heros } from "../Heros";
+import { CameraDevant } from "../camera";
 import { Commandes } from "../commandes";
 import { Generateur } from "../generateur";
 import { Genres } from "../genres";
@@ -24,6 +25,8 @@ import { lire, ecrire } from "../../../socle/sauvegarde";
 import { toucheDuSon } from "../../../socle/son";
 import { fonduPuis } from "../../../socle/retour";
 import { mettreEnPause } from "../../../socle/pause";
+import { elargir } from "../../../socle/largeur";
+import { vibrer } from "../../../socle/vibration";
 
 export type Mode = "aventure" | "infini" | "test";
 
@@ -60,10 +63,14 @@ export class Niveau extends Phaser.Scene {
   private fini = false;                    // la fin est affichée : elle a ses boutons, la pause n'a plus de sens
   private auDebut = { score: 0, pieces: 0 };   // le score et les pièces au début du niveau
   private viesGagnees = 0;                 // les vies gagnées avec les pièces de ce niveau
-  intouchableJusqua = 0;                   // l'Infini : après une deuxième chance, les ennemis ne le touchent pas jusque-là
+  // L'Infini : après une deuxième chance, les ennemis ne le touchent pas, le temps qu'il clignote. Une
+  // minuterie de la scène, pas l'heure (time.now) : elle attend pendant la pause.
+  intouchable = false;
   private generateur: Generateur | null = null;
   private genres!: Genres;
   private etincelles!: Phaser.GameObjects.Particles.ParticleEmitter;
+  confettis!: Phaser.GameObjects.Particles.ParticleEmitter;   // la fête du drapeau
+  private camera!: CameraDevant;
   private decor: Phaser.GameObjects.TileSprite[] = [];
 
   constructor() {
@@ -76,7 +83,7 @@ export class Niveau extends Phaser.Scene {
     this.donnees = { ...donnees };
     this.auDebut = { score: donnees.score, pieces: donnees.pieces };
     this.viesGagnees = 0;
-    this.intouchableJusqua = 0;
+    this.intouchable = false;
     this.enJeu = true;
     this.quitte = false;
     this.fini = false;
@@ -95,6 +102,9 @@ export class Niveau extends Phaser.Scene {
   }
 
   create() {
+    // Au doigt, le niveau prend toute la largeur du téléphone : on en voit plus. Il la garde jusqu'au
+    // niveau suivant (un téléphone qu'on tourne compte à la prochaine vie).
+    elargir(this);
     this.genres = new Genres(!this.dansLAventure);
     this.monde = new Monde(this, this.genres);
     let largeur: number;
@@ -117,12 +127,14 @@ export class Niveau extends Phaser.Scene {
         this.donnees.score++;
         this.sound.play("platformer-saut", { rate: 1.5 });
         this.etincelles.explode(10, ennemi.x, ennemi.y);
+        vibrer(this, "leger");
       },
       touche: () => {
-        if (this.time.now >= this.intouchableJusqua) {
+        if (!this.intouchable) {
           this.mourir();                   // sauf juste après une deuxième chance, le temps qu'il clignote
         }
       },
+      rebond: () => vibrer(this, "leger"),
       bossTouche: (boss) => this.toucherLeBoss(boss),
       drapeau: () => {
         if (!this.monde.boss) {
@@ -135,15 +147,26 @@ export class Niveau extends Phaser.Scene {
       emitting: false, lifespan: 500, speed: { min: 80, max: 220 }, scale: { start: 1, end: 0 },
       tint: [0xffd23f, 0xffffff, 0xff7a1a],
     }).setDepth(6);
+    // Des confettis, lancés vers le haut, qui retombent en tournoyant
+    this.confettis = this.add.particles(0, 0, "platformer-confetti", {
+      emitting: false, lifespan: 1600, speed: { min: 180, max: 420 }, angle: { min: 235, max: 305 }, gravityY: 500,
+      rotate: { start: 0, end: 540 }, scaleY: { start: 1, end: 0.3 },
+      tint: [0xffd23f, 0x5fd068, 0x3fa8ff, 0xff5a8a, 0xffffff, 0xff7a1a],
+    }).setDepth(7);
 
     // Le monde : des murs à gauche et à droite, mais ni plafond ni plancher (on tombe dans le vide)
     this.physics.world.setBounds(0, -HAUTEUR_MONDE, largeur, 3 * HAUTEUR_MONDE);
     this.physics.world.setBoundsCollision(true, true, false, false);
 
-    // La caméra montre les 480 pixels de haut du monde, agrandis pour remplir l'écran, et suit le héros
+    // La caméra montre les 480 pixels de haut du monde, agrandis pour remplir l'écran, et suit le héros en
+    // regardant devant lui (camera.ts). Un niveau moins large que l'écran (un téléphone allongé, un petit
+    // niveau de l'éditeur) se montre au milieu.
     const camera = this.cameras.main;
-    camera.setBackgroundColor(FOND).setZoom(ZOOM).setBounds(0, 0, largeur, HAUTEUR_MONDE);
-    camera.startFollow(this.heros, true, 0.15, 0.15);
+    const vue = this.scale.width / ZOOM;
+    const marge = Math.max(0, (vue - largeur) / 2);
+    camera.setBackgroundColor(FOND).setZoom(ZOOM).setBounds(-marge, 0, largeur + 2 * marge, HAUTEUR_MONDE);
+    this.camera = new CameraDevant(camera, this.heros);
+    this.camera.suivre();
     camera.fadeIn(300);
 
     this.commandes = new Commandes(this, "seul");
@@ -179,6 +202,7 @@ export class Niveau extends Phaser.Scene {
     }
 
     this.monde.avancer(duree);
+    this.camera.avancer(duree);
     const terrain = this.monde.terrain(this.heros);
     if (terrain.mortel) {
       this.mourir();
@@ -186,7 +210,7 @@ export class Niveau extends Phaser.Scene {
     }
     this.heros.avancer(this.commandes.lire(), terrain, duree);
     if (this.heros.aSaute) {
-      this.sound.play("platformer-saut");
+      this.sound.play("platformer-saut", { rate: this.heros.doubleSaut ? 1.35 : 1 });   // le double saut, plus aigu
     }
     if (this.heros.body.top > HAUTEUR_MONDE) {
       this.mourir();                       // tombé dans le vide
@@ -216,6 +240,7 @@ export class Niveau extends Phaser.Scene {
     // Battu : il explose, et le niveau est gagné un instant plus tard
     this.enJeu = false;
     this.monde.boss = null;
+    vibrer(this, "fort");
     this.cameras.main.flash(300, 255, 255, 255);
     this.etincelles.explode(60, boss.x, boss.y);
     this.tweens.add({ targets: boss, scale: 1.6, alpha: 0, angle: 30, duration: 500, onComplete: () => boss.destroy() });
@@ -229,6 +254,7 @@ export class Niveau extends Phaser.Scene {
     }
     this.enJeu = false;
     this.sound.play("platformer-aie");
+    vibrer(this, "moyen");
     this.cameras.main.shake(200, 0.008);
     const corps = this.heros.body;
     corps.checkCollision.none = true;
@@ -278,9 +304,10 @@ export class Niveau extends Phaser.Scene {
     this.heros.clearTint();
     this.heros.body.checkCollision.none = false;
     this.heros.poserA(proche.x + proche.w / 2, proche.y);
-    this.cameras.main.startFollow(this.heros, true, 0.15, 0.15);
+    this.camera.suivre();
     // Il clignote, et aucun ennemi ne le touche tant qu'il clignote : il a le temps de s'écarter
-    this.intouchableJusqua = this.time.now + INTOUCHABLE;
+    this.intouchable = true;
+    this.time.delayedCall(INTOUCHABLE, () => (this.intouchable = false));
     this.tweens.add({ targets: this.heros, alpha: 0.3, duration: 100, yoyo: true, repeat: Math.round(INTOUCHABLE / 200) - 1 });
     this.enJeu = true;
   }
@@ -291,13 +318,31 @@ export class Niveau extends Phaser.Scene {
     }
     this.enJeu = false;
     const d = this.donnees;
-    this.sound.play("platformer-vie");
+    this.feter();
     this.heros.body.setVelocity(0, SAUT * 0.5);   // un petit saut de joie
     if (d.mode === "aventure" && d.numero < d.niveaux.length - 1) {
       this.time.delayedCall(600, () => fonduPuis(this, () => this.scene.restart({ ...d, numero: d.numero + 1 })));
     } else {
       this.time.delayedCall(400, () => this.finir("gagne"));
     }
+  }
+
+  // Gagner, c'est une fête : des confettis jaillissent du drapeau, il claque au vent, la caméra s'approche
+  // un peu dans un éclair doux, et quatre notes montent (le son de la pièce, de plus en plus aigu : do mi sol do)
+  private feter() {
+    const drapeau = this.monde.drapeauVu;
+    const x = drapeau?.x ?? this.heros.x;
+    const y = drapeau ? drapeau.y - drapeau.displayHeight : this.heros.y;
+    this.confettis.explode(70, x, y);
+    if (drapeau) {
+      this.tweens.killTweensOf(drapeau);
+      this.tweens.add({ targets: drapeau, scaleX: drapeau.scaleX * 0.6, duration: 110, yoyo: true, repeat: -1, ease: "Sine.InOut" });
+    }
+    const camera = this.cameras.main;
+    camera.flash(200, 255, 250, 210);
+    camera.zoomTo(ZOOM * 1.12, 600, Phaser.Math.Easing.Sine.Out);
+    [1, 1.26, 1.5, 2].forEach((rate, i) => this.time.delayedCall(i * 85, () => this.sound.play("platformer-piece", { rate })));
+    this.time.delayedCall(340, () => this.sound.play("platformer-vie"));
   }
 
   private finir(fin: Fin) {

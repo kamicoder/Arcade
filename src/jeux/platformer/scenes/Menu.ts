@@ -10,7 +10,7 @@ import { lettresDuJoueur1 } from "../commandes";
 import { texturePour, ECHELLE_TUILE } from "../textures";
 import { Genres } from "../genres";
 import { FOND, VERT, VIES, SAUVEGARDE, OBJECTIF_DUO } from "../reglages";
-import { LARGEUR, HAUTEUR, POLICE } from "../../../socle/style";
+import { HAUTEUR, POLICE } from "../../../socle/style";
 import { surTouche } from "../../../socle/clavier";
 import { surManette, MANETTE } from "../../../socle/manette";
 import { ListeDeBoutons } from "../../../socle/listeDeBoutons";
@@ -18,6 +18,7 @@ import { estTactile } from "../../../socle/tactile";
 import { retourAuHub, fonduPuis } from "../../../socle/retour";
 import { boutonArcade } from "../../../socle/boutonArcade";
 import { boutonDuSon } from "../../../socle/son";
+import { elargir, suivreLaLargeur } from "../../../socle/largeur";
 
 type Mode = Campagne | "infini" | "duo" | "editeur";
 
@@ -32,12 +33,17 @@ export class Menu extends Phaser.Scene {
   }
 
   create() {
+    // Au doigt, le platformer prend toute la largeur du téléphone (socle/largeur.ts) : tout se place
+    // d'après this.scale.width. Le menu suit l'écran qu'on tourne ; le niveau, lui, garde sa largeur.
+    elargir(this);
+    suivreLaLargeur(this);
+    const largeur = this.scale.width;
     this.parti = false;
     this.cameras.main.setBackgroundColor(FOND).fadeIn(250);
     lancerLaMusique(this);
 
     this.creerDecor();
-    this.add.text(LARGEUR / 2, 70, "Super Platformer", {
+    this.add.text(largeur / 2, 70, "Super Platformer", {
       fontFamily: POLICE, fontSize: "50px", fontStyle: "bold", color: VERT, stroke: "#14121c", strokeThickness: 8,
     }).setOrigin(0.5);
 
@@ -62,13 +68,13 @@ export class Menu extends Phaser.Scene {
         action: () => this.lancer("duo"), possible: !auDoigt,
       },
       { nom: "Éditeur de niveaux", aide: "Dessine tes niveaux, joue-les tout de suite", action: () => this.lancer("editeur") },
-    ], { x: LARGEUR / 2, y: 140, largeur: 440, hauteur: 52, ecart: 60 }, {
+    ], { x: largeur / 2, y: 140, largeur: 440, hauteur: 52, ecart: 60 }, {
       couleur: 0x5fd068, depart: this.choisi, quandChoisi: (i) => (this.choisi = i),
     });
 
-    this.alerte = this.add.text(LARGEUR / 2, 418, "", { fontFamily: POLICE, fontSize: "18px", color: "#f07878" }).setOrigin(0.5);
+    this.alerte = this.add.text(largeur / 2, 418, "", { fontFamily: POLICE, fontSize: "18px", color: "#f07878" }).setOrigin(0.5);
     const aide = auDoigt ? "Touche un mode pour jouer !" : "↑ ↓ : choisir    Entrée : jouer    M : le son    Échap : l'Arcade";
-    this.add.text(LARGEUR / 2, 515, aide, { fontFamily: POLICE, fontSize: "16px", color: "#e9e4f0" }).setOrigin(0.5);
+    this.add.text(largeur / 2, 515, aide, { fontFamily: POLICE, fontSize: "16px", color: "#e9e4f0" }).setOrigin(0.5);
 
     boutonDuSon(this, SAUVEGARDE);
 
@@ -83,17 +89,18 @@ export class Menu extends Phaser.Scene {
 
   // Un sol de tuiles, des pièces qui flottent, et le héros qui se promène : le jeu donne envie
   private creerDecor() {
+    const largeur = this.scale.width;
     const genres = new Genres();
-    this.add.tileSprite(0, HAUTEUR - 70, LARGEUR, 70, texturePour(this, "normale", genres.fiche("normale")))
+    this.add.tileSprite(0, HAUTEUR - 70, largeur, 70, texturePour(this, "normale", genres.fiche("normale")))
       .setOrigin(0).setTileScale(ECHELLE_TUILE * 1.5);
     const heros = this.add.sprite(120, HAUTEUR - 70, "platformer-heros").setOrigin(0.5, 1).setScale(1.5).play("platformer-heros-marche");
     // Un tween qui l'emmène d'un bord à l'autre et le ramène ; il se retourne à chaque bout
     this.tweens.add({
-      targets: heros, x: LARGEUR - 120, duration: 6000, yoyo: true, repeat: -1, ease: "Sine.InOut",
+      targets: heros, x: largeur - 120, duration: 6000, yoyo: true, repeat: -1, ease: "Sine.InOut",
       onYoyo: () => heros.setFlipX(true), onRepeat: () => heros.setFlipX(false),
     });
     for (let k = 0; k < 5; k++) {
-      const piece = this.add.image(140 + k * 170, HAUTEUR - 105, "platformer-piece").setScale(0.75);
+      const piece = this.add.image(140 + k * (largeur - 280) / 4, HAUTEUR - 105, "platformer-piece").setScale(0.75);
       this.tweens.add({ targets: piece, y: piece.y - 10, duration: 700, yoyo: true, repeat: -1, ease: "Sine.InOut", delay: k * 140 });
     }
   }

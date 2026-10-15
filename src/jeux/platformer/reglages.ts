@@ -11,6 +11,9 @@ export const IMAGES = 60;                  // les images par seconde de l'atelie
 export const HAUTEUR_MONDE = 480;
 export const LARGEUR_VUE = 800;            // la fenêtre de l'atelier : un mode infini qui démarre à sa droite
 export const ZOOM = 540 / HAUTEUR_MONDE;   // la caméra agrandit ces 480 pixels pour remplir les 540 de l'Arcade
+// La caméra regarde devant, dans le sens de la course : de cette part de ce qu'elle montre (0.12 : 100
+// pixels du monde sur 850). Elle y glisse doucement (en une demi-seconde environ) quand il se retourne.
+export const AVANCE_CAMERA = 0.12;
 
 // Le héros
 export const VITESSE = 5 * IMAGES;         // 300 pixels par seconde
@@ -26,6 +29,10 @@ export const REBOND_ECRASE = SAUT / 2;     // sauter sur un ennemi fait rebondir
 // manquait, c'est l'autre bout du saut : un appui un peu trop tôt, juste avant de toucher le sol, alors
 // qu'il ne reste plus de saut en l'air. Il est gardé tant de millisecondes : touchant le sol à temps, on saute.
 export const SAUT_MEMORISE = 120;
+// Le saut court : la touche lâchée pendant la montée, il ne monte plus qu'à cette vitesse (s'il allait plus
+// vite). Lâché aussitôt, il saute d'environ 35 pixels ; tenu, le saut complet. Ni le ressort, ni le rebond
+// sur un ennemi ou le boss ne se raccourcissent : ce ne sont pas des sauts du joueur.
+export const SAUT_COURT = SAUT * 0.4;
 
 // La force d'un genre de plateforme (1, 2 ou 3, réglée dans l'éditeur) devient un nombre du jeu
 export const REBONDS = { 1: -19 * IMAGES, 2: -22 * IMAGES, 3: -26 * IMAGES } as Record<number, number>;

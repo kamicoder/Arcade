@@ -32,17 +32,17 @@ import { lancerLaMusique } from "../son";
 import { basculerLeSon, sonAllume } from "../../../socle/son";
 import type { DonneesDeNiveau } from "./Niveau";
 import { FOND, HAUTEUR_MONDE, VIES, SAUVEGARDE } from "../reglages";
-import { LARGEUR, HAUTEUR, POLICE } from "../../../socle/style";
+import { HAUTEUR, POLICE } from "../../../socle/style";
 import { fonduPuis } from "../../../socle/retour";
+import { elargir } from "../../../socle/largeur";
 
 // L'écran de l'éditeur : la barre du haut, le panneau de gauche, la zone du niveau, le niveau en petit
-// (l'aperçu), et la barre du bas
+// (l'aperçu), et la barre du bas. La zone et l'aperçu prennent ce qui reste de la largeur du jeu (plus de
+// 960 au doigt : socle/largeur.ts).
 const HAUT = 44;
 const GAUCHE = 212;
 const BAS = 24;
 const BANDE = 30;
-const ZONE = new Phaser.Geom.Rectangle(GAUCHE, HAUT, LARGEUR - GAUCHE, HAUTEUR - HAUT - BAS - BANDE);
-const APERCU = new Phaser.Geom.Rectangle(GAUCHE, ZONE.bottom, ZONE.width, BANDE);
 const ZOOMS = [0.5, 0.75, 0.92, 1, 1.25, 1.5, 2];   // 0.92 : tout le haut du niveau tient dans la zone
 
 // Ce qu'on peut poser, en plus des plateformes de chaque genre
@@ -83,6 +83,8 @@ export class Editeur extends Phaser.Scene implements PourLesOutils, PourLesFenet
   private dessus!: Phaser.GameObjects.Graphics;
   private grille!: Phaser.GameObjects.Graphics;
   private apercu!: Phaser.GameObjects.Graphics;
+  private readonly zone = new Phaser.Geom.Rectangle();             // là où l'on voit le niveau
+  private readonly cadreDeLApercu = new Phaser.Geom.Rectangle();   // le niveau en petit, dessous
   private barreDuBas!: Phaser.GameObjects.Text;
   private alerte!: Phaser.GameObjects.Text;
   private nomAffiche!: Phaser.GameObjects.Text;
@@ -109,6 +111,12 @@ export class Editeur extends Phaser.Scene implements PourLesOutils, PourLesFenet
   }
 
   create() {
+    // Au doigt, l'éditeur prend lui aussi toute la largeur du téléphone : la zone du niveau s'agrandit.
+    // Elle garde sa largeur jusqu'à la prochaine visite (on ne refait pas l'écran sous le crayon).
+    elargir(this);
+    const largeur = this.scale.width;
+    this.zone.setTo(GAUCHE, HAUT, largeur - GAUCHE, HAUTEUR - HAUT - BAS - BANDE);
+    this.cadreDeLApercu.setTo(GAUCHE, this.zone.bottom, this.zone.width, BANDE);
     this.dessinsDuNiveau = [];
     this.boutons = {};
     this.palette = [];
@@ -121,8 +129,8 @@ export class Editeur extends Phaser.Scene implements PourLesOutils, PourLesFenet
 
     // La caméra principale ne montre que la zone du niveau ; une deuxième, par-dessus, les panneaux
     const vue = this.cameras.main;
-    vue.setViewport(ZONE.x, ZONE.y, ZONE.width, ZONE.height).setBackgroundColor(0x111018);
-    this.ui = this.cameras.add(0, 0, LARGEUR, HAUTEUR);
+    vue.setViewport(this.zone.x, this.zone.y, this.zone.width, this.zone.height).setBackgroundColor(0x111018);
+    this.ui = this.cameras.add(0, 0, largeur, HAUTEUR);
 
     this.grille = this.niveau(this.add.graphics().setDepth(-1));
     this.dessus = this.niveau(this.add.graphics().setDepth(10));
@@ -178,12 +186,12 @@ export class Editeur extends Phaser.Scene implements PourLesOutils, PourLesFenet
     // Ce qui est construit ici sera détruit d'un coup si la palette change (un genre de plus)
     const avant = new Set(this.children.list);
     // Les fonds : en haut, à gauche, en bas
-    this.surLEcran(this.add.rectangle(0, 0, LARGEUR, HAUT, PANNEAU).setOrigin(0));
+    this.surLEcran(this.add.rectangle(0, 0, this.scale.width, HAUT, PANNEAU).setOrigin(0));
     this.surLEcran(this.add.rectangle(0, HAUT, GAUCHE, HAUTEUR - HAUT, PANNEAU).setOrigin(0));
-    this.surLEcran(this.add.rectangle(0, HAUTEUR - BAS, LARGEUR, BAS, 0x16151d).setOrigin(0));
-    this.surLEcran(this.add.rectangle(GAUCHE, HAUT, ZONE.width, ZONE.height + BANDE).setOrigin(0).setStrokeStyle(1, BORD));
+    this.surLEcran(this.add.rectangle(0, HAUTEUR - BAS, this.scale.width, BAS, 0x16151d).setOrigin(0));
+    this.surLEcran(this.add.rectangle(GAUCHE, HAUT, this.zone.width, this.zone.height + BANDE).setOrigin(0).setStrokeStyle(1, BORD));
     this.barreDuBas = this.texte(10, HAUTEUR - BAS / 2, "", TEXTE).setOrigin(0, 0.5);
-    this.alerte = this.texte(ZONE.x + 10, ZONE.y + 8, "", ALERTE, 15).setStroke("#111018", 4);
+    this.alerte = this.texte(this.zone.x + 10, this.zone.y + 8, "", ALERTE, 15).setStroke("#111018", 4);
 
     // La barre du haut, de gauche à droite. Chaque bouton reçoit son action : une méthode de l'éditeur.
     let x = 8;
@@ -205,13 +213,13 @@ export class Editeur extends Phaser.Scene implements PourLesOutils, PourLesFenet
     this.nomAffiche = this.texte(x + 75, 22, "", TEXTE, 15).setOrigin(0.5);
     x += 154;
     enHaut("apres", 28, ">", () => this.changerDeNiveau(1), "Le niveau d'après (Page bas)");
-    this.bouton("son", LARGEUR - 236, 7, 56, 30, "", () => {
+    this.bouton("son", this.scale.width - 236, 7, 56, 30, "", () => {
       basculerLeSon(this, SAUVEGARDE);
       this.changer();
     }, "Couper le son, ou le remettre (M)");
-    this.bouton("moins", LARGEUR - 172, 7, 30, 30, "−", () => this.zoomer(-1), "Dézoomer (molette)");
-    this.bouton("plus", LARGEUR - 138, 7, 30, 30, "+", () => this.zoomer(1), "Zoomer (molette)");
-    this.bouton("tester", LARGEUR - 100, 7, 92, 30, "▶ Tester", () => this.tester(), "Jouer ce niveau tout de suite (Tab)");
+    this.bouton("moins", this.scale.width - 172, 7, 30, 30, "−", () => this.zoomer(-1), "Dézoomer (molette)");
+    this.bouton("plus", this.scale.width - 138, 7, 30, 30, "+", () => this.zoomer(1), "Zoomer (molette)");
+    this.bouton("tester", this.scale.width - 100, 7, 92, 30, "▶ Tester", () => this.tester(), "Jouer ce niveau tout de suite (Tab)");
 
     // À gauche : les outils
     let y = HAUT + 8;
@@ -436,18 +444,19 @@ export class Editeur extends Phaser.Scene implements PourLesOutils, PourLesFenet
 
     // L'aperçu : chaque élément en petit, et le cadre de ce qu'on voit
     const a = this.apercu.clear();
-    const ex = APERCU.width / this.largeur;
-    const ey = APERCU.height / HAUTEUR_MONDE;
-    a.fillStyle(0x16151d).fillRect(APERCU.x, APERCU.y, APERCU.width, APERCU.height);
+    const cadre = this.cadreDeLApercu;
+    const ex = cadre.width / this.largeur;
+    const ey = cadre.height / HAUTEUR_MONDE;
+    a.fillStyle(0x16151d).fillRect(cadre.x, cadre.y, cadre.width, cadre.height);
     for (const e of this.elements) {
       const r = rectDe(e);
       const couleur = e.sorte === "plateforme" ? this.couleurDe(this.genres.fiche(e.genre!))
         : e.sorte === "mobile" ? 0x96c878 : e.sorte === "piece" ? 0xffd23f : e.sorte === "depart" ? 0x50aaf0
           : e.sorte === "drapeau" ? 0xff7a1a : 0xe0485c;
-      a.fillStyle(couleur).fillRect(APERCU.x + r.x * ex, APERCU.y + r.y * ey, Math.max(2, r.w * ex), Math.max(2, r.h * ey));
+      a.fillStyle(couleur).fillRect(cadre.x + r.x * ex, cadre.y + r.y * ey, Math.max(2, r.w * ex), Math.max(2, r.h * ey));
     }
-    a.lineStyle(1, 0xffffff).strokeRect(APERCU.x + Math.max(0, vue.x) * ex, APERCU.y + 1,
-      Math.min(vue.width, this.largeur) * ex, APERCU.height - 2);
+    a.lineStyle(1, 0xffffff).strokeRect(cadre.x + Math.max(0, vue.x) * ex, cadre.y + 1,
+      Math.min(vue.width, this.largeur) * ex, cadre.height - 2);
   }
 
   private couleurDe(fiche: Fiche): number {
@@ -466,7 +475,7 @@ export class Editeur extends Phaser.Scene implements PourLesOutils, PourLesFenet
   // Zoomer autour d'un point de l'écran (la souris), sans que le niveau sous elle ne bouge
   zoomer(sens: number, autour?: Point) {
     const vue = this.cameras.main;
-    const ecran = autour ?? { x: ZONE.centerX, y: ZONE.centerY };
+    const ecran = autour ?? { x: this.zone.centerX, y: this.zone.centerY };
     const avant = vue.getWorldPoint(ecran.x, ecran.y);
     this.zoomChoisi = Phaser.Math.Clamp(this.zoomChoisi + sens, 0, ZOOMS.length - 1);
     vue.setZoom(ZOOMS[this.zoomChoisi]);
@@ -498,10 +507,10 @@ export class Editeur extends Phaser.Scene implements PourLesOutils, PourLesFenet
         return;                            // une fenêtre, un geste déjà commencé, ou un bouton : pas pour le niveau
       }
       this.dernierPointeur = { x: p.x, y: p.y };
-      if (APERCU.contains(p.x, p.y)) {     // dans l'aperçu : on y va
+      if (this.cadreDeLApercu.contains(p.x, p.y)) {     // dans l'aperçu : on y va
         this.geste = "apercu";
         this.allerVersLApercu(p.x);
-      } else if (!ZONE.contains(p.x, p.y)) {
+      } else if (!this.zone.contains(p.x, p.y)) {
         return;
       } else if (p.middleButtonDown()) {   // le bouton du milieu : glisser la vue
         this.geste = "vue";
@@ -542,7 +551,7 @@ export class Editeur extends Phaser.Scene implements PourLesOutils, PourLesFenet
     this.input.on("pointerup", relacher);
     this.input.on("pointerupoutside", relacher);
     this.input.on("wheel", (p: Phaser.Input.Pointer, _sous: unknown, _dx: number, dy: number) => {
-      if (!this.fenetre && !this.geste && ZONE.contains(p.x, p.y)) {
+      if (!this.fenetre && !this.geste && this.zone.contains(p.x, p.y)) {
         this.zoomer(dy < 0 ? 1 : -1, p);   // la molette zoome, autour de la souris
       }
     });
@@ -571,7 +580,7 @@ export class Editeur extends Phaser.Scene implements PourLesOutils, PourLesFenet
   }
 
   private allerVersLApercu(x: number) {
-    this.allerA((x - APERCU.x) / APERCU.width * this.largeur, this.cameras.main.midPoint.y);
+    this.allerA((x - this.cadreDeLApercu.x) / this.cadreDeLApercu.width * this.largeur, this.cameras.main.midPoint.y);
   }
 
   private touche(evenement: KeyboardEvent) {
