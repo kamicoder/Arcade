@@ -1,4 +1,8 @@
-// L'éditeur de niveaux de l'Aventure : il assemble les morceaux (editeur/), comme dans l'atelier.
+// L'éditeur de niveaux : il assemble les morceaux (editeur/), comme dans l'atelier.
+//
+// Il ne travaille que sur Mon aventure, la campagne du joueur (voir niveaux.ts) : l'Aventure du jeu ne
+// se modifie pas, mais chacun de ses niveaux peut se copier dans Mon aventure, pour démarrer. Quand Mon
+// aventure est vide, aucun niveau n'est ouvert : la fenêtre « nouveau niveau » attend, par-dessus tout.
 //
 // DEUX CAMÉRAS : la principale ne montre que la zone du niveau (son « viewport »), et c'est elle qui
 // zoome et défile ; une deuxième, par-dessus et immobile, montre les panneaux et les boutons. Chaque
@@ -22,7 +26,7 @@ import {
   type NomDOutil, type Outil, type Point, type PourLesOutils,
 } from "../editeur/outils";
 import { Bouton, Fenetre, Saisie, SURVOL, PANNEAU, BORD, TEXTE, GRIS, ALERTE } from "../editeur/interface";
-import { FenetreDesNiveaux, FenetreDuGenre, type PourLesFenetres } from "../editeur/fenetres";
+import { FenetreDesNiveaux, FenetreDuGenre, FenetreDuNouveau, type PourLesFenetres } from "../editeur/fenetres";
 import { texturePour, ECHELLE_TUILE } from "../textures";
 import { lancerLaMusique } from "../son";
 import { basculerLeSon, sonAllume } from "../../../socle/son";
@@ -188,8 +192,10 @@ export class Editeur extends Phaser.Scene implements PourLesOutils, PourLesFenet
       x += largeur + 4;
     };
     enHaut("menu", 56, "Menu", () => this.revenirAuMenu(), "Revenir au menu du jeu");
-    enHaut("niveaux", 70, "Niveaux", () => this.ouvrirLesNiveaux(), "Tous les niveaux de l'Aventure : les ouvrir, les ranger, les renommer");
-    enHaut("nouveau", 74, "Nouveau", () => this.demanderUnNouveauNiveau(), "Un nouveau niveau (N)");
+    enHaut("niveaux", 70, "Niveaux", () => this.ouvrirLesNiveaux(),
+      `Tous les niveaux de ${niveaux.MON_AVENTURE} : les ouvrir, les ranger, les renommer`);
+    enHaut("nouveau", 74, "Nouveau", () => this.demanderUnNouveauNiveau(),
+      "Un nouveau niveau : une page blanche, ou la copie d'un niveau de l'Aventure (N)");
     enHaut("enregistrer", 94, "Enregistrer", () => this.enregistrer(), "Enregistrer ce niveau (Ctrl+S)");
     x += 6;
     enHaut("annuler", 70, "Annuler", () => this.annuler(), "Annuler le dernier geste (Ctrl+Z)");
@@ -378,7 +384,7 @@ export class Editeur extends Phaser.Scene implements PourLesOutils, PourLesFenet
     b.son!.setTexte(sonAllume(SAUVEGARDE) ? "Son" : "Muet");
     this.nomAffiche.setText(this.nom + (this.modifie ? " ★" : ""));
     this.longueur.setText("Longueur : " + this.largeur);
-    this.alerte.setText(probleme(this.elements));
+    this.alerte.setText(this.nom ? probleme(this.elements) : "");   // aucun niveau ouvert : rien à reprocher
   }
 
   // Les éléments du niveau : refaits à chaque changement (un niveau, c'est quelques dizaines d'objets)
@@ -813,16 +819,23 @@ export class Editeur extends Phaser.Scene implements PourLesOutils, PourLesFenet
     return true;
   }
 
+  // Le premier niveau de Mon aventure qui s'ouvre ; s'il n'y en a aucun, la fenêtre du nouveau niveau
+  // propose de partir d'un niveau de l'Aventure, ou d'une page blanche
   private ouvrirLePremier() {
     if (this.noms.some((nom) => this.ouvrir(nom))) {
       return;
     }
-    let nom = "Mon niveau";
-    while (!niveaux.nomLibre(nom, this.noms)) {
-      nom += " bis";
-    }
-    this.creerLeNiveau(nom);
-    this.ouvrir(nom);
+    this.abandonnerLeGeste();
+    this.nom = "";
+    this.largeur = 1200;
+    this.elements = [];
+    this.selection = [];
+    this.historique.vider();
+    this.modifie = false;
+    this.ouvert = false;
+    this.cadrerLaCamera();
+    this.changer();
+    this.ouvrirUneFenetre(new FenetreDuNouveau(this, this, true));
   }
 
   // Le niveau tel qu'on l'enregistre et tel que le jeu le joue : une copie, que le jeu peut changer
@@ -831,11 +844,11 @@ export class Editeur extends Phaser.Scene implements PourLesOutils, PourLesFenet
   }
 
   enregistrer() {
-    niveaux.enregistrer(this.niveauOuvert());
-    if (!this.noms.includes(this.nom)) {
-      this.noms.push(this.nom);
-      niveaux.ranger(this.noms);
+    if (!this.nom) {
+      return;                              // Mon aventure est vide : aucun niveau ouvert
     }
+    niveaux.enregistrer(this.niveauOuvert());   // un nom nouveau va à la fin de Mon aventure
+    this.noms = niveaux.liste();
     this.modifie = false;
     this.dire("Niveau « " + this.nom + " » enregistré");
     this.changer();
@@ -858,7 +871,7 @@ export class Editeur extends Phaser.Scene implements PourLesOutils, PourLesFenet
     }
   }
 
-  // Un niveau tout neuf : un sol, un départ, un drapeau. Il s'ajoute à la fin de l'Aventure.
+  // Un niveau tout neuf : un sol, un départ, un drapeau. Il s'ajoute à la fin de Mon aventure.
   private creerLeNiveau(nom: string) {
     niveaux.enregistrer({
       nom, largeur: 1200, elements: [
@@ -867,24 +880,40 @@ export class Editeur extends Phaser.Scene implements PourLesOutils, PourLesFenet
         { sorte: "drapeau", x: 1140, y: 400 },
       ],
     });
-    this.noms = [...niveaux.liste().filter((autre) => autre !== nom), nom];
-    niveaux.ranger(this.noms);
+    this.noms = niveaux.liste();
   }
 
+  // La fenêtre du nouveau niveau : une page blanche, ou la copie d'un niveau
   private demanderUnNouveauNiveau() {
-    const valider = (nom: string) => {
-      if (!niveaux.nomLibre(nom, this.noms)) {
-        this.dire("Ce nom est vide, trop long ou déjà pris");
-        return;
-      }
-      this.rangerSiModifie();
-      this.creerLeNiveau(nom);
-      this.ouvrir(nom);
-      this.dire("Nouveau niveau : « " + nom + " », à la fin de l'Aventure");
-    };
-    if (!Saisie.auDoigt("Le nom du nouveau niveau", "", valider)) {
-      this.ouvrirUneFenetre(new Saisie(this, "Le nom du nouveau niveau", "", valider));
+    this.rangerSiModifie();
+    this.noms = niveaux.liste();
+    this.ouvrirUneFenetre(new FenetreDuNouveau(this, this, false));
+  }
+
+  // Une page blanche de ce nom. Renvoie false si le nom ne va pas.
+  creerUnNiveau(nom: string): boolean {
+    if (!niveaux.nomLibre(nom, this.noms)) {
+      this.dire("Ce nom est vide, trop long ou déjà pris");
+      return false;
     }
+    this.rangerSiModifie();
+    this.creerLeNiveau(nom);
+    this.ouvrir(nom);
+    this.dire(`Nouveau niveau : « ${nom} », à la fin de ${niveaux.MON_AVENTURE}`);
+    return true;
+  }
+
+  // La copie d'un niveau (de l'Aventure ou de Mon aventure), à la fin de Mon aventure, et on l'ouvre
+  copierUnNiveau(campagne: niveaux.Campagne, nom: string): boolean {
+    this.rangerSiModifie();                // copier le niveau ouvert : avec ce qu'on vient d'y changer
+    const copie = niveaux.copier(campagne, nom);
+    this.noms = niveaux.liste();
+    if (!copie || !this.ouvrir(copie)) {
+      this.dire("Le niveau « " + nom + " » est abîmé");
+      return false;
+    }
+    this.dire(`« ${copie} » : une copie à toi, à la fin de ${niveaux.MON_AVENTURE}`);
+    return true;
   }
 
   renommerUnNiveau(ancien: string, nouveau: string) {
@@ -903,11 +932,8 @@ export class Editeur extends Phaser.Scene implements PourLesOutils, PourLesFenet
     this.changer();
   }
 
+  // Le dernier niveau supprimé, Mon aventure est vide : la fenêtre du nouveau niveau revient
   supprimerUnNiveau(nom: string) {
-    if (this.noms.length <= 1) {
-      this.dire("C'est le dernier niveau : il reste");
-      return;
-    }
     niveaux.supprimer(nom);
     this.noms = niveaux.liste();
     if (nom === this.nom) {
@@ -922,13 +948,6 @@ export class Editeur extends Phaser.Scene implements PourLesOutils, PourLesFenet
       [this.noms[numero], this.noms[autre]] = [this.noms[autre], this.noms[numero]];   // ils échangent leur place
       niveaux.ranger(this.noms);
     }
-  }
-
-  remettreLesNiveauxDeDepart() {
-    this.rangerSiModifie();
-    niveaux.remettreLesNiveauxDeDepart();
-    this.noms = niveaux.liste();
-    this.ouvrir(this.noms.includes(this.nom) ? this.nom : this.noms[0]);
   }
 
   private ouvrirLesNiveaux() {
@@ -985,7 +1004,8 @@ export class Editeur extends Phaser.Scene implements PourLesOutils, PourLesFenet
     this.refaireLesPanneaux();
   }
 
-  // Ses plateformes redeviennent normales, dans TOUS les niveaux
+  // Ses plateformes redeviennent normales, dans tous les niveaux de Mon aventure (l'Aventure garde ses
+  // genres de départ)
   supprimerLeGenre(nom: string) {
     this.rangerSiModifie();
     for (const autre of this.noms) {
@@ -1003,7 +1023,9 @@ export class Editeur extends Phaser.Scene implements PourLesOutils, PourLesFenet
     if (this.aPoser.join() === ["plateforme", nom].join()) {
       this.aPoser = ["plateforme", "normale"];
     }
-    this.ouvrir(this.nom);
+    if (this.nom) {
+      this.ouvrir(this.nom);
+    }
     this.refaireLesPanneaux();
     this.dire("Le genre « " + nom + " » est supprimé : ses plateformes sont redevenues normales");
   }
@@ -1030,7 +1052,7 @@ export class Editeur extends Phaser.Scene implements PourLesOutils, PourLesFenet
     fonduPuis(this, action);
   }
 
-  private revenirAuMenu() {
+  revenirAuMenu() {
     this.rangerSiModifie();
     this.partir(() => this.scene.start("platformer-menu"));
   }

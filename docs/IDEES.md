@@ -82,11 +82,6 @@ Le Tamago est une ébauche : on le laisse de côté pour l'instant, ces notes at
 
 ## Platformer
 
-**Décidé, à faire** : l'Aventure (la campagne fournie) ne se modifie plus du tout ; « Mon aventure » est
-la campagne du joueur, où l'éditeur fait tout (créer, ranger, supprimer), et où l'on peut copier un niveau de
-l'Aventure pour démarrer. On repart de zéro (rien de ce qui a été fait dans l'éditeur n'est repris). Le
-nom reste à confirmer.
-
 **Finition**
 - Un saut court si on lâche la touche tôt (S).
 - Gagner, c'est une fête : confettis, drapeau qui ondule, zoom (S).

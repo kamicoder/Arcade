@@ -1,8 +1,9 @@
-// Le menu du platformer : l'Aventure, l'Infini, les 2 joueurs et l'éditeur de niveaux.
+// Le menu du platformer : l'Aventure, Mon aventure (les niveaux du joueur), l'Infini, les 2 joueurs et
+// l'éditeur de niveaux.
 // Au clavier (↑ ↓ Entrée), à la manette (croix + A), à la souris ou au doigt (socle/listeDeBoutons.ts).
 
 import Phaser from "phaser";
-import { chargerTous, liste } from "../niveaux";
+import { chargerTous, liste, lireLeRecord as lireLeRecordDeMonAventure, MON_AVENTURE, type Campagne } from "../niveaux";
 import { lancerLaMusique, quitterLePlatformer } from "../son";
 import { lireLeRecord, type DonneesDeNiveau } from "./Niveau";
 import { lettresDuJoueur1 } from "../commandes";
@@ -18,7 +19,7 @@ import { retourAuHub, fonduPuis } from "../../../socle/retour";
 import { boutonArcade } from "../../../socle/boutonArcade";
 import { boutonDuSon } from "../../../socle/son";
 
-type Mode = "aventure" | "infini" | "duo" | "editeur";
+type Mode = Campagne | "infini" | "duo" | "editeur";
 
 export class Menu extends Phaser.Scene {
   choisi = 0;                              // gardé d'une visite à l'autre
@@ -44,19 +45,28 @@ export class Menu extends Phaser.Scene {
 
     const record = lireLeRecord();
     const auDoigt = estTactile();
+    const aEux = liste().length;             // les niveaux de Mon aventure
     this.liste = new ListeDeBoutons(this, [
-      { nom: `Aventure (${liste().length} niveaux)`, aide: aideDeLAventure(), action: () => this.lancer("aventure") },
+      { nom: `Aventure (${chargerTous("aventure").length} niveaux)`, aide: aideDe("aventure"), action: () => this.lancer("aventure") },
+      aEux === 0
+        // Vide : le bouton mène à l'éditeur, qui propose de partir d'un niveau de l'Aventure
+        ? { nom: MON_AVENTURE, aide: "Vide pour l'instant : crée ton premier niveau !", action: () => this.lancer("editeur") }
+        : {
+          nom: `${MON_AVENTURE} (${aEux} niveau${aEux > 1 ? "x" : ""})`,
+          aide: aideDe("mon-aventure") + (lireLeRecordDeMonAventure() > 0 ? `, record : ${lireLeRecordDeMonAventure()}` : ""),
+          action: () => this.lancer("mon-aventure"),
+        },
       { nom: "Infini", aide: record > 0 ? `Record : ${record} m` : "Jusqu'où iras-tu ?", action: () => this.lancer("infini") },
       {
         nom: "2 joueurs", aide: auDoigt ? "Au clavier ou à deux manettes" : `${lettresDuJoueur1()} contre les flèches : le premier à ${OBJECTIF_DUO} points`,
         action: () => this.lancer("duo"), possible: !auDoigt,
       },
       { nom: "Éditeur de niveaux", aide: "Dessine tes niveaux, joue-les tout de suite", action: () => this.lancer("editeur") },
-    ], { x: LARGEUR / 2, y: 150, largeur: 440, hauteur: 58, ecart: 68 }, {
+    ], { x: LARGEUR / 2, y: 140, largeur: 440, hauteur: 52, ecart: 60 }, {
       couleur: 0x5fd068, depart: this.choisi, quandChoisi: (i) => (this.choisi = i),
     });
 
-    this.alerte = this.add.text(LARGEUR / 2, 432, "", { fontFamily: POLICE, fontSize: "18px", color: "#f07878" }).setOrigin(0.5);
+    this.alerte = this.add.text(LARGEUR / 2, 418, "", { fontFamily: POLICE, fontSize: "18px", color: "#f07878" }).setOrigin(0.5);
     const aide = auDoigt ? "Touche un mode pour jouer !" : "↑ ↓ : choisir    Entrée : jouer    M : le son    Échap : l'Arcade";
     this.add.text(LARGEUR / 2, 515, aide, { fontFamily: POLICE, fontSize: "16px", color: "#e9e4f0" }).setOrigin(0.5);
 
@@ -83,7 +93,7 @@ export class Menu extends Phaser.Scene {
       onYoyo: () => heros.setFlipX(true), onRepeat: () => heros.setFlipX(false),
     });
     for (let k = 0; k < 5; k++) {
-      const piece = this.add.image(140 + k * 170, HAUTEUR - 130, "platformer-piece").setScale(0.75);
+      const piece = this.add.image(140 + k * 170, HAUTEUR - 105, "platformer-piece").setScale(0.75);
       this.tweens.add({ targets: piece, y: piece.y - 10, duration: 700, yoyo: true, repeat: -1, ease: "Sine.InOut", delay: k * 140 });
     }
   }
@@ -95,13 +105,13 @@ export class Menu extends Phaser.Scene {
     }
     let scene = "platformer-niveau";
     let donnees: DonneesDeNiveau | undefined;
-    if (mode === "aventure") {
-      const niveaux = chargerTous();         // relus à chaque partie : l'éditeur a pu les changer
+    if (mode === "aventure" || mode === "mon-aventure") {
+      const niveaux = chargerTous(mode);     // relus à chaque partie : l'éditeur a pu changer Mon aventure
       if (niveaux.length === 0) {
         this.alerte.setText("Aucun niveau jouable : ouvre l'éditeur");
         return false;
       }
-      donnees = { mode: "aventure", niveaux, numero: 0, score: 0, vies: VIES, pieces: 0 };
+      donnees = { mode: "aventure", campagne: mode, niveaux, numero: 0, score: 0, vies: VIES, pieces: 0 };
     } else if (mode === "infini") {
       donnees = { mode: "infini", niveaux: [], numero: 0, score: 0, vies: 1, pieces: 0 };
     } else if (mode === "duo") {
@@ -124,9 +134,9 @@ export class Menu extends Phaser.Scene {
   }
 }
 
-// L'aide de l'Aventure : ses vies, et le boss seulement s'il attend au dernier niveau (l'éditeur a pu
-// changer les niveaux, leur ordre, ou retirer le boss)
-function aideDeLAventure(): string {
-  const dernier = chargerTous().at(-1);
+// L'aide d'une campagne : ses vies, et le boss seulement s'il attend au dernier niveau (dans Mon aventure,
+// le joueur range ses niveaux comme il veut)
+function aideDe(campagne: Campagne): string {
+  const dernier = chargerTous(campagne).at(-1);
   return dernier?.elements.some((e) => e.sorte === "boss") ? `${VIES} vies, un boss au bout` : `${VIES} vies`;
 }

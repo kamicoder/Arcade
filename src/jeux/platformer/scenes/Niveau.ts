@@ -1,5 +1,5 @@
-// Un niveau en solo : l'Aventure (les niveaux à la suite), l'Infini (un monde sans fin) ou le test
-// d'un niveau de l'éditeur. Le tableau de bord (score, vies, commandes au doigt) est une autre scène,
+// Un niveau en solo : une campagne (des niveaux à la suite : l'Aventure ou Mon aventure), l'Infini (un
+// monde sans fin) ou le test d'un niveau de l'éditeur. Le tableau de bord (score, vies, commandes au doigt) est une autre scène,
 // lancée par-dessus : elle ne bouge pas avec la caméra.
 //
 // Perdre une vie ou passer au niveau suivant, c'est relancer CETTE scène (this.scene.restart) avec le
@@ -13,7 +13,7 @@ import { Heros } from "../Heros";
 import { Commandes } from "../commandes";
 import { Generateur } from "../generateur";
 import { Genres } from "../genres";
-import { chargerTous } from "../niveaux";
+import { chargerTous, garderLeRecord, type Campagne } from "../niveaux";
 import { creerLeDecor, defilerLeDecor } from "../decor";
 import type { Boss } from "../Ennemis";
 import type { Tableau } from "./Tableau";
@@ -28,8 +28,9 @@ import { mettreEnPause } from "../../../socle/pause";
 export type Mode = "aventure" | "infini" | "test";
 
 export interface DonneesDeNiveau {
-  mode: Mode;
-  niveaux: DonneesDuNiveau[];              // l'Aventure, ou le seul niveau testé ; vide pour l'Infini
+  mode: Mode;                              // « aventure » : une campagne, l'Aventure ou Mon aventure
+  campagne?: Campagne;                     // laquelle (l'Aventure si rien n'est dit)
+  niveaux: DonneesDuNiveau[];              // ceux de la campagne, ou le seul niveau testé ; vide pour l'Infini
   numero: number;
   score: number;
   vies: number;
@@ -88,8 +89,13 @@ export class Niveau extends Phaser.Scene {
     return this.donnees.niveaux[this.donnees.numero] ?? null;
   }
 
+  // L'Aventure, celle du jeu ? Elle se joue toujours telle qu'elle est livrée, genres compris
+  get dansLAventure(): boolean {
+    return this.donnees.mode === "aventure" && (this.donnees.campagne ?? "aventure") === "aventure";
+  }
+
   create() {
-    this.genres = new Genres();
+    this.genres = new Genres(!this.dansLAventure);
     this.monde = new Monde(this, this.genres);
     let largeur: number;
     if (this.donnees.mode === "infini") {
@@ -303,8 +309,12 @@ export class Niveau extends Phaser.Scene {
       ecrire(RECORD_INFINI, this.distance);
       nouveauRecord = true;
     }
-    if (d.mode === "aventure" && d.score > (lire<number>(MEILLEUR_SCORE) ?? 0)) {
+    if (this.dansLAventure && d.score > (lire<number>(MEILLEUR_SCORE) ?? 0)) {
       ecrire(MEILLEUR_SCORE, d.score);
+      nouveauRecord = true;
+    }
+    // Mon aventure a son record à elle, remis à zéro quand ses niveaux changent (niveaux.ts)
+    if (d.mode === "aventure" && d.campagne === "mon-aventure" && garderLeRecord(d.score)) {
       nouveauRecord = true;
     }
     this.fini = true;
@@ -317,7 +327,7 @@ export class Niveau extends Phaser.Scene {
     const d = this.donnees;
     this.scene.stop("platformer-fin");
     if (d.mode === "aventure") {
-      const niveaux = chargerTous();
+      const niveaux = chargerTous(d.campagne ?? "aventure");   // relus : l'éditeur a pu changer Mon aventure
       if (niveaux.length > 0) {
         this.scene.restart({ ...d, niveaux, numero: 0, score: 0, vies: VIES, pieces: 0 });
         return;

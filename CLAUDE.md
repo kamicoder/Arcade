@@ -80,8 +80,8 @@ Chaque fichier dit en tête pourquoi il existe.
   d'après `this.scale.width`, pas `LARGEUR`.
 - `barreDeChargement(scene, couleur)` dans le preload de chaque jeu (elle demande aussi la disposition du
   clavier) ; `annoncer(scene, texte, ...)` pour une annonce en grand ; `boutonFermer` pour un ✕.
-- `lire` / `ecrire` (sauvegardes), `estTactile()`, `boutonArcade(scene)` (le « ← Arcade » de chaque menu),
-  `quandNouvelleVersion` (mise à jour au Hub seulement, jamais en pleine partie).
+- `lire` / `ecrire` / `oublier` / `oublierTout` (sauvegardes), `estTactile()`, `boutonArcade(scene)` (le
+  « ← Arcade » de chaque menu), `quandNouvelleVersion` (mise à jour au Hub seulement, jamais en pleine partie).
 - `correctifs.ts` : les défauts de Phaser réparés en attendant une version qui les corrige.
 
 ## Ajouter un jeu

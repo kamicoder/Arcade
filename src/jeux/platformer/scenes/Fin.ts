@@ -5,6 +5,7 @@
 import Phaser from "phaser";
 import type { Niveau, Fin as Issue } from "./Niveau";
 import type { Duo } from "./Duo";
+import { nomDeLaCampagne } from "../niveaux";
 import { ecranDeFin, type LigneDeFin } from "../../../socle/fin";
 
 export interface DonneesDeFin {
@@ -29,7 +30,8 @@ export class Fin extends Phaser.Scene {
     } else if (donnees.fin === "gagne") {
       lignes.push({ y: 160, texte: mode === "test" ? "Niveau réussi !" : "BRAVO !", taille: 64, couleur: "#78f078" });
       if (mode === "aventure") {
-        lignes.push({ y: 240, texte: "Toute l'Aventure est finie !", taille: 26, couleur: "#ffffff" });
+        const campagne = nomDeLaCampagne(niveau.donnees.campagne ?? "aventure");
+        lignes.push({ y: 240, texte: `Toute ${campagne} est finie !`, taille: 26, couleur: "#ffffff" });
       }
     } else {
       lignes.push({ y: 160, texte: mode === "infini" ? "PERDU !" : "GAME OVER", taille: 64, couleur: "#f07878" });

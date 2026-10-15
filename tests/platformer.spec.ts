@@ -1,14 +1,14 @@
 import { test, expect, type Page } from "@playwright/test";
 import {
   ouvrir, appuyer, attendreScene, scenesActives, versLaPage, toucher, toucherLaCarte, ouvrirLaCarte, manette, manetteAToutes,
-  attendreLaPause,
+  attendreLaPause, quitterParLaPause,
 } from "./outils";
 import { faisable } from "./faisable";
 import { Generateur } from "../src/jeux/platformer/generateur";
 import { SAUT_MEMORISE } from "../src/jeux/platformer/reglages";
 import type { Niveau as DonneesDuNiveau, Element } from "../src/jeux/platformer/elements";
 
-// Les niveaux de départ de l'Aventure, dans l'ordre
+// Les niveaux de l'Aventure, dans l'ordre
 const NIVEAUX = [
   "Premiers pas", "Plateforme mobile", "Grand saut", "Ascenseur", "Glace et ressorts", "Tapis roulants",
   "Plongée", "Pont fragile", "Téléporteurs", "Le boss",
@@ -22,7 +22,7 @@ async function menuPlatformer(page: Page) {
   return ouverte;
 }
 
-// Choisir un mode du menu (0 Aventure, 1 Infini, 2 deux joueurs, 3 éditeur) au clavier.
+// Choisir un mode du menu (0 Aventure, 1 Mon aventure, 2 Infini, 3 deux joueurs, 4 éditeur) au clavier.
 // Le menu se souvient du dernier choix : on part de là où il en est.
 async function choisirLeMode(page: Page, numero: number, scene: string) {
   const choisi = await page.evaluate(() => (window as any).jeu.scene.getScene("platformer-menu").choisi as number);
@@ -158,7 +158,7 @@ test("Échap met le niveau en pause ; sur la fin, Start rejoue sans que le nivea
 
 test("à deux, à la manette : Start met en pause, et « Le menu » ramène au menu", async ({ page }) => {
   const { sansErreur } = await menuPlatformer(page);
-  await choisirLeMode(page, 2, "platformer-duo");
+  await choisirLeMode(page, 3, "platformer-duo");
   await manette(page, "platformer-duo", 9);
   await attendreLaPause(page);
   expect(await page.evaluate(() => (window as any).jeu.scene.isPaused("platformer-duo"))).toBe(true);
@@ -279,7 +279,7 @@ test("le boss : trois coups sur la tête, ça secoue, et l'Aventure est gagnée"
 
 test("l'Infini : le monde se fabrique devant, s'oublie derrière, et le record est gardé", async ({ page }) => {
   const { sansErreur } = await menuPlatformer(page);
-  await choisirLeMode(page, 1, "platformer-niveau");
+  await choisirLeMode(page, 2, "platformer-niveau");
   expect((await niveau(page)).mode).toBe("infini");
 
   // Le héros saute loin devant : des plateformes l'y attendent, celles du début sont oubliées
@@ -330,10 +330,10 @@ test("à deux : Q D Z d'un AZERTY à leur place, les flèches pour le joueur 2, 
     const azerty: Record<string, string> = { KeyA: "Q", KeyD: "D", KeyW: "Z" };
     return ["KeyA", "KeyD", "KeyW"].map((code) => carte?.get(code)?.toUpperCase() ?? azerty[code]).join(" ");
   });
-  const aide = await page.evaluate(() => (window as any).jeu.scene.getScene("platformer-menu").boutons[2].aide.text as string);
+  const aide = await page.evaluate(() => (window as any).jeu.scene.getScene("platformer-menu").boutons[3].aide.text as string);
   expect(aide).toBe(attendu + " contre les flèches : le premier à 15 points");
 
-  await choisirLeMode(page, 2, "platformer-duo");
+  await choisirLeMode(page, 3, "platformer-duo");
   expect(await scenesActives(page)).toEqual(["platformer-duo", "platformer-tableau"]);
   const coureurs = () => page.evaluate(() => (window as any).jeu.scene.getScene("platformer-duo").coureurs
     .map((c: any) => ({ x: c.heros.body.x, y: c.heros.body.y, vy: c.heros.body.velocity.y })));
@@ -393,35 +393,73 @@ test("à deux : Q D Z d'un AZERTY à leur place, les flèches pour le joueur 2, 
   sansErreur();
 });
 
-test("l'éditeur : créer un niveau, y poser des choses à la souris, le tester, et le retrouver dans l'Aventure", async ({ page }) => {
-  const { sansErreur } = await menuPlatformer(page);
-  await choisirLeMode(page, 3, "platformer-editeur");
-  const editeur = () => page.evaluate(() => {
+// ================================================================ L'éditeur et Mon aventure
+
+// L'état de l'éditeur, lu dans la scène Phaser ; « fenetre » : le titre de la fenêtre du dessus
+function editeur(page: Page) {
+  return page.evaluate(() => {
     const e = (window as any).jeu.scene.getScene("platformer-editeur");
-    return { nom: e.nom as string, elements: e.elements.map((x: any) => ({ ...x })) as any[], outil: e.outil as string };
+    const dessus = e.fenetres[e.fenetres.length - 1];
+    return {
+      nom: e.nom as string, noms: [...e.noms] as string[], elements: e.elements.map((x: any) => ({ ...x })) as any[],
+      fenetre: (dessus?.list[2]?.text ?? null) as string | null,
+      boutonsDeLaFenetre: (dessus?.list ?? []).filter((o: any) => o.etiquette).map((o: any) => o.etiquette.text) as string[],
+    };
   });
-  // Le milieu d'un bouton de l'éditeur, en pixels du jeu
-  const bouton = (cle: string) => page.evaluate((cle) => {
+}
+
+// Le milieu d'un bouton de l'éditeur (la barre du haut, la palette...), en pixels du jeu
+function boutonDeLEditeur(page: Page, cle: string) {
+  return page.evaluate((cle) => {
     const b = (window as any).jeu.scene.getScene("platformer-editeur").boutons[cle];
     return { x: b.x + b.fond.width / 2, y: b.y + b.fond.height / 2 };
   }, cle);
-  const cliquer = async (x: number, y: number) => {
-    const p = await versLaPage(page, x, y);
-    await page.mouse.click(p.x, p.y);
-    await page.waitForTimeout(80);
-  };
+}
 
-  // Un nouveau niveau : N, son nom, Entrée
-  await appuyer(page, "n");
+// Le milieu du bouton de la fenêtre du dessus qui porte ce texte (« rang » : le combientième, s'il y en a plusieurs)
+function boutonDeLaFenetre(page: Page, texte: string, rang = 0) {
+  return page.evaluate(([texte, rang]) => {
+    const e = (window as any).jeu.scene.getScene("platformer-editeur");
+    const b = e.fenetres[e.fenetres.length - 1].list.filter((o: any) => o.etiquette?.text === texte)[rang];
+    return { x: b.x + b.fond.width / 2, y: b.y + b.fond.height / 2 };
+  }, [texte, rang] as const);
+}
+
+async function cliquer(page: Page, point: { x: number; y: number }) {
+  const p = await versLaPage(page, point.x, point.y);
+  await page.mouse.click(p.x, p.y);
+  await page.waitForTimeout(80);
+}
+
+const cliquerSurLaFenetre = async (page: Page, texte: string, rang = 0) => cliquer(page, await boutonDeLaFenetre(page, texte, rang));
+const cliquerSurLEditeur = async (page: Page, cle: string) => cliquer(page, await boutonDeLEditeur(page, cle));
+
+// Les noms des niveaux de la partie en cours
+const nomsJoues = (page: Page) => page.evaluate(() =>
+  (window as any).jeu.scene.getScene("platformer-niveau").donnees.niveaux.map((n: any) => n.nom) as string[]);
+
+const MON_AVENTURE = "platformer/mon-aventure";
+
+test("l'éditeur : Mon aventure vide propose une page blanche ; on y pose des choses, on teste, et on joue Mon aventure", async ({ page }) => {
+  const { sansErreur } = await menuPlatformer(page);
+  await choisirLeMode(page, 4, "platformer-editeur");
+
+  // Mon aventure est vide : aucun niveau ouvert, la fenêtre du premier niveau attend
+  let etat = await editeur(page);
+  expect(etat).toMatchObject({ nom: "", noms: [], fenetre: "Mon aventure est vide : ton premier niveau !" });
+  expect(etat.boutonsDeLaFenetre).toContain("Page blanche (Entrée)");
+  expect(etat.boutonsDeLaFenetre).toContain("3. Grand saut");
+
+  // Une page blanche : Entrée, son nom, Entrée
+  await appuyer(page, "Enter");
   await page.keyboard.type("Volcan");
   await appuyer(page, "Enter");
-  let etat = await editeur();
-  expect(etat.nom).toBe("Volcan");
+  etat = await editeur(page);
+  expect(etat).toMatchObject({ nom: "Volcan", noms: ["Volcan"], fenetre: null });
   expect(etat.elements.map((e) => e.sorte).sort()).toEqual(["depart", "drapeau", "plateforme"]);
 
   // Une plateforme de glace, tracée à la souris
-  const glace = await bouton("genre-glace");
-  await cliquer(glace.x, glace.y);
+  await cliquerSurLEditeur(page, "genre-glace");
   const a = await versLaPage(page, 450, 300);
   const b = await versLaPage(page, 620, 320);
   await page.mouse.move(a.x, a.y);
@@ -430,10 +468,9 @@ test("l'éditeur : créer un niveau, y poser des choses à la souris, le tester,
   await page.mouse.up();
   await page.waitForTimeout(100);
   // Une pièce, d'un clic
-  const piece = await bouton("sorte-piece");
-  await cliquer(piece.x, piece.y);
-  await cliquer(700, 200);
-  etat = await editeur();
+  await cliquerSurLEditeur(page, "sorte-piece");
+  await cliquer(page, { x: 700, y: 200 });
+  etat = await editeur(page);
   const plateforme = etat.elements.find((e) => e.genre === "glace");
   expect(plateforme.w).toBeGreaterThan(100);
   expect(etat.elements.filter((e) => e.sorte === "piece").length).toBe(1);
@@ -441,31 +478,252 @@ test("l'éditeur : créer un niveau, y poser des choses à la souris, le tester,
   // Annuler retire la pièce, Rétablir la remet
   await page.keyboard.press("Control+z");
   await page.waitForTimeout(80);
-  expect((await editeur()).elements.filter((e) => e.sorte === "piece").length).toBe(0);
+  expect((await editeur(page)).elements.filter((e) => e.sorte === "piece").length).toBe(0);
   await page.keyboard.press("Control+y");
   await page.waitForTimeout(80);
-  expect((await editeur()).elements.filter((e) => e.sorte === "piece").length).toBe(1);
+  expect((await editeur(page)).elements.filter((e) => e.sorte === "piece").length).toBe(1);
 
-  // Tester (Tab) enregistre le niveau et le joue
+  // Tester (Tab) enregistre le niveau dans Mon aventure, et le joue
   await appuyer(page, "Tab");
   await attendreScene(page, "platformer-niveau");
   expect(await niveau(page)).toMatchObject({ mode: "test", nom: "Volcan" });
-  const sauve = await page.evaluate(() => JSON.parse(localStorage.getItem("platformer/niveau/Volcan")!));
+  const sauve = await page.evaluate((cle) => JSON.parse(localStorage.getItem(cle)!), MON_AVENTURE + "/niveau/Volcan");
   expect(sauve.elements.length).toBe(5);
   await allerAuDrapeau(page);
   await attendreScene(page, "platformer-fin");
   await page.waitForTimeout(700);
   await appuyer(page, "Escape");           // Échap : retour à l'éditeur, sur le même niveau
   await attendreScene(page, "platformer-editeur");
-  expect((await editeur()).nom).toBe("Volcan");
+  expect((await editeur(page)).nom).toBe("Volcan");
 
-  // Le menu : l'Aventure a un niveau de plus, et le dernier est le nôtre
-  const menu = await bouton("menu");
-  await cliquer(menu.x, menu.y);
+  // Le menu : l'Aventure n'a pas changé ; Mon aventure, c'est Volcan, et elle se joue comme l'Aventure
+  await cliquerSurLEditeur(page, "menu");
+  await attendreScene(page, "platformer-menu");
+  const nomDuBouton = await page.evaluate(() => (window as any).jeu.scene.getScene("platformer-menu").boutons[1].nom.text as string);
+  expect(nomDuBouton).toBe("Mon aventure (1 niveau)");
+  await choisirLeMode(page, 1, "platformer-niveau");
+  expect(await niveau(page)).toMatchObject({ mode: "aventure", numero: 0, nom: "Volcan", vies: 3 });
+  expect(await nomsJoues(page)).toEqual(["Volcan"]);
+  await allerAuDrapeau(page);
+  await attendreScene(page, "platformer-fin");
+  await page.waitForTimeout(700);
+  await appuyer(page, "Escape");
   await attendreScene(page, "platformer-menu");
   await choisirLeMode(page, 0, "platformer-niveau");
-  expect(await page.evaluate(() => (window as any).jeu.scene.getScene("platformer-niveau").donnees.niveaux.map((n: any) => n.nom)))
-    .toEqual([...NIVEAUX, "Volcan"]);
+  expect(await nomsJoues(page)).toEqual(NIVEAUX);
+  sansErreur();
+});
+
+test("l'éditeur : copier des niveaux de l'Aventure, les retoucher, les ranger, les renommer, en supprimer ; l'Aventure ne bouge pas", async ({ page }) => {
+  const { sansErreur } = await menuPlatformer(page);
+  await choisirLeMode(page, 4, "platformer-editeur");
+
+  // Mon aventure vide : on part du troisième niveau de l'Aventure, d'un clic
+  await cliquerSurLaFenetre(page, "3. Grand saut");
+  let etat = await editeur(page);
+  expect(etat).toMatchObject({ nom: "Grand saut (copie)", noms: ["Grand saut (copie)"], fenetre: null });
+
+  // N : la fenêtre du nouveau niveau. Deux fois le premier niveau : la deuxième copie a un autre nom
+  for (const copie of ["Premiers pas (copie)", "Premiers pas (copie 2)"]) {
+    await appuyer(page, "n");
+    expect((await editeur(page)).fenetre).toBe("Un nouveau niveau");
+    await cliquerSurLaFenetre(page, "1. Premiers pas");
+    expect((await editeur(page)).nom).toBe(copie);
+  }
+  etat = await editeur(page);
+  expect(etat.noms).toEqual(["Grand saut (copie)", "Premiers pas (copie)", "Premiers pas (copie 2)"]);
+  const piecesAuDepart = etat.elements.filter((e) => e.sorte === "piece").length;
+
+  // La copie se retouche : une pièce de plus, enregistrée (Ctrl+S)
+  await cliquerSurLEditeur(page, "sorte-piece");
+  await cliquer(page, { x: 700, y: 120 });
+  await page.keyboard.press("Control+s");
+  await page.waitForTimeout(80);
+  const sauve = await page.evaluate((cle) => JSON.parse(localStorage.getItem(cle)!), MON_AVENTURE + "/niveau/Premiers pas (copie 2)");
+  expect(sauve.elements.filter((e: any) => e.sorte === "piece").length).toBe(piecesAuDepart + 1);
+
+  // La fenêtre des niveaux : rien que Mon aventure, et plus de « Remettre les niveaux de départ »
+  await cliquerSurLEditeur(page, "niveaux");
+  etat = await editeur(page);
+  expect(etat.fenetre).toBe("Les niveaux de Mon aventure, dans l'ordre");
+  expect(etat.boutonsDeLaFenetre.filter((texte) => /^\d+\. /.test(texte)))
+    .toEqual(["1. Grand saut (copie)", "2. Premiers pas (copie)", "3. Premiers pas (copie 2)"]);
+  expect(etat.boutonsDeLaFenetre.join()).not.toContain("Remettre");
+
+  // Ranger : le premier descend
+  await cliquerSurLaFenetre(page, "↓", 0);
+  expect((await editeur(page)).noms).toEqual(["Premiers pas (copie)", "Grand saut (copie)", "Premiers pas (copie 2)"]);
+
+  // Renommer le premier : effacer son nom, en taper un autre
+  await cliquerSurLaFenetre(page, "Renommer", 0);
+  for (let i = 0; i < "Premiers pas (copie)".length; i++) {
+    await page.keyboard.press("Backspace");
+  }
+  await page.keyboard.type("Le commencement");
+  await appuyer(page, "Enter");
+  expect((await editeur(page)).noms).toEqual(["Le commencement", "Grand saut (copie)", "Premiers pas (copie 2)"]);
+
+  // Supprimer le deuxième : une question, puis il disparaît
+  await cliquerSurLaFenetre(page, "Supprimer", 1);
+  expect((await editeur(page)).fenetre).toBe("Supprimer « Grand saut (copie) » ?");
+  await cliquerSurLaFenetre(page, "Supprimer");
+  expect((await editeur(page)).noms).toEqual(["Le commencement", "Premiers pas (copie 2)"]);
+  expect(await page.evaluate(() => Object.keys(localStorage).filter((cle) => cle.startsWith("platformer/mon-aventure/niveau/")).sort()))
+    .toEqual(["platformer/mon-aventure/niveau/Le commencement", "platformer/mon-aventure/niveau/Premiers pas (copie 2)"]);
+  await cliquerSurLaFenetre(page, "Fermer");
+
+  // L'Aventure se joue comme elle est livrée : son premier niveau n'a pas la pièce de plus
+  await cliquerSurLEditeur(page, "menu");
+  await attendreScene(page, "platformer-menu");
+  await choisirLeMode(page, 0, "platformer-niveau");
+  expect(await nomsJoues(page)).toEqual(NIVEAUX);
+  expect(await page.evaluate(() => (window as any).jeu.scene.getScene("platformer-niveau").donnees.niveaux[0].elements
+    .filter((e: any) => e.sorte === "piece").length)).toBe(piecesAuDepart);
+
+  // Mon aventure, dans son ordre ; le drapeau du premier mène au second
+  await quitterParLaPause(page);
+  await attendreScene(page, "platformer-menu");
+  await choisirLeMode(page, 1, "platformer-niveau");
+  expect(await nomsJoues(page)).toEqual(["Le commencement", "Premiers pas (copie 2)"]);
+  await page.waitForTimeout(300);
+  await allerAuDrapeau(page);
+  await attendreLeNiveau(page, "n.donnees.numero === 1");
+  expect(await niveau(page)).toMatchObject({ mode: "aventure", nom: "Premiers pas (copie 2)", vies: 3 });
+  sansErreur();
+});
+
+test("Mon aventure vide : le menu le dit et mène à l'éditeur ; supprimer le dernier niveau la vide de nouveau", async ({ page }) => {
+  const { sansErreur } = await menuPlatformer(page);
+  const bouton = () => page.evaluate(() => {
+    const b = (window as any).jeu.scene.getScene("platformer-menu").boutons[1];
+    return { nom: b.nom.text as string, aide: b.aide.text as string };
+  });
+  expect(await bouton()).toEqual({ nom: "Mon aventure", aide: "Vide pour l'instant : crée ton premier niveau !" });
+
+  // Le bouton mène à l'éditeur, sur la fenêtre du premier niveau ; Échap ramène au menu
+  await choisirLeMode(page, 1, "platformer-editeur");
+  expect((await editeur(page)).fenetre).toBe("Mon aventure est vide : ton premier niveau !");
+  await appuyer(page, "Escape");
+  await attendreScene(page, "platformer-menu");
+
+  // Un niveau copié, puis supprimé : Mon aventure est vide, la fenêtre du premier niveau revient
+  await choisirLeMode(page, 1, "platformer-editeur");
+  await cliquerSurLaFenetre(page, "10. Le boss");
+  expect((await editeur(page)).nom).toBe("Le boss (copie)");
+  await cliquerSurLEditeur(page, "niveaux");
+  await cliquerSurLaFenetre(page, "Supprimer");
+  await cliquerSurLaFenetre(page, "Supprimer");
+  expect(await editeur(page)).toMatchObject({ nom: "", noms: [], fenetre: "Mon aventure est vide : ton premier niveau !" });
+  expect(await page.evaluate(() => (window as any).jeu.scene.getScene("platformer-editeur").fenetres.length)).toBe(1);
+  await cliquerSurLaFenetre(page, "Revenir au menu");
+  await attendreScene(page, "platformer-menu");
+  expect(await bouton()).toEqual({ nom: "Mon aventure", aide: "Vide pour l'instant : crée ton premier niveau !" });
+  sansErreur();
+});
+
+// Les sauvegardes de l'ancien éditeur, qui retouchait l'Aventure : on n'en reprend rien
+test("le premier passage oublie les anciennes sauvegardes de l'éditeur ; l'Aventure reste celle du jeu", async ({ page }) => {
+  const { sansErreur } = await ouvrir(page);
+  await page.evaluate(() => {
+    localStorage.setItem("platformer/ordre", JSON.stringify(["Grand saut", "Volcan"]));
+    localStorage.setItem("platformer/niveau/Grand saut", JSON.stringify({ nom: "Grand saut", largeur: 800, elements: [] }));
+    localStorage.setItem("platformer/niveau/Volcan", JSON.stringify({ nom: "Volcan", largeur: 800, elements: [] }));
+    localStorage.setItem("platformer/record-infini", "42");
+    localStorage.setItem("platformer/genres", JSON.stringify({ glace: { couleur: [1, 2, 3], solide: true, effet: "mortel" } }));
+  });
+  await ouvrirLaCarte(page, "platformer");
+  await attendreScene(page, "platformer-menu");
+  expect(await page.evaluate(() => Object.keys(localStorage).filter((cle) => cle.startsWith("platformer/")).sort()))
+    .toEqual(["platformer/record-infini"]);
+  expect(await page.evaluate(() => (window as any).jeu.scene.getScene("platformer-menu").boutons[1].nom.text)).toBe("Mon aventure");
+  await choisirLeMode(page, 0, "platformer-niveau");
+  expect(await nomsJoues(page)).toEqual(NIVEAUX);
+  sansErreur();
+});
+
+// Mon aventure a son record, qui ne vaut que pour ses niveaux tels qu'ils étaient : un niveau retouché l'efface
+test("le record de Mon aventure : gardé à la fin, montré au menu, effacé quand un niveau change", async ({ page }) => {
+  const { sansErreur } = await ouvrir(page);
+  await page.evaluate(() => {
+    const bon = {
+      nom: "Bon", largeur: 1200, elements: [
+        { sorte: "plateforme", x: 0, y: 440, w: 1200, h: 40, genre: "normale", force: 2, sens: 1 },
+        { sorte: "depart", x: 60, y: 400 }, { sorte: "piece", x: 66, y: 400 }, { sorte: "drapeau", x: 1140, y: 400 },
+      ],
+    };
+    localStorage.setItem("platformer/mon-aventure/ordre", JSON.stringify(["Bon"]));
+    localStorage.setItem("platformer/mon-aventure/niveau/Bon", JSON.stringify(bon));
+  });
+  await ouvrirLaCarte(page, "platformer");
+  await attendreScene(page, "platformer-menu");
+  await choisirLeMode(page, 1, "platformer-niveau");
+  // La pièce est sous ses pieds, au départ : un point, puis le drapeau
+  await page.waitForFunction(() => (window as any).jeu.scene.getScene("platformer-niveau").donnees.score === 1);
+  await allerAuDrapeau(page);
+  await attendreScene(page, "platformer-fin");
+  expect(await page.evaluate(() => (window as any).jeu.scene.getScene("platformer-fin").sys.settings.data.nouveauRecord)).toBe(true);
+  expect(await page.evaluate(() => localStorage.getItem("platformer/mon-aventure/meilleur-score"))).toBe("1");
+
+  // Au menu, le bouton de Mon aventure le dit
+  await page.waitForTimeout(800);
+  await appuyer(page, "Escape");
+  await attendreScene(page, "platformer-menu");
+  expect(await page.evaluate(() => (window as any).jeu.scene.getScene("platformer-menu").boutons[1].aide.text)).toContain("record : 1");
+
+  // Ouvrir l'éditeur sans rien changer ne l'efface pas ; enregistrer le niveau (Ctrl+S), si
+  await choisirLeMode(page, 4, "platformer-editeur");
+  await page.waitForTimeout(300);
+  expect(await page.evaluate(() => localStorage.getItem("platformer/mon-aventure/meilleur-score"))).toBe("1");
+  await page.keyboard.press("Control+s");
+  await page.waitForFunction(() => localStorage.getItem("platformer/mon-aventure/meilleur-score") === null);
+  sansErreur();
+});
+
+// Mon aventure passe par le même validerNiveau que l'Aventure : une sauvegarde illisible, ou lisible mais
+// fausse (sans départ), est sautée
+test("un niveau abîmé dans Mon aventure est sauté, sans planter", async ({ page }) => {
+  const { sansErreur } = await ouvrir(page);
+  await page.evaluate(() => {
+    const bon = {
+      nom: "Bon", largeur: 1200, elements: [
+        { sorte: "plateforme", x: 0, y: 440, w: 1200, h: 40, genre: "normale", force: 2, sens: 1 },
+        { sorte: "depart", x: 60, y: 400 }, { sorte: "drapeau", x: 1140, y: 400 },
+      ],
+    };
+    localStorage.setItem("platformer/mon-aventure/ordre", JSON.stringify(["Illisible", "Faux", "Bon"]));
+    localStorage.setItem("platformer/mon-aventure/niveau/Illisible", "{ pas du json");
+    localStorage.setItem("platformer/mon-aventure/niveau/Faux", JSON.stringify({ largeur: "abc", elements: [] }));
+    localStorage.setItem("platformer/mon-aventure/niveau/Bon", JSON.stringify(bon));
+  });
+  await ouvrirLaCarte(page, "platformer");
+  await attendreScene(page, "platformer-menu");
+  // Le menu dit ce qui attend : un boss au bout de l'Aventure, pas au bout de Mon aventure
+  const aides = await page.evaluate(() => (window as any).jeu.scene.getScene("platformer-menu").boutons
+    .slice(0, 2).map((b: any) => b.aide.text));
+  expect(aides).toEqual(["3 vies, un boss au bout", "3 vies"]);
+  await choisirLeMode(page, 1, "platformer-niveau");
+  expect(await nomsJoues(page)).toEqual(["Bon"]);
+  sansErreur();
+});
+
+// L'Aventure se joue avec les genres de départ : un genre changé dans l'éditeur ne touche que Mon aventure
+test("un genre changé dans l'éditeur ne change pas l'Aventure", async ({ page }) => {
+  const { sansErreur } = await ouvrir(page);
+  await page.evaluate(() => {
+    localStorage.setItem("platformer/mon-aventure/genres", JSON.stringify({ glace: { couleur: [1, 2, 3], solide: true, effet: "mortel" } }));
+  });
+  await ouvrirLaCarte(page, "platformer");
+  await attendreScene(page, "platformer-menu");
+  await choisirLeMode(page, 0, "platformer-niveau");
+  const effet = () => page.evaluate(() => (window as any).jeu.scene.getScene("platformer-niveau").genres.effet("glace") as string);
+  expect(await effet()).toBe("glisse");
+  // Le même niveau joué hors de l'Aventure (comme le bouton Tester) : le genre changé compte
+  await page.evaluate(() => {
+    const n = (window as any).jeu.scene.getScene("platformer-niveau");
+    n.scene.restart({ ...n.donnees, mode: "test", niveaux: [n.donnees.niveaux[0]] });
+  });
+  await attendreLeNiveau(page, "n.donnees.mode === 'test'");
+  expect(await effet()).toBe("mortel");
   sansErreur();
 });
 
@@ -505,20 +763,6 @@ test("les genres de plateforme : le ressort fait rebondir, le tapis emporte, le 
   sansErreur();
 });
 
-// Une sauvegarde illisible est ignorée (on rejoue le niveau de départ) ; une sauvegarde lisible mais
-// fausse rend le niveau injouable : il est sauté
-test("un niveau abîmé dans la sauvegarde est sauté, sans planter", async ({ page }) => {
-  const { sansErreur } = await ouvrir(page);
-  await page.evaluate(() => localStorage.setItem("platformer/niveau/Premiers pas", "{ pas du json"));
-  await page.evaluate(() => localStorage.setItem("platformer/niveau/Grand saut", JSON.stringify({ largeur: "abc", elements: [] })));
-  await ouvrirLaCarte(page, "platformer");
-  await attendreScene(page, "platformer-menu");
-  await choisirLeMode(page, 0, "platformer-niveau");
-  expect(await page.evaluate(() => (window as any).jeu.scene.getScene("platformer-niveau").donnees.niveaux.map((n: any) => n.nom)))
-    .toEqual(NIVEAUX.filter((nom) => nom !== "Grand saut"));
-  sansErreur();
-});
-
 test.describe("au doigt", () => {
   test.use({ viewport: { width: 844, height: 390 }, hasTouch: true, isMobile: true });
 
@@ -526,7 +770,7 @@ test.describe("au doigt", () => {
     const { sansErreur } = await ouvrir(page);
     await toucherLaCarte(page, "platformer");
     await attendreScene(page, "platformer-menu");
-    expect(await page.evaluate(() => (window as any).jeu.scene.getScene("platformer-menu").boutons[2].possible)).toBe(false);
+    expect(await page.evaluate(() => (window as any).jeu.scene.getScene("platformer-menu").boutons[3].possible)).toBe(false);
     await toucher(page, 480, 150);         // « Aventure »
     await attendreScene(page, "platformer-niveau");
     await page.waitForTimeout(400);
@@ -712,7 +956,7 @@ test("le saut qui pardonne : un appui juste avant de toucher le sol fait sauter 
 });
 test("l'Infini : pendant qu'il clignote, après une deuxième chance, aucun ennemi ne le touche", async ({ page }) => {
   const { sansErreur } = await menuPlatformer(page);
-  await choisirLeMode(page, 1, "platformer-niveau");
+  await choisirLeMode(page, 2, "platformer-niveau");
   await page.evaluate(() => {
     (window as any).jeu.scene.getScene("platformer-niveau").donnees.vies = 3;
   });
@@ -744,16 +988,4 @@ test("l'Infini : pièces et ennemis seulement sur les plateformes qui ne bougent
   for (const e of poses) {
     expect(sousLui(e)).toMatchObject({ sorte: "plateforme", genre: "normale" });
   }
-});
-
-test("le menu dit ce qui attend : le boss au bout de l'Aventure s'il y est encore", async ({ page }) => {
-  const { sansErreur } = await menuPlatformer(page);
-  const aide = () => page.evaluate(() => (window as any).jeu.scene.getScene("platformer-menu").boutons[0].aide.text as string);
-  expect(await aide()).toBe("3 vies, un boss au bout");
-
-  // Le boss retiré de l'Aventure (l'éditeur range l'ordre des niveaux) : le menu ne le promet plus
-  await page.evaluate((noms) => localStorage.setItem("platformer/ordre", JSON.stringify(noms)), NIVEAUX.slice(0, -1));
-  await page.evaluate(() => (window as any).jeu.scene.getScene("platformer-menu").scene.restart());
-  await page.waitForFunction(() => (window as any).jeu.scene.getScene("platformer-menu").boutons?.[0]?.aide.text === "3 vies");
-  sansErreur();
 });

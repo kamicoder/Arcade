@@ -4,10 +4,11 @@
 // Les genres de départ ont une image (public/platformer/images/plateformes/<genre>.png), répétée en
 // tuiles sur toute la plateforme ; un genre inventé dans l'éditeur se montre de sa couleur.
 // La force de l'effet et le sens d'un tapis roulant, eux, se règlent sur chaque plateforme posée.
-// Les fiches sont sauvegardées (platformer/genres) dès que l'éditeur en change une.
+// Les fiches sont sauvegardées (platformer/mon-aventure/genres) dès que l'éditeur en change une. L'Aventure, elle,
+// se joue toujours avec les genres de départ : ce que le joueur change ne touche que ses niveaux.
 
 import { lire, ecrire } from "../../socle/sauvegarde";
-import { SAUVEGARDE } from "./reglages";
+import { RACINE, oublierLeRecord } from "./niveaux";
 
 export type Effet = "" | "glisse" | "rebond" | "mortel" | "tapis" | "ecroule" | "eau" | "teleporte";
 
@@ -60,18 +61,19 @@ export const DE_DEPART: Record<string, Fiche> = {
 // Les genres qui ont leur image dans public/platformer/images/plateformes/
 export const AVEC_IMAGE = ["decor", "eau", "fragile", "glace", "lave", "ressort", "tapis", "teleporteur"];
 
-const CLE = SAUVEGARDE + "/genres";
+const CLE = RACINE + "/genres";
 
 export class Genres {
   fiches: Record<string, Fiche> = {};
 
-  constructor() {
+  // sauvegardes = false : les genres de départ, tels quels (pour jouer l'Aventure)
+  constructor(private readonly sauvegardes = true) {
     this.charger();
   }
 
   // Une sauvegarde absente ou abîmée : les genres de départ. Une fiche abîmée : laissée de côté.
   charger() {
-    let lues = lire<Record<string, unknown>>(CLE);
+    let lues = this.sauvegardes ? lire<Record<string, unknown>>(CLE) : null;
     if (!lues || typeof lues !== "object" || Array.isArray(lues)) {
       lues = DE_DEPART as unknown as Record<string, unknown>;
     }
@@ -89,8 +91,10 @@ export class Genres {
     this.fiches.normale = { ...NORMALE, couleur: this.fiches.normale?.couleur ?? NORMALE.couleur };
   }
 
+  // Un genre changé change Mon aventure : son record ne vaut plus
   enregistrer() {
     ecrire(CLE, this.fiches);
+    oublierLeRecord();
   }
 
   // Un genre inconnu (supprimé, mal écrit) se comporte comme la normale

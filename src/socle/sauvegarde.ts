@@ -25,3 +25,14 @@ export function oublier(cle: string) {
     // rien à oublier
   }
 }
+
+// Oublie toutes les sauvegardes dont la clé commence par ce préfixe (« platformer/niveau/ ») : pour
+// effacer d'un coup des sauvegardes dont on ne connaît pas tous les noms
+export function oublierTout(prefixe: string) {
+  try {
+    const cles = Object.keys(localStorage).filter((cle) => cle.startsWith(prefixe));
+    cles.forEach((cle) => localStorage.removeItem(cle));
+  } catch {
+    // rien à oublier
+  }
+}

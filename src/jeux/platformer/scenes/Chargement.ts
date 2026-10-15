@@ -5,6 +5,7 @@ import Phaser from "phaser";
 import { fabriquerTextures, garderLesPixelsNets } from "../textures";
 import { creerLesAnimations, type Descriptif } from "../Heros";
 import { AVEC_IMAGE } from "../genres";
+import { oublierLesAnciennesSauvegardes } from "../niveaux";
 import { barreDeChargement } from "../../../socle/chargement";
 
 const IMAGES = ["drapeau", "ennemi", "volant", "sauteur", "piece"];
@@ -46,6 +47,7 @@ export class Chargement extends Phaser.Scene {
     const descriptif = this.cache.json.get("platformer-descriptif") as Descriptif;
     creerLesAnimations(this, "platformer-heros", descriptif);
     creerLesAnimations(this, "platformer-heros2", descriptif);
+    oublierLesAnciennesSauvegardes();
     this.scene.start("platformer-menu");
   }
 }
