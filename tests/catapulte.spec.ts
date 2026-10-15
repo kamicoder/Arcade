@@ -176,11 +176,15 @@ test("gagner : plus de slime, des étoiles selon les boulets restants, et le niv
   expect(garde[0].etoiles).toBe(3);
   expect(garde[0].score).toBeGreaterThanOrEqual(2500);
   await page.waitForTimeout(800);          // la fin n'écoute qu'après un petit moment
-  await appuyer(page, "Enter");            // « Niveau suivant », le premier bouton
+  await appuyer(page, "Enter");            // « Niveau suivant », le premier bouton...
+  await appuyer(page, "Escape");           // ... puis Échap pendant le fondu : le premier départ seul compte
   await page.waitForFunction(() => {
     const n = (window as any).jeu.scene.getScene("catapulte-niveau");
     return n.sys.isActive() && n.numero === 1 && n.etat === "pret";
   }, undefined, { timeout: 20_000 });
+  await page.waitForTimeout(500);
+  expect(await page.evaluate(() => (window as any).jeu.scene.isActive("catapulte-menu"))).toBe(false);
+  expect((await niveau(page)).etat).toBe("pret");
   sansErreur();
 });
 
@@ -203,6 +207,56 @@ test("perdre : plus de boulet, des slimes encore là, et Rejouer recommence le n
   sansErreur();
 });
 
+// Un bloc lâché de très haut tombe encore longtemps après le tir (plus de 9 s) : le tir n'est pas coupé tant
+// que tout bouge, et une fois la fin dite, plus rien ne compte (le score affiché est celui gardé)
+test("la fin d'un tir attend que tout soit calme, et rien ne compte plus après", async ({ page }) => {
+  test.setTimeout(90_000);
+  const { sansErreur } = await menuCatapulte(page);
+  await jouerLeNiveau(page, 2);            // « Sur la glace » : un slime à découvert, à droite
+  await page.evaluate(() => {
+    const n = (window as any).jeu.scene.getScene("catapulte-niveau");
+    n.file = [];                           // le dernier boulet
+    n.force = 0.3;                         // un tir trop faible, vite posé
+    const slime = n.slimes.find((s: any) => s.image.x > 1100).image;
+    n.poserUnBloc({ matiere: "pierre", forme: "carre", x: slime.x, y: -17000 });
+  });
+  await appuyer(page, "Space");
+  await page.waitForFunction(() => {
+    const n = (window as any).jeu.scene.getScene("catapulte-niveau");
+    return n.time.now - n.tirDepuis > 9500;
+  }, undefined, { timeout: 30_000 });
+  expect((await niveau(page)).etat).toBe("vol");
+  await page.waitForFunction(() => (window as any).jeu.scene.isActive("catapulte-fin"), undefined, { timeout: 40_000 });
+  const fin = await page.evaluate(() => {
+    const n = (window as any).jeu.scene.getScene("catapulte-niveau");
+    const donnees = (window as any).jeu.scene.getScene("catapulte-fin").sys.settings.data;
+    return { gagne: donnees.gagne as boolean, score: donnees.score as number, slimes: n.slimes.length as number, actuel: n.score as number };
+  });
+  // La fin dit ce qui est (gagné si le bloc a écrasé le slime), et le score gardé est celui affiché
+  expect(fin.gagne).toBe(fin.slimes === 0);
+  if (fin.gagne) {
+    const garde = await page.evaluate(() => JSON.parse(localStorage.getItem("catapulte/niveaux")!));
+    expect(garde[2].score).toBe(fin.score);
+  }
+  await page.waitForTimeout(1500);
+  expect(await niveau(page)).toMatchObject({ score: fin.actuel, slimes: fin.slimes });
+  sansErreur();
+});
+
+test("ce qui tombe du monde disparaît, sans rapporter de points", async ({ page }) => {
+  const { sansErreur } = await menuCatapulte(page);
+  await jouerLeNiveau(page, 2);
+  // Un slime projeté vers la droite (réveillé : posé, il dormait) : la physique l'emporte au-delà du bord
+  await page.evaluate(() => {
+    const n = (window as any).jeu.scene.getScene("catapulte-niveau");
+    const slime = n.slimes.find((s: any) => s.image.x > 1100).image;
+    slime.setAwake().setPosition(1500, 200).setVelocity(15, 0);
+  });
+  await page.waitForFunction(() => (window as any).jeu.scene.getScene("catapulte-niveau").slimes.length === 1);
+  expect((await niveau(page)).score).toBe(0);
+  sansErreur();
+});
+
 test("les boulets spéciaux montrent leur pouvoir, et le triple se divise en trois (clic ou Espace) en plein vol", async ({ page }) => {
   const { sansErreur } = await menuCatapulte(page);
   const fiche = () => page.evaluate(() => {
@@ -219,9 +273,26 @@ test("les boulets spéciaux montrent leur pouvoir, et le triple se divise en tro
   expect(await fiche()).toContain("se divise en trois");
   await appuyer(page, "Space");
   expect((await niveau(page)).enVol).toBe(1);
+  // Les trois petits ne se cognent pas entre eux : nés l'un dans l'autre, ils se repoussaient
+  await page.evaluate(() => {
+    const n = (window as any).jeu.scene.getScene("catapulte-niveau");
+    (window as any).__entreBoulets = 0;
+    n.matter.world.on("collisionstart", (e: any) => {
+      for (const { bodyA, bodyB } of e.pairs) {
+        if (bodyA.label === "boulet" && bodyB.label === "boulet") {
+          (window as any).__entreBoulets++;
+        }
+      }
+    });
+  });
   await page.waitForTimeout(300);
   await appuyer(page, "Space");
   expect((await niveau(page)).enVol).toBe(3);
+  await page.waitForTimeout(300);
+  expect(await page.evaluate(() => (window as any).__entreBoulets)).toBe(0);
+  // Et ils frottent comme un boulet normal
+  expect(await page.evaluate(() => (window as any).jeu.scene.getScene("catapulte-niveau").enVol
+    .map((p: any) => p.image.body.friction))).toEqual([0.5, 0.5, 0.5]);
   // Divisé : la fiche s'en va
   await page.waitForFunction(() => !(window as any).jeu.scene.getScene("catapulte-tableau").fiche.visible);
   sansErreur();
@@ -243,17 +314,34 @@ test.describe("au doigt", () => {
     await page.touchscreen.tap(p.x, p.y);
     await attendreLEtat(page, "pret");
 
+    // Une tape à gauche (pour chasser l'annonce, par exemple) ne tire pas
+    const tape = await duMonde(page, 300, 300);
+    await page.touchscreen.tap(tape.x, tape.y);
+    await page.waitForTimeout(300);
+    expect(await niveau(page)).toMatchObject({ etat: "pret", file: 2 });
+
+    // Le doigt posé loin du boulet, on tire en arrière : le boulet suit le glissé, sans sauter sous le doigt
     const cdp = await page.context().newCDPSession(page);
-    const de = await duMonde(page, 190, 520);
+    const de = await duMonde(page, 300, 300);
     await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x: de.x, y: de.y, id: 1 }] });
+    await page.waitForTimeout(50);
+    expect((await niveau(page)).etat).toBe("pret");
     for (let k = 1; k <= 8; k++) {
-      const a = await duMonde(page, 190 - 11 * k, 520 + 7 * k);
+      const a = await duMonde(page, 300 - 11 * k, 300 + 7 * k);
       await cdp.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ x: a.x, y: a.y, id: 1 }] });
       await page.waitForTimeout(20);
     }
     expect((await niveau(page)).etat).toBe("vise");
+    const boulet = await page.evaluate(() => {
+      const image = (window as any).jeu.scene.getScene("catapulte-niveau").boulet.image;
+      return { x: image.x as number, y: image.y as number };
+    });
+    expect(boulet.x).toBeCloseTo(190 - 88, -1);
+    expect(boulet.y).toBeCloseTo(520 + 56, -1);
     await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
-    expect((await niveau(page)).etat).toBe("vol");
+    const vol = await niveau(page);
+    expect(vol.etat).toBe("vol");
+    expect(vol.vitesse!.x).toBeGreaterThan(10);
     sansErreur();
   });
 });

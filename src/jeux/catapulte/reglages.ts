@@ -64,9 +64,11 @@ export const FORCE_DES_CHOCS = 4;
 export const MASSE_MAX = 6;
 export const CALME_AU_DEBUT = 1200;        // ms : le château se pose, sans dégâts
 
-// Un tir est fini quand tout est calme (plus rien ne bouge), ou au bout de ce temps
+// Un tir est fini quand tout est calme (plus rien ne bouge). TIR_MAX n'est qu'un secours, pour un bloc qui
+// tremblerait sans fin : un château qui s'écroule encore n'est pas coupé (à 9 s, il l'était : « Raté »,
+// puis le dernier slime mourait)
 export const VITESSE_CALME = 0.15;
-export const TIR_MAX = 9000;
+export const TIR_MAX = 20000;
 
 // Les points
 export const POINTS_PAR_BOULET_RESTANT = 1000;

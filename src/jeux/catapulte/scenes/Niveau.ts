@@ -19,6 +19,7 @@ import {
 import { surTouche } from "../../../socle/clavier";
 import { surManette, MANETTE } from "../../../socle/manette";
 import { fonduPuis } from "../../../socle/retour";
+import { uneSeuleFois } from "../../../socle/fin";
 import { appliquerLeSon, toucheDuSon } from "../../../socle/son";
 
 export type Etat = "attente" | "pret" | "vise" | "vol" | "fini";
@@ -41,6 +42,15 @@ export interface DonneesDeNiveau {
 
 // Les débris et les gouttes, une gerbe par matière
 const ECLATS = ["eclat-bois", "eclat-pierre", "eclat-glace", "goutte"];
+
+// Le corps d'un boulet, le même pour tous : celui de la fronde comme les trois petits du triple
+function corpsDeBoulet(genre: GenreDeBoulet): Phaser.Types.Physics.Matter.MatterBodyConfig {
+  const fiche = BOULETS[genre];
+  return {
+    label: "boulet", shape: { type: "circle", radius: fiche.rayon }, density: fiche.densite, friction: 0.5, restitution: 0.3,
+    frictionAir: FROTTEMENT_DE_L_AIR,
+  };
+}
 
 export class Niveau extends Phaser.Scene {
   numero = 0;
@@ -65,7 +75,8 @@ export class Niveau extends Phaser.Scene {
   private tirDepuis = 0;
   private divise = false;                  // le triple s'est déjà divisé
   private dernierBruit = 0;
-  private quitte = false;
+  private prise: Point | null = null;      // où le doigt (ou la souris) s'est posé pour tirer l'élastique
+  private partir = uneSeuleFois();         // rejouer, le niveau suivant ou les niveaux : un seul départ
 
   constructor() {
     super({
@@ -93,7 +104,8 @@ export class Niveau extends Phaser.Scene {
     this.enAttente = [];
     this.gerbes = new Map();
     this.divise = false;
-    this.quitte = false;
+    this.prise = null;
+    this.partir = uneSeuleFois();
   }
 
   create() {
@@ -178,10 +190,7 @@ export class Niveau extends Phaser.Scene {
       return;
     }
     const fiche = BOULETS[genre];
-    const image = this.matter.add.image(REPOS.x, REPOS.y, "catapulte-" + fiche.image, undefined, {
-      label: "boulet", shape: { type: "circle", radius: fiche.rayon }, density: fiche.densite, friction: 0.5, restitution: 0.3,
-      frictionAir: FROTTEMENT_DE_L_AIR,
-    });
+    const image = this.matter.add.image(REPOS.x, REPOS.y, "catapulte-" + fiche.image, undefined, corpsDeBoulet(genre));
     // Immobile dans la fronde jusqu'au tir. Rendu immobile APRÈS sa création : créé immobile (isStatic dans
     // ses options), Matter ne connaît pas encore sa masse, et le libérer lui donnerait une masse NaN.
     image.setStatic(true);
@@ -261,11 +270,12 @@ export class Niveau extends Phaser.Scene {
     const vitesse = Math.hypot(v.x, v.y);
     const angle = Math.atan2(v.y, v.x);
     this.retirer(boulet);
+    // Côte à côte, en travers de leur vol, sans se toucher : nés l'un dans l'autre, ils se repoussaient
+    const fiche = BOULETS.petit;
+    const ecart = fiche.rayon * 2 + 2;
     this.enVol = [-1, 0, 1].map((cote) => {
-      const fiche = BOULETS.petit;
-      const image = this.matter.add.image(x, y + cote * 10, "catapulte-" + fiche.image, undefined, {
-        label: "boulet", shape: { type: "circle", radius: fiche.rayon }, density: fiche.densite, restitution: 0.3, frictionAir: FROTTEMENT_DE_L_AIR,
-      });
+      const ici = { x: x - Math.sin(angle) * cote * ecart, y: y + Math.cos(angle) * cote * ecart };
+      const image = this.matter.add.image(ici.x, ici.y, "catapulte-" + fiche.image, undefined, corpsDeBoulet("petit"));
       image.setDepth(5).setVelocity(Math.cos(angle + cote * ECART_DU_TRIPLE) * vitesse, Math.sin(angle + cote * ECART_DU_TRIPLE) * vitesse);
       const piece: Piece = { image, sorte: "boulet", genre: "petit", vie: 1, vieMax: 1, detruite: false };
       this.pieces.set(image, piece);
@@ -286,23 +296,27 @@ export class Niveau extends Phaser.Scene {
   // —— Le clavier, la manette, le doigt et la souris ——
 
   private ecouter() {
-    // Le doigt ou la souris : attraper le boulet (ou poser le doigt n'importe où à gauche), tirer, lâcher
+    // Le doigt ou la souris : se poser sur le boulet (ou n'importe où à gauche), tirer, lâcher. Comme un
+    // élastique : le boulet suit le glissé depuis l'endroit où l'on s'est posé, il ne saute pas sous le
+    // doigt. Une tape sans glisser ne tire donc pas (une tape pour chasser l'annonce partait en tir).
     this.input.on(Phaser.Input.Events.POINTER_DOWN, (pointeur: Phaser.Input.Pointer) => {
       if (this.etat === "vol") {
         this.pouvoir();
         return;
       }
       const p = { x: pointeur.worldX, y: pointeur.worldY };
-      if (this.etat === "pret" && (Math.hypot(p.x - REPOS.x, p.y - REPOS.y) < ZONE_DE_PRISE || p.x < MONDE.largeur * 0.4)) {
-        this.viser(p);
-      }
+      const prenable = Math.hypot(p.x - REPOS.x, p.y - REPOS.y) < ZONE_DE_PRISE || p.x < MONDE.largeur * 0.4;
+      this.prise = this.etat === "pret" && prenable ? p : null;
     });
     this.input.on(Phaser.Input.Events.POINTER_MOVE, (pointeur: Phaser.Input.Pointer) => {
-      if (this.etat === "vise" && pointeur.isDown) {
-        this.viser({ x: pointeur.worldX, y: pointeur.worldY });
+      if (this.prise && pointeur.isDown && (this.etat === "pret" || this.etat === "vise")) {
+        this.viser({ x: REPOS.x + pointeur.worldX - this.prise.x, y: REPOS.y + pointeur.worldY - this.prise.y });
       }
     });
-    this.input.on(Phaser.Input.Events.POINTER_UP, () => this.lacher());
+    this.input.on(Phaser.Input.Events.POINTER_UP, () => {
+      this.prise = null;
+      this.lacher();
+    });
 
     // Le clavier et la manette : l'angle et la force, puis on tire ; en vol, le pouvoir du boulet
     const regler = (dAngle: number, dForce: number) => {
@@ -342,7 +356,8 @@ export class Niveau extends Phaser.Scene {
   // —— Les chocs ——
 
   private chocs(paires: { bodyA: MatterJS.BodyType; bodyB: MatterJS.BodyType }[]) {
-    if (this.time.now < this.calmeJusqua) {
+    // Le niveau fini, plus rien ne compte : ni dégât, ni point (le score est gardé, la fin est dite)
+    if (this.time.now < this.calmeJusqua || this.etat === "fini") {
       return;
     }
     for (const { bodyA, bodyB } of paires) {
@@ -396,7 +411,8 @@ export class Niveau extends Phaser.Scene {
   private detruire(piece: Piece, avecEclat: boolean) {
     piece.detruite = true;
     const { x, y } = piece.image;
-    const points = piece.sorte === "bloc" ? MATIERES[piece.matiere!].points : piece.sorte === "slime" ? SLIMES[piece.genre as GenreDeSlime].points : 0;
+    const points = !avecEclat || this.etat === "fini" ? 0
+      : piece.sorte === "bloc" ? MATIERES[piece.matiere!].points : piece.sorte === "slime" ? SLIMES[piece.genre as GenreDeSlime].points : 0;
     if (avecEclat) {
       const eclat = piece.sorte === "slime" ? "goutte" : MATIERES[piece.matiere!].eclat;
       this.gerbes.get(eclat)!.explode(piece.sorte === "slime" ? 24 : 12, x, y);
@@ -502,29 +518,31 @@ export class Niveau extends Phaser.Scene {
 
   // —— Partir ——
 
+  // Un seul départ, le premier : « Niveau suivant » puis Échap pendant le fondu lançait les deux
+
   rejouer() {
-    this.scene.stop("catapulte-fin");
-    this.scene.stop("catapulte-tableau");
-    this.scene.restart({ numero: this.numero });
+    this.partir(() => {
+      this.scene.stop("catapulte-fin");
+      this.scene.stop("catapulte-tableau");
+      this.scene.restart({ numero: this.numero });
+    })();
   }
 
   suivant() {
-    this.scene.stop("catapulte-fin");
-    this.scene.stop("catapulte-tableau");
-    fonduPuis(this, () => this.scene.restart({ numero: this.numero + 1 }));
+    this.partir(() => {
+      this.scene.stop("catapulte-fin");
+      this.scene.stop("catapulte-tableau");
+      fonduPuis(this, () => this.scene.restart({ numero: this.numero + 1 }));
+    })();
   }
 
   quitter() {
-    if (this.quitte) {
-      return;
-    }
-    this.quitte = true;
-    fonduPuis(this, () => {
+    this.partir(() => fonduPuis(this, () => {
       this.scene.stop("catapulte-tableau");
       this.scene.stop("catapulte-fin");
       const menu = this.scene.get("catapulte-menu") as Phaser.Scene & { choisi: number };
       menu.choisi = this.numero;
       this.scene.start("catapulte-menu");
-    });
+    }))();
   }
 }
