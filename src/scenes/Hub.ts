@@ -9,13 +9,18 @@ import { surManette, MANETTE, VALIDER } from "../socle/manette";
 import { fonduPuis } from "../socle/retour";
 import { quandNouvelleVersion, installerNouvelleVersion } from "../socle/miseAJour";
 
-// Jusqu'à 6 jeux, 3 grandes cartes par rangée ; au-delà, 4 plus petites (trois rangées ne tiendraient
-// pas en hauteur)
-const GRANDES = CATALOGUE.length <= 6;
-const PAR_RANGEE = GRANDES ? 3 : 4;
-const CARTE_L = GRANDES ? 240 : 200;
-const CARTE_H = GRANDES ? 170 : 160;
-const ECART = GRANDES ? 30 : 24;
+// Toujours deux rangées au plus (trois ne tiendraient pas en hauteur) : jusqu'à 6 jeux, 3 grandes cartes
+// par rangée ; jusqu'à 8, 4 plus petites ; au-delà, 5 plus petites encore
+const TAILLES = [
+  { jeux: 6, parRangee: 3, largeur: 240, hauteur: 170, ecart: 30, emoji: 64, titre: 20 },
+  { jeux: 8, parRangee: 4, largeur: 200, hauteur: 160, ecart: 24, emoji: 58, titre: 18 },
+  { jeux: 10, parRangee: 5, largeur: 172, hauteur: 150, ecart: 14, emoji: 52, titre: 16 },
+];
+const TAILLE = TAILLES.find((t) => CATALOGUE.length <= t.jeux) ?? TAILLES[TAILLES.length - 1];
+const PAR_RANGEE = TAILLE.parRangee;
+const CARTE_L = TAILLE.largeur;
+const CARTE_H = TAILLE.hauteur;
+const ECART = TAILLE.ecart;
 
 interface Carte {
   fiche: FicheDeJeu;
@@ -92,9 +97,9 @@ export class Hub extends Phaser.Scene {
       const fond = this.add.rectangle(0, 0, CARTE_L, CARTE_H, COULEURS.carte)
         .setRounded(22)
         .setStrokeStyle(3, COULEURS.carteBord);
-      const emoji = this.add.text(0, -18, fiche.emoji, { fontSize: GRANDES ? "64px" : "58px" }).setOrigin(0.5);
+      const emoji = this.add.text(0, -18, fiche.emoji, { fontSize: TAILLE.emoji + "px" }).setOrigin(0.5);
       const titre = this.add.text(0, 52, fiche.titre, {
-        fontFamily: POLICE, fontSize: GRANDES ? "20px" : "18px", fontStyle: "bold", color: COULEURS.texte,
+        fontFamily: POLICE, fontSize: TAILLE.titre + "px", fontStyle: "bold", color: COULEURS.texte,
       }).setOrigin(0.5);
       const boite = this.add.container(x, y, [fond, emoji, titre]);
 

@@ -55,4 +55,8 @@ export const CATALOGUE: FicheDeJeu[] = [
     cle: "catapulte", titre: "Catapulte", emoji: "🏰", couleur: 0xdc9a52,
     charger: () => import("./catapulte").then((module) => module.default),
   },
+  {
+    cle: "briques", titre: "Casse-briques", emoji: "🧱", couleur: 0x9b6bff,
+    charger: () => import("./briques").then((module) => module.default),
+  },
 ];

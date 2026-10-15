@@ -35,6 +35,8 @@ Les téléphones récupèrent la nouvelle version tout seuls, au retour dans le 
 | `public/` | Copié tel quel : icônes, sons |
 | `src/jeux/tamago/` | Le Tamago : un animal virtuel qui vit pendant qu'on joue ; ses règles dans `REGLES.md` |
 | `src/jeux/catapulte/` | La catapulte : le château contre les slimes, en physique Matter ; les calculs du tir dans `tir.ts`, les niveaux dans `niveaux.ts` |
+| `src/jeux/briques/` | Le casse-briques : dix niveaux dessinés et un mode sans fin, en physique Arcade ; les murs dans `niveaux.ts`, les rebonds sur la raquette dans `rebond.ts` |
+| `outils/briques/` | Les sons du casse-briques : `node outils/briques/sons.mjs public/briques/sons` les refabrique |
 | `outils/catapulte/` | L'atelier des images et des sons de la catapulte : `node outils/catapulte/dessiner.mjs planche` les redessine dans `public/catapulte/` |
 | `docs/CARNET-PHASER.md` | Apprendre Phaser en suivant la construction de l'Arcade |
 | `docs/PIEGES-PHASER.md` | Les pièges de Phaser 4 rencontrés en route, et les défauts de la 4.2 contournés |
