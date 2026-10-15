@@ -18,6 +18,7 @@ export class Fin extends Phaser.Scene {
     const combat = this.scene.get("baston-combat") as Combat;
     const milieu = this.scale.width / 2;   // la baston peut être plus large que 960 (au doigt)
     const bleuGagne = combat.manches.gauche >= MANCHES_GAGNANTES;
+    const teinte = bleuGagne ? BLEU : ORANGE;   // le titre et les boutons : la couleur du vainqueur
     let titre = bleuGagne ? "Le robot bleu gagne !" : "Le robot orange gagne !";
     if (combat.solo) {
       titre = bleuGagne ? "Tu gagnes !" : "L'ordinateur gagne !";
@@ -27,7 +28,7 @@ export class Fin extends Phaser.Scene {
     this.tweens.add({ targets: voile, alpha: 1, duration: 300 });
     const lignes = [
       this.add.text(milieu, 120, titre, {
-        fontFamily: POLICE, fontSize: "56px", fontStyle: "bold", color: enCouleur(bleuGagne ? BLEU : ORANGE),
+        fontFamily: POLICE, fontSize: "56px", fontStyle: "bold", color: enCouleur(teinte),
         stroke: "#1c1a25", strokeThickness: 8,
       }).setOrigin(0.5),
       // Le score du vainqueur d'abord : « 2 manches à 1 »
@@ -47,7 +48,7 @@ export class Fin extends Phaser.Scene {
         { nom: "Revanche", action: () => combat.revanche() },
         { nom: "Changer de robots", action: () => combat.quitter("baston-choix") },
         { nom: "Menu", action: () => combat.quitter() },
-      ], { x: milieu, y: 280, largeur: 340, hauteur: 58, ecart: 74 }, { couleur: ORANGE });
+      ], { x: milieu, y: 280, largeur: 340, hauteur: 58, ecart: 74 }, { couleur: teinte });
       surTouche(this, "ESC", () => combat.quitter());
       surManette(this, MANETTE.B, () => combat.quitter());
     });

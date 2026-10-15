@@ -13,7 +13,7 @@ import { compterUnMatch, type DonneesDeCombat } from "../partie";
 import { dessinerArene } from "../decor";
 import {
   SOL, GRAVITE, DEPART, BLEU, ORANGE, MANCHES_GAGNANTES, DUREE_ANNONCE, DUREE_KO,
-  SECOUSSE, RALENTI, COULEUR_ETINCELLES, BOITES, AIDE_MOBILE, PROFONDEUR,
+  SECOUSSE, RALENTI, COULEUR_ETINCELLES, BOITES, AIDE_MOBILE, PROFONDEUR, SAUVEGARDE,
 } from "../reglages";
 import { HAUTEUR, POLICE } from "../../../socle/style";
 import { surTouche } from "../../../socle/clavier";
@@ -21,6 +21,7 @@ import { surManette, MANETTE } from "../../../socle/manette";
 import { estTactile } from "../../../socle/tactile";
 import { fonduPuis } from "../../../socle/retour";
 import { elargir } from "../../../socle/largeur";
+import { toucheDuSon } from "../../../socle/son";
 
 // « debut » : on annonce la manche, personne ne bouge. « ko » : on peut encore bouger, plus se battre.
 // « fini » : le match est joué, tout s'arrête.
@@ -119,6 +120,7 @@ export class Combat extends Phaser.Scene {
     surTouche(this, "ESC", () => this.quitter());
     // Le bouton Start d'une manette (le 9 d'une manette « standard ») : on quitte aussi
     surManette(this, MANETTE.START, () => this.quitter());
+    toucheDuSon(this, SAUVEGARDE);         // M : couper le son, ou le remettre (aucun robot ne s'en sert)
 
     if (BOITES) {
       this.boites = this.add.graphics().setDepth(PROFONDEUR.boites);
@@ -256,6 +258,11 @@ export class Combat extends Phaser.Scene {
   }
 
   private finirLaManche() {
+    // On a quitté pendant le K.O. : ni manche suivante, ni écran de fin, et le match ne compte pas.
+    // La minuterie du K.O. tourne encore pendant le fondu du départ : elle arrive ici quand même.
+    if (this.enPartance) {
+      return;
+    }
     if (this.manches.gauche >= MANCHES_GAGNANTES || this.manches.droite >= MANCHES_GAGNANTES) {
       // Le match est fini : tout s'arrête derrière l'écran de fin
       this.changerDePhase("fini");
@@ -267,9 +274,6 @@ export class Combat extends Phaser.Scene {
       return;
     }
     // Une nouvelle manche : la même scène, redémarrée avec le score
-    if (this.enPartance) {
-      return;                              // on a quitté pendant le K.O.
-    }
     this.enPartance = true;
     const donnees: DonneesDeCombat = { solo: this.solo, modeles: this.modeles, manches: this.manches };
     fonduPuis(this, () => this.scene.restart(donnees));

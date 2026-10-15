@@ -34,6 +34,8 @@ export class Robot extends Phaser.Physics.Arcade.Sprite implements VueDeRobot {
   recul = 0;                               // sa vitesse de recul quand il est touché (pixels/s)
   direction: 1 | -1 = 1;
   private frappait = false;                // la commande « frapper » était-elle déjà là à l'image d'avant ?
+  private tirait = false;                  // et « tirer » (ou « special ») ?
+  private specialDemande = false;          // un appui donné jauge pleine, encore tenu : le spécial attend de partir
 
   constructor(scene: Phaser.Scene, x: number, couleur: CouleurDeRobot, teinte: number, modele: Modele) {
     super(scene, x, SOL, cleDePlanche(couleur), "repos-0");
@@ -112,13 +114,24 @@ export class Robot extends Phaser.Physics.Arcade.Sprite implements VueDeRobot {
     // Un nouvel appui seulement : garder la touche ne refrappe pas
     const frappe = commandes.frapper && !this.frappait;
     this.frappait = commandes.frapper;
+    // Le coup spécial aussi : seul un appui donné jauge pleine le lance. Garder le tir pendant que la
+    // jauge se remplit ne le lâche pas par surprise. L'appui reste valable tant qu'on tient : donné
+    // pendant un tir ou un coup encaissé, le spécial part dès qu'il a les mains libres.
+    const tire = commandes.tirer || commandes.special;
+    if (tire && !this.tirait && this.jauge >= JAUGE) {
+      this.specialDemande = true;
+    } else if (!tire) {
+      this.specialDemande = false;
+    }
+    this.tirait = tire;
 
     let marche = 0;
     if (this.etat === "repos" || this.etat === "marche") {
       // Au sol, les mains libres : il peut tout faire
       if (frappe) {
         this.passer("attaque", DUREE.attaque);
-      } else if ((commandes.tirer || commandes.special) && this.jauge >= JAUGE) {
+      } else if (this.specialDemande && this.jauge >= JAUGE) {
+        this.specialDemande = false;
         this.lancerLeSpecial();
       } else if (commandes.tirer && this.tirs.getLength() < TIRS) {
         this.tirer();

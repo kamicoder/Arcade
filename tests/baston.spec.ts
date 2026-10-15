@@ -171,6 +171,112 @@ test("la fin du match : le vainqueur, le bilan gardé, et la revanche", async ({
   sansErreur();
 });
 
+test("garder le tir pendant que la jauge se remplit ne lâche pas le spécial : il faut un nouvel appui", async ({ page }) => {
+  const { sansErreur } = await combatSolo(page);
+  await placer(page, 200, 600);
+  await page.evaluate(() => {
+    const c = (window as any).jeu.scene.getScene("baston-combat");
+    c.specialsLances = 0;
+    c.gauche.on("special", () => c.specialsLances++);
+  });
+
+  // G tenu : des tirs normaux, en rafale ; la jauge se remplit pendant ce temps
+  await page.keyboard.down("g");
+  await page.waitForFunction(() => (window as any).jeu.scene.getScene("baston-combat").gauche.etat === "tir");
+  await page.evaluate(() => {
+    (window as any).jeu.scene.getScene("baston-combat").gauche.jauge = 100;
+  });
+  // Le robot repasse plusieurs fois au repos, les mains libres, la touche toujours tenue
+  await page.waitForTimeout(600);
+  let lances = await page.evaluate(() => (window as any).jeu.scene.getScene("baston-combat").specialsLances);
+  expect(lances).toBe(0);
+  expect((await combat(page)).gauche.jauge).toBe(100);
+  await page.keyboard.up("g");
+
+  // Un nouvel appui, les mains libres (un appui bref pendant un tir n'est pas gardé, comme pour frapper) :
+  // le spécial part
+  await page.waitForFunction(() => (window as any).jeu.scene.getScene("baston-combat").gauche.etat === "repos");
+  await appuyer(page, "g");
+  await page.waitForFunction(() => (window as any).jeu.scene.getScene("baston-combat").specialsLances === 1);
+  expect((await combat(page)).gauche.jauge).toBe(0);
+  sansErreur();
+});
+
+test("Échap pendant le K.O. de la dernière manche : on quitte, sans écran de fin, et le match ne compte pas", async ({ page }) => {
+  const { sansErreur } = await combatSolo(page);
+  await placer(page, 400, 450);
+  await page.evaluate(() => {
+    const c = (window as any).jeu.scene.getScene("baston-combat");
+    c.manches.gauche = 1;                  // la manche de la victoire
+    c.droite.vie = 1;
+    c.finVue = false;
+    (window as any).jeu.scene.getScene("baston-fin").events.once("create", () => { c.finVue = true; });
+  });
+  await appuyer(page, "f");
+  await attendrePhase(page, "ko");
+
+  // La minuterie du K.O. tombe pendant le fondu du départ : on l'y pousse, dès qu'Échap est vu
+  // (attendre ses vraies secondes laisserait le hasard dire si Échap arrive avant ou après elle)
+  const presse = page.evaluate(() => new Promise<void>((fini) => {
+    const c = (window as any).jeu.scene.getScene("baston-combat");
+    const guetter = () => {
+      if (c.enPartance) {
+        c.time.timeScale = 1000;
+        fini();
+      } else {
+        requestAnimationFrame(guetter);
+      }
+    };
+    guetter();
+  }));
+  await appuyer(page, "Escape");
+  await presse;
+  await attendreScene(page, "baston-titre");
+  expect(await page.evaluate(() => (window as any).jeu.scene.getScene("baston-combat").finVue)).toBe(false);
+  expect(await page.evaluate(() => localStorage.getItem("baston/contre-ordinateur"))).toBeNull();
+  sansErreur();
+});
+
+test("le bleu gagne à deux : les boutons de fin sont bleus", async ({ page }) => {
+  const { sansErreur } = await titreBaston(page);
+  await appuyer(page, "d");
+  await attendreScene(page, "baston-choix");
+  await appuyer(page, "f");
+  await appuyer(page, "k");
+  await attendreScene(page, "baston-combat");
+  await attendrePhase(page, "combat");
+  await placer(page, 400, 450);
+  await page.evaluate(() => {
+    const c = (window as any).jeu.scene.getScene("baston-combat");
+    c.manches.gauche = 1;
+    c.droite.vie = 1;
+  });
+  await appuyer(page, "f");
+  await attendreScene(page, "baston-fin");
+  // Les boutons arrivent un peu après ; le choisi (Revanche) a la couleur du vainqueur
+  const couleurs = await page.waitForFunction(() => {
+    const fin = (window as any).jeu.scene.getScene("baston-fin");
+    const fonds = fin.children.list.filter((o: any) => o.type === "Rectangle" && o.width === 340);
+    return fonds.length === 3 && fonds.map((o: any) => o.fillColor);
+  });
+  const [revanche] = await couleurs.jsonValue() as number[];
+  expect(revanche).toBe(0x50aaf0);         // BLEU
+  sansErreur();
+});
+
+test("M coupe le son au titre comme en combat, et c'est rangé", async ({ page }) => {
+  const { sansErreur } = await titreBaston(page);
+  await appuyer(page, "m");
+  expect(await page.evaluate(() => localStorage.getItem("baston/son"))).toBe("false");
+  await appuyer(page, "o");
+  await attendreScene(page, "baston-choix");
+  await appuyer(page, "f");
+  await attendreScene(page, "baston-combat");
+  await appuyer(page, "m");
+  expect(await page.evaluate(() => localStorage.getItem("baston/son"))).toBe("true");
+  sansErreur();
+});
+
 test("à deux sur le même clavier : chacun ses touches et son robot", async ({ page }) => {
   const { sansErreur } = await titreBaston(page);
   await appuyer(page, "d");
@@ -344,6 +450,16 @@ test.describe("au doigt", () => {
     await page.waitForFunction(() => (window as any).jeu.scene.getScene("baston-tableau").specialPret === true);
     await toucher(page, largeur - 104, 272);
     await page.waitForFunction(() => (window as any).jeu.scene.getScene("baston-combat").gauche.jauge === 0);
+    sansErreur();
+  });
+
+  test("la touche D ne lance pas « À deux », caché au doigt", async ({ page }) => {
+    const { sansErreur } = await ouvrir(page);
+    await toucherLaCarte(page, "baston");
+    await attendreScene(page, "baston-titre");
+    await appuyer(page, "d");
+    await page.waitForTimeout(400);       // le fondu d'un départ aurait eu le temps de finir
+    expect(await scenesActives(page)).toEqual(["baston-titre"]);
     sansErreur();
   });
 

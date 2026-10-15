@@ -7,7 +7,7 @@ import { lireLeBilan } from "../partie";
 import { manettes, TOUCHES, type Cote } from "../commandes";
 import { etiquette } from "../../../socle/touchesPhysiques";
 import { cleDePlanche, cleDAnimation } from "../textures";
-import { SOL, ECHELLE, ORANGE } from "../reglages";
+import { SOL, ECHELLE, ORANGE, SAUVEGARDE } from "../reglages";
 import { POLICE } from "../../../socle/style";
 import { surTouche } from "../../../socle/clavier";
 import { surManette, MANETTE } from "../../../socle/manette";
@@ -15,6 +15,7 @@ import { estTactile } from "../../../socle/tactile";
 import { retourAuHub, fonduPuis } from "../../../socle/retour";
 import { elargir, suivreLaLargeur } from "../../../socle/largeur";
 import { boutonArcade } from "../../../socle/boutonArcade";
+import { appliquerLeSon, boutonDuSon } from "../../../socle/son";
 
 export class Titre extends Phaser.Scene {
   private parti = false;
@@ -25,6 +26,7 @@ export class Titre extends Phaser.Scene {
 
   create() {
     this.parti = false;
+    appliquerLeSon(this, SAUVEGARDE);      // le son tel que le joueur l'a laissé (le Hub l'a remis)
     // Au doigt, la baston prend toute la largeur du téléphone (voir socle/largeur.ts)
     elargir(this);
     suivreLaLargeur(this);
@@ -59,17 +61,19 @@ export class Titre extends Phaser.Scene {
     });
 
     boutonArcade(this);
+    boutonDuSon(this, SAUVEGARDE);
 
     // À deux, il faut deux mains sur un clavier, ou deux manettes : au doigt seul, on ne le propose pas
     const choix: Choix[] = [
       { nom: "Contre l'ordinateur", aide: estTactile() ? "Toi contre lui" : "O", action: () => this.lancer(true) },
     ];
+    // Sa touche D aussi : un choix caché ne se lance pas en cachette
     if (!estTactile() || manettes(this).length >= 2) {
       choix.push({ nom: "À deux", aide: "D", action: () => this.lancer(false) });
+      surTouche(this, "D", () => this.lancer(false));
     }
     new ListeDeBoutons(this, choix, { x: milieu, y: 190, largeur: 380, hauteur: 70, ecart: 90 }, { couleur: ORANGE });
     surTouche(this, "O", () => this.lancer(true));
-    surTouche(this, "D", () => this.lancer(false));
     surTouche(this, "ESC", () => retourAuHub(this));
     surManette(this, MANETTE.B, () => retourAuHub(this));
 
