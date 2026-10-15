@@ -3,6 +3,16 @@ import {
   ouvrir, appuyer, attendreScene, scenesActives, versLaPage, toucher, toucherLaCarte, ouvrirLaCarte, manette, manetteAToutes,
   attendreLaPause,
 } from "./outils";
+import { faisable } from "./faisable";
+import { Generateur } from "../src/jeux/platformer/generateur";
+import { SAUT_MEMORISE } from "../src/jeux/platformer/reglages";
+import type { Niveau as DonneesDuNiveau, Element } from "../src/jeux/platformer/elements";
+
+// Les niveaux de départ de l'Aventure, dans l'ordre
+const NIVEAUX = [
+  "Premiers pas", "Plateforme mobile", "Grand saut", "Ascenseur", "Glace et ressorts", "Tapis roulants",
+  "Plongée", "Pont fragile", "Téléporteurs", "Le boss",
+];
 
 // Du Hub jusqu'au menu du platformer
 async function menuPlatformer(page: Page) {
@@ -455,7 +465,7 @@ test("l'éditeur : créer un niveau, y poser des choses à la souris, le tester,
   await attendreScene(page, "platformer-menu");
   await choisirLeMode(page, 0, "platformer-niveau");
   expect(await page.evaluate(() => (window as any).jeu.scene.getScene("platformer-niveau").donnees.niveaux.map((n: any) => n.nom)))
-    .toEqual(["Premiers pas", "Plateforme mobile", "Grand saut", "Ascenseur", "Le boss", "Volcan"]);
+    .toEqual([...NIVEAUX, "Volcan"]);
   sansErreur();
 });
 
@@ -485,8 +495,10 @@ test("les genres de plateforme : le ressort fait rebondir, le tapis emporte, le 
   await page.waitForTimeout(400);
   expect((await niveau(page)).x).toBeGreaterThan(x + 30);
 
-  await poserLeHeros(page, 115, 255);      // sur le premier téléporteur : il arrive sur le second
+  await poserLeHeros(page, 115, 255);      // sur le premier téléporteur : il arrive sur le second...
   await page.waitForFunction(() => (window as any).jeu.scene.getScene("platformer-niveau").heros.body.x > 1690);
+  await page.waitForTimeout(500);          // ... et y reste (il repartait aussitôt d'où il venait)
+  expect((await niveau(page)).x).toBeGreaterThan(1690);
 
   await poserLeHeros(page, 835, 395);      // dans la lave
   await page.waitForFunction(() => !(window as any).jeu.scene.getScene("platformer-niveau").enJeu);
@@ -503,7 +515,7 @@ test("un niveau abîmé dans la sauvegarde est sauté, sans planter", async ({ p
   await attendreScene(page, "platformer-menu");
   await choisirLeMode(page, 0, "platformer-niveau");
   expect(await page.evaluate(() => (window as any).jeu.scene.getScene("platformer-niveau").donnees.niveaux.map((n: any) => n.nom)))
-    .toEqual(["Premiers pas", "Plateforme mobile", "Ascenseur", "Le boss"]);
+    .toEqual(NIVEAUX.filter((nom) => nom !== "Grand saut"));
   sansErreur();
 });
 
@@ -578,4 +590,170 @@ test.describe("au doigt", () => {
     expect((await niveau(page)).x).toBeCloseTo(arret.x, 0);
     sansErreur();
   });
+});
+
+// Un niveau d'essai, joué comme le bouton Tester de l'éditeur le ferait
+async function jouerUnEssai(page: Page, elements: Element[], largeur = 2000) {
+  await page.evaluate(([elements, largeur]) => {
+    (window as any).jeu.scene.getScene("platformer-menu").scene
+      .start("platformer-niveau", { mode: "test", niveaux: [{ nom: "Essai", largeur, elements }], numero: 0, score: 0, vies: 3, pieces: 0 });
+  }, [elements, largeur] as const);
+  await attendreLeNiveau(page, "n.enJeu && n.heros.getData('auSol')");
+}
+
+const sol = (x: number, w: number, y = 440): Element => ({ sorte: "plateforme", x, y, w, h: 40, genre: "normale", force: 2, sens: 1 });
+
+test("les niveaux de départ : chacun se joue, montre un genre de plus, et son arrivée est atteignable en théorie", async ({ page }) => {
+  const { sansErreur } = await menuPlatformer(page);
+  await choisirLeMode(page, 0, "platformer-niveau");
+  const niveaux: DonneesDuNiveau[] = await page.evaluate(() => (window as any).jeu.scene.getScene("platformer-niveau").donnees.niveaux);
+  expect(niveaux.map((n) => n.nom)).toEqual(NIVEAUX);
+
+  // Du départ à l'arrivée en courant et en sautant, avec la physique du héros (voir faisable.ts)
+  for (const niveau of niveaux) {
+    expect(faisable(niveau), niveau.nom).toBe(true);
+  }
+  // Le calcul voit bien l'impossible : sans son ressort, le haut perchoir de « Glace et ressorts » est hors d'atteinte
+  const glace = niveaux.find((n) => n.nom === "Glace et ressorts")!;
+  expect(faisable({ ...glace, elements: glace.elements.filter((e) => e.genre !== "ressort") })).toBe(false);
+  // ... et sans ses téléporteurs, le mur de « Téléporteurs » barre la route
+  const tele = niveaux.find((n) => n.nom === "Téléporteurs")!;
+  expect(faisable({ ...tele, elements: tele.elements.filter((e) => e.genre !== "teleporteur") })).toBe(false);
+
+  // Toute l'Aventure montre ce que le jeu sait faire : chaque genre de plateforme et chaque ennemi
+  const montres = new Set(niveaux.flatMap((n) => n.elements.map((e) => e.genre ?? e.type ?? e.sorte)));
+  for (const chose of ["glace", "ressort", "tapis", "fragile", "eau", "teleporteur", "lave", "marcheur", "volant", "sauteur", "mobile", "boss"]) {
+    expect(montres.has(chose), chose).toBe(true);
+  }
+
+  // Chaque niveau se charge, et le héros tient debout au départ
+  for (let numero = 0; numero < niveaux.length; numero++) {
+    await page.evaluate((numero) => {
+      const n = (window as any).jeu.scene.getScene("platformer-niveau");
+      n.scene.restart({ ...n.donnees, numero });
+    }, numero);
+    await attendreLeNiveau(page, `n.donnees.numero === ${numero} && n.enJeu && n.heros.getData('auSol')`);
+    await page.waitForTimeout(300);
+    expect(await niveau(page), NIVEAUX[numero]).toMatchObject({ nom: NIVEAUX[numero], enJeu: true, vies: 3 });
+  }
+  sansErreur();
+});
+
+// Chaque image du niveau est notée, après la physique : au sol ? un appui de saut en attente ? un saut ?
+type Note = { sol: boolean; envie: number; saute: boolean; sauts: number };
+function noterLesImages(page: Page) {
+  return page.evaluate(() => {
+    const n = (window as any).jeu.scene.getScene("platformer-niveau");
+    n.notes = [];
+    if (!n.noter) {
+      n.noter = () => n.notes.push({ sol: n.heros.getData("auSol"), envie: n.heros.envieDeSauter, saute: n.heros.aSaute, sauts: n.heros.sauts });
+      n.events.on("postupdate", n.noter);
+    }
+  });
+}
+const lesNotes = (page: Page): Promise<Note[]> => page.evaluate(() => (window as any).jeu.scene.getScene("platformer-niveau").notes);
+const aSaute = (page: Page) => page.waitForFunction(() => (window as any).jeu.scene.getScene("platformer-niveau").notes.some((note: any) => note.saute));
+
+test("le saut qui pardonne : on saute encore juste après avoir quitté le bord", async ({ page }) => {
+  const { sansErreur } = await menuPlatformer(page);
+  // Un perchoir, haut au-dessus du sol : la chute laisse le temps d'appuyer
+  await jouerUnEssai(page, [sol(0, 400, 100), sol(0, 2000), { sorte: "depart", x: 300, y: 60 }, { sorte: "drapeau", x: 1950, y: 400 }]);
+
+  // Il court, quitte le bord sans sauter, et tombe ; un instant après, le saut part quand même
+  await page.keyboard.down("ArrowRight");
+  await page.waitForFunction(() => !(window as any).jeu.scene.getScene("platformer-niveau").heros.getData("auSol"));
+  await noterLesImages(page);
+  await page.waitForTimeout(80);
+  await page.keyboard.press("Space");
+  await aSaute(page);
+  await page.keyboard.up("ArrowRight");
+  const notes = await lesNotes(page);
+  const saut = notes.find((note) => note.saute)!;
+  expect(saut.sol).toBe(false);            // en l'air, après le bord
+  expect(saut.sauts).toBe(1);              // et c'était le saut du sol : il lui reste le double saut
+  sansErreur();
+});
+
+test("le saut qui pardonne : un appui juste avant de toucher le sol fait sauter en y arrivant", async ({ page }) => {
+  const { sansErreur } = await menuPlatformer(page);
+  await jouerUnEssai(page, [sol(0, 2000), { sorte: "depart", x: 300, y: 400 }, { sorte: "drapeau", x: 1950, y: 400 }]);
+  expect(SAUT_MEMORISE).toBeGreaterThanOrEqual(100);   // le test appuie un peu moins de 100 ms avant le sol
+
+  for (let essai = 1; ; essai++) {
+    // Il tombe de haut, ses deux sauts déjà pris
+    await page.evaluate(() => {
+      const n = (window as any).jeu.scene.getScene("platformer-niveau");
+      n.heros.body.reset(n.heros.x, 100);
+      n.heros.sauts = 0;
+    });
+    await noterLesImages(page);
+    // L'appui, à 120 pixels du sol : moins de 100 ms avant de s'y poser
+    await page.waitForFunction(() => {
+      const corps = (window as any).jeu.scene.getScene("platformer-niveau").heros.body;
+      return corps.velocity.y > 0 && corps.bottom > 320;
+    });
+    await page.keyboard.press("Space");
+    await aSaute(page);
+    const notes = await lesNotes(page);
+    const appui = notes.findIndex((note) => note.envie > 0);
+    // Sur un poste chargé, l'appui peut n'arriver qu'une fois au sol : ce n'est pas ce qu'on veut voir, on recommence
+    if (appui < 0 && essai < 4) {
+      await page.waitForTimeout(600);      // le temps qu'il retombe
+      continue;
+    }
+    const saut = notes.findIndex((note) => note.saute);
+    expect(appui).toBeGreaterThanOrEqual(0);
+    expect(appui).toBeLessThan(saut);      // l'appui, entendu en l'air, sans saut possible...
+    expect(notes[appui]).toMatchObject({ sol: false, sauts: 0 });
+    expect(notes[saut].sol).toBe(true);    // ... fait sauter en touchant le sol, sans nouvel appui
+    break;
+  }
+  sansErreur();
+});
+test("l'Infini : pendant qu'il clignote, après une deuxième chance, aucun ennemi ne le touche", async ({ page }) => {
+  const { sansErreur } = await menuPlatformer(page);
+  await choisirLeMode(page, 1, "platformer-niveau");
+  await page.evaluate(() => {
+    (window as any).jeu.scene.getScene("platformer-niveau").donnees.vies = 3;
+  });
+  await poserLeHeros(page, 300, 600);      // tombé dans le vide : une deuxième chance
+  await attendreLeNiveau(page, "n.enJeu && n.donnees.vies === 2");
+
+  // Un ennemi apparaît sur lui, et va et vient sur place
+  await page.evaluate(() => {
+    const n = (window as any).jeu.scene.getScene("platformer-niveau");
+    const c = n.heros.body;
+    n.monde.ajouter([{ sorte: "ennemi", type: "marcheur", x: c.x, y: c.y + 5, xmin: c.x - 10, xmax: c.x + 40 }]);
+  });
+  await page.waitForTimeout(400);
+  expect(await niveau(page)).toMatchObject({ enJeu: true, vies: 2 });
+  // Le clignotement fini, l'ennemi le touche
+  await page.waitForFunction(() => !(window as any).jeu.scene.getScene("platformer-niveau").enJeu);
+  await attendreLeNiveau(page, "n.enJeu && n.donnees.vies === 1");
+  sansErreur();
+});
+
+test("l'Infini : pièces et ennemis seulement sur les plateformes qui ne bougent pas", () => {
+  const elements = new Generateur("infini").suite(60_000);
+  const plateformes = elements.filter((e) => e.sorte === "plateforme" || e.sorte === "mobile");
+  expect(plateformes.some((p) => p.sorte === "mobile")).toBe(true);
+  expect(plateformes.some((p) => p.genre === "fragile")).toBe(true);
+  const sousLui = (e: Element) => plateformes.find((p) => p.x <= e.x && e.x < p.x + p.w!);
+  const poses = elements.filter((e) => e.sorte === "piece" || e.sorte === "ennemi");
+  expect(poses.length).toBeGreaterThan(50);
+  for (const e of poses) {
+    expect(sousLui(e)).toMatchObject({ sorte: "plateforme", genre: "normale" });
+  }
+});
+
+test("le menu dit ce qui attend : le boss au bout de l'Aventure s'il y est encore", async ({ page }) => {
+  const { sansErreur } = await menuPlatformer(page);
+  const aide = () => page.evaluate(() => (window as any).jeu.scene.getScene("platformer-menu").boutons[0].aide.text as string);
+  expect(await aide()).toBe("3 vies, un boss au bout");
+
+  // Le boss retiré de l'Aventure (l'éditeur range l'ordre des niveaux) : le menu ne le promet plus
+  await page.evaluate((noms) => localStorage.setItem("platformer/ordre", JSON.stringify(noms)), NIVEAUX.slice(0, -1));
+  await page.evaluate(() => (window as any).jeu.scene.getScene("platformer-menu").scene.restart());
+  await page.waitForFunction(() => (window as any).jeu.scene.getScene("platformer-menu").boutons?.[0]?.aide.text === "3 vies");
+  sansErreur();
 });

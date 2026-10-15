@@ -1,0 +1,24 @@
+{
+  "nom": "Glace et ressorts",
+  "largeur": 2200,
+  "elements": [
+    {"sorte": "plateforme", "x": 0, "y": 440, "w": 400, "h": 40, "genre": "normale", "force": 2, "sens": 1},
+    {"sorte": "plateforme", "x": 400, "y": 440, "w": 600, "h": 40, "genre": "glace", "force": 1, "sens": 1},
+    {"sorte": "plateforme", "x": 540, "y": 340, "w": 120, "h": 20, "genre": "glace", "force": 1, "sens": 1},
+    {"sorte": "plateforme", "x": 760, "y": 300, "w": 120, "h": 20, "genre": "glace", "force": 2, "sens": 1},
+    {"sorte": "plateforme", "x": 1120, "y": 440, "w": 280, "h": 40, "genre": "normale", "force": 2, "sens": 1},
+    {"sorte": "plateforme", "x": 1400, "y": 440, "w": 60, "h": 40, "genre": "ressort", "force": 2, "sens": 1},
+    {"sorte": "plateforme", "x": 1600, "y": 170, "w": 200, "h": 20, "genre": "normale", "force": 2, "sens": 1},
+    {"sorte": "plateforme", "x": 1900, "y": 440, "w": 300, "h": 40, "genre": "glace", "force": 2, "sens": 1},
+    {"sorte": "piece", "x": 590, "y": 310},
+    {"sorte": "piece", "x": 810, "y": 270},
+    {"sorte": "piece", "x": 1052, "y": 360},
+    {"sorte": "piece", "x": 1422, "y": 300},
+    {"sorte": "piece", "x": 1660, "y": 140},
+    {"sorte": "piece", "x": 1740, "y": 140},
+    {"sorte": "piece", "x": 2000, "y": 410},
+    {"sorte": "ennemi", "type": "marcheur", "x": 1200, "y": 410, "xmin": 1120, "xmax": 1400},
+    {"sorte": "drapeau", "x": 2140, "y": 400},
+    {"sorte": "depart", "x": 60, "y": 380}
+  ]
+}

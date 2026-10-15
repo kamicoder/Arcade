@@ -23,6 +23,14 @@ bugs de Phaser : c'est sa façon de faire, logique une fois qu'on la connaît, m
 - Avec plusieurs pas de physique par image, un `overlap` peut revenir au pas suivant même après
   `body.enable = false` : protéger ce qui ne doit compter qu'une fois (une pièce, un ennemi écrasé).
 - Pour le ralenti, `world.timeScale` est à l'envers : `world.timeScale = 3` ralentit.
+- `body.reset` efface `blocked` et `touching` : un corps remis pile sur une plateforme n'y est « posé »
+  qu'au pas suivant, et son rectangle la touche bord contre bord sans la chevaucher. Le téléporteur du
+  platformer y perdait le héros qu'il venait de poser : celui-ci se croyait déjà sorti de l'arrivée, et
+  repartait d'où il venait (`Monde.terrain`). Un test qui attend « il est arrivé » ne le voit pas : il faut
+  regarder s'il y reste.
+- Les écouteurs de `this.events` dans une scène incluent ceux de Phaser : `events.off("postupdate")`
+  sans dire lequel retire aussi celui de la physique Arcade (`world.postUpdate`) : plus rien ne bouge.
+  Toujours retirer **son** écouteur.
 
 **La physique Matter** (la catapulte)
 

@@ -2,7 +2,8 @@
 //
 // Les niveaux de départ sont des fichiers JSON, dans src/jeux/platformer/niveaux/ : un fichier par
 // niveau, au format de l'atelier (voir elements.ts). On peut les lire et les retoucher à la main ;
-// un nouveau fichier s'ajoute tout seul à l'Aventure, dans l'ordre des noms de fichier.
+// un nouveau fichier s'ajoute tout seul à l'Aventure, dans l'ordre des noms de fichier (d'où les deux
+// chiffres devant : « 10-le-boss » viendrait sinon avant « 2-... »).
 //
 // L'éditeur sauvegarde dans le navigateur (lire / ecrire du socle) :
 //   platformer/ordre            la liste des noms, dans l'ordre de l'Aventure

@@ -8,7 +8,7 @@ import { lireLeRecord, type DonneesDeNiveau } from "./Niveau";
 import { lettresDuJoueur1 } from "../commandes";
 import { texturePour, ECHELLE_TUILE } from "../textures";
 import { Genres } from "../genres";
-import { FOND, VERT, VIES, SAUVEGARDE } from "../reglages";
+import { FOND, VERT, VIES, SAUVEGARDE, OBJECTIF_DUO } from "../reglages";
 import { LARGEUR, HAUTEUR, POLICE } from "../../../socle/style";
 import { surTouche } from "../../../socle/clavier";
 import { surManette, MANETTE } from "../../../socle/manette";
@@ -45,10 +45,10 @@ export class Menu extends Phaser.Scene {
     const record = lireLeRecord();
     const auDoigt = estTactile();
     this.liste = new ListeDeBoutons(this, [
-      { nom: `Aventure (${liste().length} niveaux)`, aide: `${VIES} vies, un boss au bout`, action: () => this.lancer("aventure") },
+      { nom: `Aventure (${liste().length} niveaux)`, aide: aideDeLAventure(), action: () => this.lancer("aventure") },
       { nom: "Infini", aide: record > 0 ? `Record : ${record} m` : "Jusqu'où iras-tu ?", action: () => this.lancer("infini") },
       {
-        nom: "2 joueurs", aide: auDoigt ? "Au clavier ou à deux manettes" : `${lettresDuJoueur1()} contre les flèches : le premier à 15 points`,
+        nom: "2 joueurs", aide: auDoigt ? "Au clavier ou à deux manettes" : `${lettresDuJoueur1()} contre les flèches : le premier à ${OBJECTIF_DUO} points`,
         action: () => this.lancer("duo"), possible: !auDoigt,
       },
       { nom: "Éditeur de niveaux", aide: "Dessine tes niveaux, joue-les tout de suite", action: () => this.lancer("editeur") },
@@ -122,4 +122,11 @@ export class Menu extends Phaser.Scene {
     quitterLePlatformer(this);
     retourAuHub(this);
   }
+}
+
+// L'aide de l'Aventure : ses vies, et le boss seulement s'il attend au dernier niveau (l'éditeur a pu
+// changer les niveaux, leur ordre, ou retirer le boss)
+function aideDeLAventure(): string {
+  const dernier = chargerTous().at(-1);
+  return dernier?.elements.some((e) => e.sorte === "boss") ? `${VIES} vies, un boss au bout` : `${VIES} vies`;
 }

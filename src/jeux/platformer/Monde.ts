@@ -256,7 +256,7 @@ export class Monde {
     const sol = this.solSous(heros);
     const c = heros.body;
     const lui: Rect = { x: c.x, y: c.y, w: c.width, h: c.height };
-    const terrain = { auSol: sol !== null, glisse: 0, eau: null as Rect | null, poussee: 0, mortel: false, atterrit: false };
+    const terrain = { auSol: sol !== null, glisse: 0, eau: null as Rect | null, poussee: 0, rebond: false, mortel: false, atterrit: false };
     const etaitEnLAir = !heros.getData("auSol");
     terrain.atterrit = etaitEnLAir && sol !== null;
     heros.setData("auSol", sol !== null);
@@ -267,7 +267,10 @@ export class Monde {
     let surUnTeleporteur = false;
     for (const zone of this.zones) {
       const dessus = zone.objet === sol;
-      const touche = dessus || seTouchent(lui, zone.rect);
+      // Le téléporteur compte aussi pour les pieds posés pile sur lui : à l'arrivée, le héros remis en
+      // place (body.reset) n'est ni « posé » ni dedans. Il se croyait sorti, et repartait d'où il venait.
+      const r = zone.effet === "teleporte" ? { ...zone.rect, y: zone.rect.y - 2, h: zone.rect.h + 2 } : zone.rect;
+      const touche = dessus || seTouchent(lui, r);
       if (!touche) {
         continue;
       }
@@ -277,6 +280,7 @@ export class Monde {
         terrain.glisse = GLISSES[zone.force];
       } else if (dessus && zone.effet === "rebond") {
         c.setVelocityY(REBONDS[zone.force]);   // boing !
+        terrain.rebond = true;
         this.scene.sound.play("platformer-saut", { rate: 0.8 });
         this.scene.tweens.add({ targets: zone.objet, scaleY: 0.7, duration: 70, yoyo: true });
       } else if (dessus && zone.effet === "tapis") {

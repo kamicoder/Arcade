@@ -18,7 +18,7 @@ import { creerLeDecor, defilerLeDecor } from "../decor";
 import type { Boss } from "../Ennemis";
 import type { Tableau } from "./Tableau";
 import {
-  FOND, ZOOM, HAUTEUR_MONDE, LARGEUR_VUE, PIECES_POUR_UNE_VIE, VIES, SAUVEGARDE, SAUT,
+  FOND, ZOOM, HAUTEUR_MONDE, LARGEUR_VUE, PIECES_POUR_UNE_VIE, VIES, SAUVEGARDE, SAUT, INTOUCHABLE,
 } from "../reglages";
 import { lire, ecrire } from "../../../socle/sauvegarde";
 import { toucheDuSon } from "../../../socle/son";
@@ -59,6 +59,7 @@ export class Niveau extends Phaser.Scene {
   private fini = false;                    // la fin est affichée : elle a ses boutons, la pause n'a plus de sens
   private auDebut = { score: 0, pieces: 0 };   // le score et les pièces au début du niveau
   private viesGagnees = 0;                 // les vies gagnées avec les pièces de ce niveau
+  intouchableJusqua = 0;                   // l'Infini : après une deuxième chance, les ennemis ne le touchent pas jusque-là
   private generateur: Generateur | null = null;
   private genres!: Genres;
   private etincelles!: Phaser.GameObjects.Particles.ParticleEmitter;
@@ -74,6 +75,7 @@ export class Niveau extends Phaser.Scene {
     this.donnees = { ...donnees };
     this.auDebut = { score: donnees.score, pieces: donnees.pieces };
     this.viesGagnees = 0;
+    this.intouchableJusqua = 0;
     this.enJeu = true;
     this.quitte = false;
     this.fini = false;
@@ -110,7 +112,11 @@ export class Niveau extends Phaser.Scene {
         this.sound.play("platformer-saut", { rate: 1.5 });
         this.etincelles.explode(10, ennemi.x, ennemi.y);
       },
-      touche: () => this.mourir(),
+      touche: () => {
+        if (this.time.now >= this.intouchableJusqua) {
+          this.mourir();                   // sauf juste après une deuxième chance, le temps qu'il clignote
+        }
+      },
       bossTouche: (boss) => this.toucherLeBoss(boss),
       drapeau: () => {
         if (!this.monde.boss) {
@@ -267,7 +273,9 @@ export class Niveau extends Phaser.Scene {
     this.heros.body.checkCollision.none = false;
     this.heros.poserA(proche.x + proche.w / 2, proche.y);
     this.cameras.main.startFollow(this.heros, true, 0.15, 0.15);
-    this.tweens.add({ targets: this.heros, alpha: 0.3, duration: 100, yoyo: true, repeat: 4 });
+    // Il clignote, et aucun ennemi ne le touche tant qu'il clignote : il a le temps de s'écarter
+    this.intouchableJusqua = this.time.now + INTOUCHABLE;
+    this.tweens.add({ targets: this.heros, alpha: 0.3, duration: 100, yoyo: true, repeat: Math.round(INTOUCHABLE / 200) - 1 });
     this.enJeu = true;
   }
 

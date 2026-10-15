@@ -4,7 +4,7 @@
 
 import Phaser from "phaser";
 import type { Rect } from "./elements";
-import { VITESSE, SAUT, NAGE, GRAVITE, CHUTE_DANS_L_EAU, CHUTE_MAX } from "./reglages";
+import { VITESSE, SAUT, NAGE, GRAVITE, CHUTE_DANS_L_EAU, CHUTE_MAX, SAUT_MEMORISE } from "./reglages";
 
 export interface Entrees {
   gauche: boolean;
@@ -19,6 +19,7 @@ export interface Terrain {
   glisse: number;                          // sur la glace : de combien l'élan rattrape la vitesse voulue (0 : pas de glace)
   eau: Rect | null;                        // l'eau où il est plongé
   poussee: number;                         // un tapis roulant ou une plateforme mobile l'emporte (pixels par seconde)
+  rebond?: boolean;                        // un ressort vient de le lancer : un saut le freinerait
 }
 
 export class Heros extends Phaser.Physics.Arcade.Sprite {
@@ -27,6 +28,7 @@ export class Heros extends Phaser.Physics.Arcade.Sprite {
   aSaute = false;                          // vient-il de sauter ? (le son, la poussière)
   private sautAvant = false;               // le saut était-il déjà tenu à l'image d'avant ?
   private elan = 0;                        // sa vitesse de côté (sur la glace, elle change doucement)
+  envieDeSauter = 0;                       // un appui de saut encore valable pendant tant de secondes (le saut mémorisé)
 
   // x, y : le coin haut gauche, comme le « départ » d'un niveau. « planche » : heros ou heros2 (le joueur 2).
   constructor(scene: Phaser.Scene, x: number, y: number, readonly planche = "platformer-heros") {
@@ -66,8 +68,14 @@ export class Heros extends Phaser.Physics.Arcade.Sprite {
     }
 
     // Sauter, au moment de l'appui seulement (tenir le saut ne fait pas sauter en boucle).
-    // Un appui très bref, enfoncé et relâché entre deux images, compte aussi.
-    if (entrees.appui || (entrees.saut && !this.sautAvant)) {
+    // Un appui très bref, enfoncé et relâché entre deux images, compte aussi. Un appui qui ne peut rien
+    // (plus de saut en l'air) attend un court instant : s'il touche le sol pendant ce temps, il saute.
+    const appui = entrees.appui || (entrees.saut && !this.sautAvant);
+    this.envieDeSauter = appui ? SAUT_MEMORISE / 1000 : Math.max(0, this.envieDeSauter - duree);
+    if (terrain.rebond) {
+      this.envieDeSauter = 0;              // le ressort lance plus haut qu'un saut : on ne le gâche pas
+    }
+    if (this.envieDeSauter > 0) {
       if (terrain.eau) {                   // dans l'eau, chaque appui fait nager ; la tête dehors, un vrai saut
         corps.setVelocityY(corps.top < terrain.eau.y ? SAUT : NAGE);
         this.sauts = 1;
@@ -76,6 +84,9 @@ export class Heros extends Phaser.Physics.Arcade.Sprite {
         corps.setVelocityY(SAUT);
         this.sauts--;
         this.aSaute = true;
+      }
+      if (this.aSaute) {
+        this.envieDeSauter = 0;
       }
     }
     this.sautAvant = entrees.saut;

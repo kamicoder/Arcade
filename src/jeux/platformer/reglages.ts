@@ -21,6 +21,12 @@ export const CHUTE_DANS_L_EAU = 2 * IMAGES;   // dans l'eau, on ne coule jamais 
 export const CHUTE_MAX = 26 * IMAGES;      // assez pour le plus grand ressort ; au-delà, on traverserait le sol
 export const REBOND_ECRASE = SAUT / 2;     // sauter sur un ennemi fait rebondir à moitié
 
+// Un saut qui pardonne. Le « coyote time » (sauter encore un instant après avoir quitté un bord) est déjà
+// là, et sans limite : tomber d'un bord sans sauter garde ses deux sauts, comme dans l'atelier. Ce qui
+// manquait, c'est l'autre bout du saut : un appui un peu trop tôt, juste avant de toucher le sol, alors
+// qu'il ne reste plus de saut en l'air. Il est gardé tant de millisecondes : touchant le sol à temps, on saute.
+export const SAUT_MEMORISE = 120;
+
 // La force d'un genre de plateforme (1, 2 ou 3, réglée dans l'éditeur) devient un nombre du jeu
 export const REBONDS = { 1: -19 * IMAGES, 2: -22 * IMAGES, 3: -26 * IMAGES } as Record<number, number>;
 // Sur la glace, l'élan rattrape la vitesse voulue de tant de pixels par seconde, chaque seconde
@@ -40,6 +46,7 @@ export const ECRASER_BOSS = 24;
 // La partie
 export const VIES = 3;
 export const PIECES_POUR_UNE_VIE = 10;
+export const INTOUCHABLE = 1000;           // l'Infini : après une deuxième chance, il clignote, et aucun ennemi ne le touche (ms)
 export const OBJECTIF_DUO = 15;            // 2 joueurs : le premier à ce nombre de points gagne
 
 // Les couleurs de l'atelier

@@ -43,13 +43,18 @@ export class Generateur {
     this.y = Math.max(240, Math.min(420, this.y + auHasard(-90, 90)));   // on reste dans une bande jouable
     const y = this.y;
     const tirage = Math.random();
+    this.x = x + w;
     if (tirage < 0.12) {
       nouveaux.push({ sorte: "mobile", x, y, w, h: 20, axe: Math.random() < 0.5 ? "x" : "y", dist: 100, v: 2 });
-    } else if (tirage < 0.26) {
-      nouveaux.push({ sorte: "plateforme", x, y, w, h: 20, genre: "fragile", force: 2, sens: 1 });
-    } else {
-      nouveaux.push({ sorte: "plateforme", x, y, w, h: 20, genre: "normale", force: 2, sens: 1 });
+      return;
     }
+    if (tirage < 0.26) {
+      nouveaux.push({ sorte: "plateforme", x, y, w, h: 20, genre: "fragile", force: 2, sens: 1 });
+      return;
+    }
+    // Pièces et ennemis seulement sur une plateforme normale : ils ne suivent pas une plateforme qui
+    // bouge, et resteraient en l'air quand une fragile s'écroule
+    nouveaux.push({ sorte: "plateforme", x, y, w, h: 20, genre: "normale", force: 2, sens: 1 });
     if (Math.random() < 0.55) {
       nouveaux.push({ sorte: "piece", x: x + w / 2 - 8, y: y - 28 });
     }
@@ -64,7 +69,6 @@ export class Generateur {
         nouveaux.push({ sorte: "ennemi", type, x: ex, y: y - taille, xmin: x, xmax: x + w, sol: y, taille, v });
       }
     }
-    this.x = x + w;
   }
 
   // Le duo : plus simple, que des plateformes normales, des pièces et des marcheurs
