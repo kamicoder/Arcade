@@ -113,5 +113,6 @@ Les anciens jeux ne servent plus que de **référence pour le comportement** : l
 compatibilité de leurs sauvegardes. Un défaut de jeu trouvé ici existe peut-être aussi là-bas : le
 signaler à l'utilisateur.
 
-Pistes ouvertes : les petits outils de socle que les agents ont réclamés (saisie de texte, couleurs,
+Les idées pour améliorer les jeux, relevées par des agents et à trier par l'utilisateur : `docs/IDEES.md` (en
+retirer ce qui est fait). Pistes ouvertes : les petits outils de socle que les agents ont réclamés (saisie de texte, couleurs,
 fondu de toutes les caméras).
