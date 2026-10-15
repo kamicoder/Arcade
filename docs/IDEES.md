@@ -64,7 +64,7 @@ Le Tamago est une ébauche : on le laisse de côté pour l'instant, ces notes at
 **Finition**
 - Arrêt sur coup (hit-stop) (S).
 - Le robot touché flashe en blanc, les dégâts s'envolent (S).
-- Un « 3, 2, 1, Combat ! », des sons de saut et de victoire, le son coupé (M).
+- Un « 3, 2, 1, Combat ! », des sons de saut et de victoire (M).
 
 **Contenu**
 - Garde / parade (M, à essayer : peut ralentir les parties).
@@ -134,7 +134,6 @@ Le Tamago est une ébauche : on le laisse de côté pour l'instant, ces notes at
 - Le slime casqué (S).
 
 **Au doigt et à la manette**
-- Viser d'après le glissé du doigt (règle aussi la tape qui tire) (S).
 - Remplir l'écran du téléphone (M).
 - Le stick analogique, et l'aide de la manette (S).
 
