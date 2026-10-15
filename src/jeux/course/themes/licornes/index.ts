@@ -13,7 +13,7 @@ import { fabriquerTextures, textureDeLicorne, imageDuGalop } from "./textures";
 import { peindreDecor, dessinerApercu } from "./dessins";
 import { decorDesLicornes } from "./decor";
 import { sons, MUSIQUES } from "./sons";
-import { assombrir } from "../../interface";
+import { assombrir, bords } from "../../interface";
 import { LARGEUR } from "../../../../socle/style";
 
 // ===== Les licornes, et ce que l'atelier peut y changer =====
@@ -151,7 +151,7 @@ function confettis(scene: Phaser.Scene, frequence: number): Phaser.GameObjects.P
   type Confetti = Phaser.GameObjects.Particles.Particle & { tourne?: number };
   return scene.add.particles(0, 0, "licorne-particules", {
     frame: ["rond", "etoile"],
-    x: { min: 0, max: LARGEUR },
+    x: { min: bords(scene).gauche, max: bords(scene).droite },   // toute la largeur, même élargie
     y: { min: -80, max: -10 },
     speedX: { min: -40, max: 40 },
     speedY: { min: 60, max: 160 },
@@ -174,21 +174,24 @@ function confettis(scene: Phaser.Scene, frequence: number): Phaser.GameObjects.P
 }
 
 // Le ciel des menus : le dégradé, l'arc-en-ciel, des nuages qui passent, quelques confettis
+// Le ciel est peint en 960 × 540 : sur un écran plus large (au doigt), il grandit pour le couvrir,
+// et les nuages traversent toute la largeur.
 function fondDeMenu(scene: Phaser.Scene) {
-  scene.add.image(0, 0, "licorne-ciel").setOrigin(0);
+  const { gauche, droite, milieu } = bords(scene);
+  scene.add.image(milieu, 0, "licorne-ciel").setOrigin(0.5, 0).setScale(Math.max(1, (droite - gauche) / LARGEUR));
   for (let i = 0; i < 6; i++) {
     const y = 80 + (i * 97) % 380;
     const vitesse = 12 + i * 5;                       // pixels par seconde
-    const depart = ((i * 230) % (LARGEUR + 300)) - 150;
+    const depart = gauche + ((i * 230) % (droite - gauche + 300)) - 150;
     const nuage = scene.add.image(depart, y, "licorne-nuage");
     // Un tween qui traverse l'écran, puis un autre qui recommence de la gauche, sans fin
     const traverser = (de: number) => {
       nuage.x = de;
       scene.tweens.add({
         targets: nuage,
-        x: LARGEUR + 150,
-        duration: (LARGEUR + 150 - de) / vitesse * 1000,
-        onComplete: () => traverser(-150),
+        x: droite + 150,
+        duration: (droite + 150 - de) / vitesse * 1000,
+        onComplete: () => traverser(gauche - 150),
       });
     };
     traverser(depart);

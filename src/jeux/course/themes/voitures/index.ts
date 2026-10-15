@@ -9,7 +9,9 @@ import {
 } from "./dessins";
 import { decorDesVoitures, moteurDeVoiture } from "./decor";
 import { jouerFichier } from "../../son";
-import { LARGEUR, HAUTEUR, POLICE } from "../../../../socle/style";
+import { sons } from "./sons";
+import { HAUTEUR, POLICE } from "../../../../socle/style";
+import { bords } from "../../interface";
 
 const FOND = "#1c1a25";
 
@@ -136,7 +138,7 @@ export const voitures: Theme = {
     },
     // Un feu d'artifice : des étincelles qui jaillissent du bas de l'écran
     fete: (scene, frequence) => scene.add.particles(0, 0, "etincelle", {
-      x: { min: 100, max: LARGEUR - 100 },
+      x: { min: bords(scene).gauche + 100, max: bords(scene).droite - 100 },
       y: HAUTEUR + 10,
       lifespan: 1600,
       speedY: { min: -420, max: -260 },
@@ -232,9 +234,9 @@ export const voitures: Theme = {
   sons: {
     bip: (scene) => jouerFichier(scene, "voiture-bip"),
     partez: (scene) => jouerFichier(scene, "voiture-bip", { rate: 2 }),
-    tour: (scene) => jouerFichier(scene, "voiture-bip", { rate: 1.5 }),
-    victoire: (scene) => jouerFichier(scene, "voiture-bip", { rate: 1.5 }),
-    record: (scene) => jouerFichier(scene, "voiture-bip", { rate: 3 }),
+    tour: sons.tour,
+    victoire: sons.victoire,
+    record: sons.record,
   },
   moteur: moteurDeVoiture,
 };

@@ -9,7 +9,7 @@ import {
 } from "../sauvegarde";
 import { jouer, musicien } from "../son";
 import {
-  titre, ecrire, bouton, touche, zone, boutonSon, Annonces, textureCadre, portrait, couleurDuNom,
+  titre, ecrire, bouton, touche, zone, boutonSon, Annonces, textureCadre, portrait, couleurDuNom, menuElargi, bords,
 } from "../interface";
 import { LARGEUR } from "../../../socle/style";
 import { surTouche, surChaqueTouche } from "../../../socle/clavier";
@@ -80,12 +80,14 @@ export class Menu extends Phaser.Scene {
     this.parti = false;
     musicien.jouer("menu");
 
+    menuElargi(this);                      // au doigt, toute la largeur du téléphone
     this.cameras.main.fadeIn(250);
     theme.habillage.fond(this);
     titre(this, 46, theme.titre, 50);
+    // Le bouton se place contre le bord de l'écran : élargi, ce bord est à gauche de 0
     boutonArcade(this, () => retourAuHub(this), {
       police: theme.habillage.police, texte: c.texte, fond: c.fondPanneau, fondAlpha: c.alphaPanneau,
-    });
+    }).x += bords(this).gauche;
     if (avecChoixDuTheme) {
       this.creerChoixDuTheme();
     }
@@ -129,7 +131,7 @@ export class Menu extends Phaser.Scene {
       fonduPuis(this, () => this.scene.start("course-chargement", { theme: suivant.id, choixDuTheme: true }));
     };
     const libelle = THEMES.map((t) => t.emoji).join(" ⇄ ") + touche(" (T)");
-    ecrire(this, LARGEUR - 14, 14, libelle, 18, c.texteDoux, { origine: [1, 0] })
+    ecrire(this, bords(this).droite - 14, 14, libelle, 18, c.texteDoux, { origine: [1, 0] })
       .setInteractive({ useHandCursor: true }).on("pointerup", changer);
     surTouche(this, "T", changer);
   }
@@ -191,14 +193,15 @@ export class Menu extends Phaser.Scene {
     const theme = themeEnCours();
     const libelle = () => (this.auDoigt ? "" : "Niveau : ") + theme.niveaux[preferences.niveau].nom + touche(" (N)");
     const [w, h, y] = this.auDoigt ? [200, 42, 486] : [230, 34, 494];
+    const x = bords(this).gauche + 16;     // en bas à gauche de l'écran
     const changer = () => {
       preferences.niveau = (preferences.niveau + 1) % theme.niveaux.length;
       garderLeNiveau();
       jouer(this, "menu");
       this.niveau.destroy();
-      this.niveau = bouton(this, 16, y, w, h, libelle(), changer, true);
+      this.niveau = bouton(this, x, y, w, h, libelle(), changer, true);
     };
-    this.niveau = bouton(this, 16, y, w, h, libelle(), changer, true);
+    this.niveau = bouton(this, x, y, w, h, libelle(), changer, true);
     surTouche(this, "N", changer);
   }
 

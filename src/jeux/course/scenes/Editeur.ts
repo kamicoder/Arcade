@@ -11,6 +11,7 @@ import { jouer } from "../son";
 import { titre, ecrire, bouton, Annonces, textureApercu, enNombre } from "../interface";
 import { LARGEUR } from "../../../socle/style";
 import { surTouche } from "../../../socle/clavier";
+import { retablir } from "../../../socle/largeur";
 import { estTactile } from "../../../socle/tactile";
 import { fonduPuis } from "../../../socle/retour";
 
@@ -53,6 +54,8 @@ export class Editeur extends Phaser.Scene {
     this.pres = estTactile() ? 24 : 13;
     this.rayon = estTactile() ? 12 : 9;
 
+    // L'éditeur garde ses 960 × 540, même au doigt : il lit le doigt en pixels de l'écran (pointeur.x)
+    retablir(this.game);
     this.cameras.main.fadeIn(250);
     theme.habillage.fond(this);
     titre(this, 20, "Dessine ton circuit", 26);

@@ -9,6 +9,11 @@ Un seul jeu de course, et des **thèmes** : « voitures » et « licornes ». Le
 - les circuits et leur trace (`circuits.ts`), les sauvegardes (`sauvegarde.ts`), le son et la musique
   (`son.ts`), les boutons et textes (`interface.ts`).
 
+Au doigt, le jeu prend la largeur du téléphone (`socle/largeur.ts`) : la course et ses écrans se placent
+d'après `this.scale.width` (les pouces contre les bords) ; les menus restent pensés en 960 × 540 et leur
+caméra en regarde le milieu (`menuElargi`, et `bords` pour ce qui va contre un bord, dans `interface.ts`).
+L'éditeur (il lit le doigt en pixels de l'écran) et l'écran coupé en deux gardent leurs 960.
+
 Tous les modes sont communs : Grand Prix, contre l'ordinateur, à deux (avec ou sans rivaux), contre la
 montre et son fantôme, atelier, circuit dessiné, niveaux Facile / Normal / Expert.
 

@@ -43,6 +43,7 @@ export interface Circuit {
   modele: ModeleDeCircuit;
   points: Point[];
   portes: Point[];                         // une au milieu de chaque côté
+  distancesDesPortes: number[];            // où est chaque porte le long du tour (la première : la ligne, 0)
   angleDepart: number;
   trace: PointDeTrace[];
   longueur: number;
@@ -101,9 +102,9 @@ export function modeleDuCircuitDessine(theme: Theme, points: Point[]): ModeleDeC
 export function preparerCircuit(modele: ModeleDeCircuit, theme: Theme): Circuit {
   const points = modele.points;
   const portes = portesDe(points);
-  const { trace, longueur } = echantillonner(points, portes);
+  const { trace, longueur, distancesDesPortes } = echantillonner(points, portes);
   const c: Circuit = {
-    modele, points, portes, trace, longueur,
+    modele, points, portes, distancesDesPortes, trace, longueur,
     largeurRoute: theme.route.largeur,
     barriere: theme.route.barriere,
     angleDepart: Math.atan2(points[1].y - points[0].y, points[1].x - points[0].x),
@@ -118,7 +119,9 @@ export function preparerCircuit(modele: ModeleDeCircuit, theme: Theme): Circuit 
 function echantillonner(points: Point[], portes: Point[]) {
   const n = points.length;
   const trace: PointDeTrace[] = [];
+  const debuts: number[] = [];             // le point de la trace où commence chaque côté : sa porte
   for (let i = 1; i <= n; i++) {
+    debuts.push(trace.length);
     const a = portes[i - 1];
     const k = points[i % n];
     const b = portes[i % n];
@@ -152,7 +155,7 @@ function echantillonner(points: Point[], portes: Point[]) {
     p.ny = dx / d;
   }
   const longueur = s + Math.hypot(trace[0].x - trace[total - 1].x, trace[0].y - trace[total - 1].y);
-  return { trace, longueur };
+  return { trace, longueur, distancesDesPortes: debuts.map((i) => trace[i].s) };
 }
 
 // Le numéro du point de la trace le plus proche de (x, y). Avec autour >= 0, on ne cherche qu'à côté

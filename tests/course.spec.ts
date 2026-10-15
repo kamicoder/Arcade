@@ -2,7 +2,9 @@
 // Le code est le même pour les deux thèmes : chaque scénario n'est joué qu'une fois, dans l'un ou l'autre.
 // Seul le premier test passe par les deux, pour faire tourner le décor, les dessins et le pilote de chacun.
 import { test, expect, type Page } from "@playwright/test";
-import { ouvrir, appuyer, attendreScene, scenesActives, versLaPage, toucher, toucherLaCarte, manette } from "./outils";
+import {
+  ouvrir, appuyer, attendreScene, scenesActives, versLaPage, toucher, toucherLaCarte, manette, tailleDuJeu,
+} from "./outils";
 
 type IdTheme = "voitures" | "licornes";
 const CARTE: Record<IdTheme, number> = { voitures: 0, licornes: 1 };
@@ -27,6 +29,13 @@ async function mode(page: Page, id: string) {
     await appuyer(page, "ArrowDown");
   }
   await appuyer(page, "Enter");
+}
+
+// Au doigt, la course prend la largeur du téléphone. Les menus, la pause et l'arrivée restent pensés en
+// 960 de large, au milieu : un point pensé en 960 glisse vers la droite de la moitié de la largeur en plus.
+async function auMilieu(page: Page, x: number) {
+  const { largeur } = await tailleDuJeu(page);
+  return x + (largeur - 960) / 2;
 }
 
 // L'état de la course, lu dans la scène Phaser
@@ -393,6 +402,141 @@ test.describe("les voitures", () => {
     sansErreur();
   });
 
+  test("contre la montre : à chaque porte du circuit, l'écart avec le fantôme, en vert quand on est devant", async ({ page }) => {
+    const { sansErreur } = await menu(page, "voitures");
+    await mode(page, "chrono");
+    await attendreScene(page, "course-circuits");
+    await appuyer(page, "Enter");
+    await attendreScene(page, "course-piste");
+
+    // Un record lent, et son fantôme qui suit le milieu de la route à 150 pixels par seconde ; la course
+    // repart pour le lire, et l'ordinateur conduit le joueur à pleine vitesse
+    await page.evaluate(() => {
+      const c = (window as any).jeu.scene.getScene("course-piste");
+      const fantome = c.circuit.trace.map((p: any) => ({ t: p.s / 150, x: p.x, y: p.y, angle: 0 }));
+      localStorage.setItem("course/voitures/record/" + c.circuit.modele.id,
+        JSON.stringify({ temps: c.circuit.longueur / 150, fantome }));
+      c.scene.restart(c.donnees);
+    });
+    await attendreLeDepart(page);
+    await page.evaluate(() => {
+      const j = (window as any).jeu.scene.getScene("course-piste").joueurs[0];
+      j.pilote = true;
+      j.niveau = 1;
+    });
+    const ecart = () => page.evaluate(() => {
+      const texte = (window as any).jeu.scene.getScene("course-tableau").compteurs[0].ecart;
+      return { texte: texte.text as string, couleur: texte.style.color as string, alpha: texte.alpha as number };
+    });
+    await page.waitForFunction(() => (window as any).jeu.scene.getScene("course-tableau").compteurs[0].ecart.text !== "",
+      null, { timeout: 15_000 });
+    const premier = await ecart();
+    expect(premier.texte).toMatch(/^−\d+\.\d\d$/);
+    expect(premier.couleur).toBe("#2fd16a");
+    expect(premier.alpha).toBeGreaterThan(0.5);
+    sansErreur();
+  });
+
+  test("le turbo fait un petit flash, un choc fort contre les pneus secoue la caméra (sans manette ni vibreur)", async ({ page }) => {
+    const { sansErreur } = await menu(page, "voitures");
+    await mode(page, "chrono");
+    await attendreScene(page, "course-circuits");
+    await appuyer(page, "Enter");
+    await attendreLeDepart(page);
+    // Les effets de la caméra sont brefs : on écoute ceux qui commencent (les événements de Phaser)
+    await page.evaluate(() => {
+      const w = window as any;
+      const camera = w.jeu.scene.getScene("course-piste").cameras.main;
+      w.effets = { flash: 0, secousse: 0 };
+      camera.on("cameraflashstart", () => w.effets.flash++);
+      camera.on("camerashakestart", () => w.effets.secousse++);
+      w.jeu.scene.getScene("course-piste").joueurs[0].reserve = 1;
+    });
+    const effets = () => page.evaluate(() => (window as any).effets as { flash: number; secousse: number });
+    await appuyer(page, "Space");
+    await page.waitForFunction(() => (window as any).effets.flash === 1);
+    expect(await effets()).toEqual({ flash: 1, secousse: 0 });
+
+    // Lancée vers les pneus à pleine vitesse, depuis l'herbe
+    await page.evaluate(() => {
+      const c = (window as any).jeu.scene.getScene("course-piste");
+      const v = c.joueurs[0];
+      const t = c.circuit.trace[200];
+      v.x = t.x + t.nx * 110;
+      v.y = t.y + t.ny * 110;
+      v.angle = Math.atan2(t.ny, t.nx);
+      v.vx = t.nx * 500;
+      v.vy = t.ny * 500;
+      v.indice = 200;
+    });
+    await page.waitForFunction(() => (window as any).effets.secousse === 1);
+    sansErreur();
+  });
+
+  test("deux véhicules qui se cognent : une seule gerbe par contact, et la barrière ne s'en trouve pas avalée", async ({ page }) => {
+    const { sansErreur } = await menu(page, "voitures");
+    await mode(page, "course");
+    await attendreScene(page, "course-circuits");
+    await appuyer(page, "Enter");
+    await attendreLeDepart(page);
+    // Un rival lancé droit sur le joueur ; on note ce que la piste reçoit
+    await page.evaluate(() => {
+      const w = window as any;
+      const piste = w.jeu.scene.getScene("course-piste");
+      w.chocs = [];
+      const reagir = piste.reagir.bind(piste);
+      piste.reagir = (c: any, e: any) => {
+        if (e.genre === "choc") {
+          w.chocs.push({ joueur: c === piste.joueurs[0], gerbe: e.gerbe });
+        }
+        reagir(c, e);
+      };
+      const moi = piste.joueurs[0];
+      const rival = piste.coureurs.find((c: any) => c !== moi);
+      rival.x = moi.x + 30;
+      rival.y = moi.y;
+      rival.vx = -400;
+      rival.vy = 0;
+    });
+    await page.waitForFunction(() => (window as any).chocs.length >= 2);
+    const chocs = await page.evaluate(() => (window as any).chocs.slice(0, 2));
+    expect(chocs.filter((c: any) => c.gerbe)).toHaveLength(1);      // les deux le sentent, une seule gerbe
+    expect(chocs.some((c: any) => c.joueur)).toBe(true);
+    // Le choc ne fait pas attendre la barrière : son attente à elle est toujours libre
+    expect(await page.evaluate(() => (window as any).jeu.scene.getScene("course-piste").joueurs[0].attentePouf)).toBe(0);
+    sansErreur();
+  });
+
+  test("une place gagnée se voit : le compteur de place grossit un instant", async ({ page }) => {
+    const { sansErreur } = await menu(page, "voitures");
+    await mode(page, "course");
+    await attendreScene(page, "course-circuits");
+    await appuyer(page, "Enter");
+    await attendreLeDepart(page);
+    const place = () => page.evaluate(() => {
+      const compteur = (window as any).jeu.scene.getScene("course-tableau").compteurs[0];
+      return { place: compteur.coureur.place as number, echelle: compteur.droite.scaleX as number };
+    });
+
+    // Loin derrière : dernier, et le compteur ne bouge pas
+    await page.evaluate(() => {
+      (window as any).jeu.scene.getScene("course-piste").joueurs[0].progres -= 3000;
+    });
+    await page.waitForFunction(() => (window as any).jeu.scene.getScene("course-tableau").compteurs[0].placeAvant === 4);
+    await page.waitForTimeout(500);
+    expect(await place()).toEqual({ place: 4, echelle: 1 });
+
+    // Loin devant : premier, le compteur grossit
+    await page.evaluate(() => {
+      (window as any).jeu.scene.getScene("course-piste").joueurs[0].progres += 4000;
+    });
+    await page.waitForFunction(() => {
+      const compteur = (window as any).jeu.scene.getScene("course-tableau").compteurs[0];
+      return compteur.placeAvant === 1 && compteur.droite.scaleX > 1.1;
+    });
+    sansErreur();
+  });
+
   // Les boutons d'une manette « standard » : voir socle/manette.ts
   const CROIX_DROITE = 15, X = 2, START = 9;
 
@@ -575,13 +719,59 @@ test.describe("les voitures", () => {
   test.describe("au doigt", () => {
     test.use({ viewport: { width: 844, height: 390 }, hasTouch: true, isMobile: true });
 
+    test("toute la largeur du téléphone : menus, course, pouces aux bords, arrivée ; l'éditeur garde ses 960", async ({ page }) => {
+      const { sansErreur } = await ouvrir(page);
+      await toucherLaCarte(page, "voiture");
+      await attendreScene(page, "course-menu");
+      const large = Math.round(540 * 844 / 390);   // un écran en 20/9 : plus de bandes noires
+      expect(await tailleDuJeu(page)).toEqual({ largeur: large, hauteur: 540 });
+      expect((await page.locator("canvas").boundingBox())!.width).toBeCloseTo(844, 0);
+
+      await toucher(page, await auMilieu(page, 610), 171);   // « Contre l'ordinateur », le deuxième bouton
+      await attendreScene(page, "course-circuits");
+      await toucher(page, await auMilieu(page, 480), 514);   // « Partir ! »
+      await attendreLeDepart(page);
+      expect((await tailleDuJeu(page)).largeur).toBe(large);
+      expect(await page.evaluate(() => (window as any).jeu.scene.getScene("course-piste").cameras.main.width)).toBe(large);
+
+      // Le turbo est contre le bord droit : le pouce droit le trouve
+      await page.evaluate(() => {
+        (window as any).jeu.scene.getScene("course-piste").joueurs[0].reserve = 1;
+      });
+      await toucher(page, large - 90, 432);
+      await page.waitForFunction(() => (window as any).jeu.scene.getScene("course-piste").joueurs[0].turbo > 0);
+
+      // L'ordinateur l'emmène passer la ligne ; l'arrivée est au milieu, et « Menu » y ramène
+      await page.evaluate(() => {
+        const c = (window as any).jeu.scene.getScene("course-piste");
+        const j = c.joueurs[0];
+        j.pilote = true;
+        j.tour = 3;
+        j.progres = 3 * c.circuit.longueur - 250;
+      });
+      await attendreScene(page, "course-arrivee");
+      await page.waitForTimeout(1300);
+      await toucher(page, await auMilieu(page, 590), 498);  // « Menu »
+      await attendreScene(page, "course-menu");
+      expect((await tailleDuJeu(page)).largeur).toBe(large);
+
+      // L'éditeur reprend ses 960 × 540, et le menu, au retour, la largeur du téléphone
+      await toucher(page, await auMilieu(page, 610), 339);   // « Dessiner un circuit »
+      await attendreScene(page, "course-editeur");
+      expect((await tailleDuJeu(page)).largeur).toBe(960);
+      await toucher(page, 72, 20);         // ✕ Annuler
+      await attendreScene(page, "course-menu");
+      expect((await tailleDuJeu(page)).largeur).toBe(large);
+      sansErreur();
+    });
+
     test("pas de course à deux au doigt ; toucher pose un point, toucher un point l'enlève, ✓ enregistre", async ({ page }) => {
       const { sansErreur } = await ouvrir(page);
       await toucherLaCarte(page, "voiture");
       await attendreScene(page, "course-menu");
       const modes = await page.evaluate(() => (window as any).jeu.scene.getScene("course-menu").modes.map((m: any) => m.id));
       expect(modes).toEqual(["grandprix", "course", "chrono", "atelier", "editeur"]);
-      await toucher(page, 610, 339);       // « Dessiner un circuit », le cinquième bouton
+      await toucher(page, await auMilieu(page, 610), 339);      // « Dessiner un circuit », le cinquième bouton
       await attendreScene(page, "course-editeur");
 
       const poser = async (x: number, y: number) => {
@@ -840,9 +1030,9 @@ test.describe("les licornes", () => {
         (window as any).jeu.scene.getScene("course-menu").modes.map((m: any) => m.id));
       expect(modes).toEqual(["grandprix", "course", "chrono", "atelier", "editeur"]);
 
-      await toucher(page, 610, 227);       // « Contre la montre »
+      await toucher(page, await auMilieu(page, 610), 227);      // « Contre la montre »
       await attendreScene(page, "course-circuits");
-      await toucher(page, 480, 514);       // « Partir ! »
+      await toucher(page, await auMilieu(page, 480), 514);      // « Partir ! »
       await attendreLeDepart(page);
       await page.waitForTimeout(800);
       expect((await course(page)).vitesse).toBeGreaterThan(100);
@@ -858,7 +1048,7 @@ test.describe("les licornes", () => {
       expect((await course(page)).tactile.droite).toBe(false);
 
       // Le pouce reste sur ▶ pendant qu'un autre doigt touche la pause, et se lève pendant la pause
-      const pause = await versLaPage(page, 480, 32);
+      const pause = await versLaPage(page, await auMilieu(page, 480), 32);
       await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x: droite.x, y: droite.y, id: 1 }] });
       await page.waitForTimeout(200);
       await cdp.send("Input.dispatchTouchEvent", {
@@ -870,7 +1060,7 @@ test.describe("les licornes", () => {
       await attendreScene(page, "course-pause");
       await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
       await page.waitForTimeout(200);
-      await toucher(page, 375, 305);       // « Reprendre »
+      await toucher(page, await auMilieu(page, 375), 305);      // « Reprendre »
       await page.waitForFunction(() => !(window as any).jeu.scene.isPaused("course-piste"));
       await page.waitForTimeout(300);
       expect((await course(page)).tactile.droite).toBe(false);   // la licorne ne tourne pas toute seule

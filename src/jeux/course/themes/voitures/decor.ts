@@ -9,6 +9,7 @@ import type { CourseVue, DecorDeCourse, Evenement, Moteur, VueDuCoureur } from "
 import { textureDeVoiture, type LookDeVoiture } from "./dessins";
 import { ecrire } from "../../interface";
 import { jouerFichier, sonCoupe } from "../../son";
+import { sons } from "./sons";
 
 const RESOLUTION = 2;                      // la voiture est dessinée en double : nette dans les menus aussi
 
@@ -96,10 +97,27 @@ export function decorDesVoitures(course: CourseVue): DecorDeCourse {
     etincelles.explode(12, x, y);
   };
 
+  // Les bruitages ne sont que pour les joueurs : on n'entend pas les rivaux se cogner à l'autre bout
+  const joue = (c: Coureur, son: () => void) => {
+    if (c.humain && !sonCoupe()) {
+      son();
+    }
+  };
+
   const reagir = (c: Coureur, evenement: Evenement) => {
     switch (evenement.genre) {
       case "barriere":
         gerbe(evenement.x, evenement.y, 0x222222);
+        joue(c, () => sons.choc(evenement.fort));
+        break;
+      case "choc":
+        if (evenement.gerbe) {
+          gerbe(evenement.x, evenement.y, 0xffe08a);
+        }
+        joue(c, () => sons.choc(evenement.fort));
+        break;
+      case "turbo":
+        joue(c, sons.nitro);
         break;
       case "repeche":
         gerbe(c.x, c.y, 0xffffff);

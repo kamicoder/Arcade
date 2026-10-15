@@ -26,6 +26,35 @@ export interface Instant {
   angle: number;
 }
 
+// Le fantôme garde le temps de chaque instant de son tour : on en tire le moment où il a passé chaque
+// porte du circuit (la première, la ligne, à 0). On le suit le long de la trace d'un instant à l'autre,
+// comme un véhicule (suivreLaTrace) : au croisement d'un huit, il reste sur sa branche. Un tour pris dès
+// la grille commence derrière la ligne : son chemin part en dessous de 0, comme celui du joueur.
+export function tempsAuxPortes(c: Circuit, fantome: Instant[]): number[] {
+  if (fantome.length === 0) {
+    return [];
+  }
+  let indice = plusProche(c, fantome[0].x, fantome[0].y, -1);
+  const depart = c.trace[indice].s;
+  let chemin = depart > c.longueur / 2 ? depart - c.longueur : depart;
+  const temps = [0];
+  for (const instant of fantome) {
+    const i = plusProche(c, instant.x, instant.y, indice);
+    let ds = c.trace[i].s - c.trace[indice].s;
+    if (ds > c.longueur / 2) {
+      ds -= c.longueur;
+    } else if (ds < -c.longueur / 2) {
+      ds += c.longueur;
+    }
+    chemin += ds;
+    indice = i;
+    while (temps.length < c.distancesDesPortes.length && chemin >= c.distancesDesPortes[temps.length]) {
+      temps.push(instant.t);
+    }
+  }
+  return temps;
+}
+
 // Un objet de la route, tel que la scène l'affiche : il disparaît (visible devient faux), puis revient
 export interface ObjetEnCourse {
   type: TypeDObjet;
@@ -53,6 +82,12 @@ export interface Engage {
 }
 
 const NIVEAU_APRES_L_ARRIVEE = 0.7;        // le joueur arrivé est ramené tranquillement par l'ordinateur
+
+// Les chocs qui se sentent (un son, une gerbe, la caméra qui tremble, la manette qui vibre), selon la
+// vitesse qui rentre dans la barrière ou dans l'autre véhicule, en pixels par seconde. Rien à voir avec la
+// conduite : seulement ce qu'on voit, entend et sent.
+const CHOC_LEGER = 120;
+export const CHOC_FORT = 300;
 
 export class Coureur {
   readonly numero: number;
@@ -93,6 +128,8 @@ export class Coureur {
   private adherenceGlisse = 1;
   private readonly attentes = new Map<TypeDObjet, number>();
   private attentePouf = 0;
+  private attenteChoc = 0;                 // la même attente, pour les chocs entre véhicules : à part, pour qu'un
+                                           // rival qui frotte n'avale pas le coup de barrière qui suit
   private dernierPas = 0;
   private couloir = 0;
   private couloirVoulu = 0;
@@ -222,6 +259,7 @@ export class Coureur {
     this.etourdie = Math.max(0, this.etourdie - duree);
     this.glisse = Math.max(0, this.glisse - duree);
     this.attentePouf = Math.max(0, this.attentePouf - duree);
+    this.attenteChoc = Math.max(0, this.attenteChoc - duree);
     for (const [type, reste] of this.attentes) {
       this.attentes.set(type, reste - duree);
     }
@@ -341,9 +379,11 @@ export class Coureur {
       if (dehors > 0) {
         this.vx -= ux * dehors * 1.5;      // un petit rebond
         this.vy -= uy * dehors * 1.5;
-        if (dehors > 120 && this.attentePouf <= 0) {
+        if (dehors > CHOC_LEGER && this.attentePouf <= 0) {
           this.attentePouf = 0.3;
-          this.monde.reagir(this, { genre: "barriere", x: this.x + ux * r.rayonBarriere, y: this.y + uy * r.rayonBarriere });
+          this.monde.reagir(this, {
+            genre: "barriere", x: this.x + ux * r.rayonBarriere, y: this.y + uy * r.rayonBarriere, fort: dehors > CHOC_FORT,
+          });
         }
       }
       // Le nez dans la barrière : elle le tourne doucement dans le sens de la route (si le thème le veut)
@@ -456,6 +496,16 @@ export class Coureur {
     }
   }
 
+  // Un autre véhicule le percute : le monde le fait voir et entendre (pas plus d'une fois par 0,3 s,
+  // comme la barrière : deux véhicules qui se frottent ne font pas un choc à chaque image). Les deux
+  // véhicules du choc le sentent ; gerbe : un seul des deux fait les étincelles, au point du contact.
+  cogner(choc: number, x: number, y: number, gerbe: boolean) {
+    if (choc > CHOC_LEGER && this.attenteChoc <= 0) {
+      this.attenteChoc = 0.3;
+      this.monde.reagir(this, { genre: "choc", x, y, fort: choc > CHOC_FORT, gerbe });
+    }
+  }
+
   etourdir(duree: number) {
     this.etourdie = Math.max(this.etourdie, duree);
     this.monde.reagir(this, { genre: "etourdi" });
@@ -526,6 +576,10 @@ export function bousculer(coureurs: Coureur[], conduite: Conduite) {
         a.vy -= ny * choc * force;
         b.vx += nx * choc * force;
         b.vy += ny * choc * force;
+        const x = (a.x + b.x) / 2;
+        const y = (a.y + b.y) / 2;
+        a.cogner(choc, x, y, true);
+        b.cogner(choc, x, y, false);
       }
     }
   }

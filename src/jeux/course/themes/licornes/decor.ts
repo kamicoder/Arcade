@@ -207,6 +207,12 @@ export function decorDesLicornes(course: CourseVue): DecorDeCourse {
         joue(sons.pouf);
         gerbe(evenement.x, evenement.y, 8, ["#ffffff", "#ffd3ec"]);
         break;
+      case "choc":
+        if (evenement.gerbe) {             // un « pouf » et une gerbe par contact, pas un par licorne
+          joue(sons.pouf);
+          gerbe(evenement.x, evenement.y, evenement.fort ? 10 : 5, ["#ffffff", "#ffe066"]);
+        }
+        break;
       case "repeche":
         gerbe(evenement.avantX, evenement.avantY, 12, ["#ffffff", "#ffd3ec"]);
         gerbe(c.x, c.y, 18, ["#ffe066", "#ffffff", "#c47dff"]);

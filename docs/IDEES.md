@@ -34,11 +34,7 @@ Le Tamago est une ébauche : on le laisse de côté pour l'instant, ces notes at
 ## Course (voitures et licornes)
 
 **Finition**
-- Caméra qui tremble au choc, flash au turbo, vibration (S).
-- De vrais sons pour les voitures : nitro, choc, victoire (aujourd'hui le même bip) (S).
-- Les écarts au contre-la-montre, à chaque porte (« −0.42 » en vert) (S).
 - Un ralenti et un zoom sur la ligne d'arrivée (M).
-- Une place gagnée se voit (le compteur grossit) (S).
 
 **Contenu**
 - Des rivaux qui vont chercher les bonus et évitent les pièges ; des écarts de vitesse entre eux (M).
@@ -46,7 +42,6 @@ Le Tamago est une ébauche : on le laisse de côté pour l'instant, ces notes at
 - De nouveaux objets pour les voitures avec les effets existants : boue (étourdi), monster truck (géant) (M).
 
 **Au doigt et à la manette**
-- La course sur toute la largeur du téléphone (`elargir`) (M).
 - L'aide de la manette à l'écran quand une manette est branchée (S).
 
 **Modes**
@@ -158,5 +153,4 @@ Le Tamago est une ébauche : on le laisse de côté pour l'instant, ces notes at
 ## Plusieurs jeux à la fois
 
 Des idées revenues d'un jeu à l'autre, qui iraient au socle :
-- **Les vibrations** (manette et téléphone) : course.
-- **`elargir` là où il manque** : course, démineur, Tamago.
+- **`elargir` là où il manque** : Tamago.

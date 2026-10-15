@@ -9,20 +9,25 @@ import { chrono, cheminDeRoute, type Circuit } from "../circuits";
 import { themeEnCours } from "../sauvegarde";
 import { changerReglageSon, jouer } from "../son";
 import { ecrire, enNombre, Annonces, rangTexte } from "../interface";
-import { LARGEUR, HAUTEUR } from "../../../socle/style";
+import { HAUTEUR } from "../../../socle/style";
 import { BoutonsAuDoigt } from "../../../socle/doigts";
 import { estTactile } from "../../../socle/tactile";
 import { surTouche } from "../../../socle/clavier";
 
 type Action = "gauche" | "droite" | "reculer" | "turbo";
 
-// Les commandes au doigt : pas de bouton pour avancer, le véhicule avance tout seul
-const COMMANDES: { action: Action; x: number; y: number; rayon: number; icone: string }[] = [
+// Les commandes au doigt : pas de bouton pour avancer, le véhicule avance tout seul.
+// x : depuis le bord gauche, ou depuis le bord droit (aDroite) : chaque pouce trouve ses boutons contre
+// son bord, quelle que soit la largeur du téléphone.
+const COMMANDES: { action: Action; x: number; y: number; rayon: number; icone: string; aDroite?: boolean }[] = [
   { action: "gauche", x: 92, y: 448, rayon: 64, icone: "◀" },
   { action: "droite", x: 238, y: 448, rayon: 64, icone: "▶" },
-  { action: "reculer", x: 738, y: 475, rayon: 46, icone: "▼" },
-  { action: "turbo", x: 870, y: 432, rayon: 68, icone: "" },
+  { action: "reculer", x: 222, y: 475, rayon: 46, icone: "▼", aDroite: true },
+  { action: "turbo", x: 90, y: 432, rayon: 68, icone: "", aDroite: true },
 ];
+
+// L'écart avec le fantôme, sous les compteurs : en vert quand on est en avance, en rouge en retard
+const ECART = { avance: "#2fd16a", retard: "#ff4b4b", duree: 1600 };
 
 // Les compteurs d'un joueur, dans sa moitié d'écran
 interface Compteurs {
@@ -32,6 +37,8 @@ interface Compteurs {
   temps: Phaser.GameObjects.Text;
   droite: Phaser.GameObjects.Text;         // le record, ou la place
   sur: Phaser.GameObjects.Text;            // « /4 » après la place
+  placeAvant: number;                      // pour voir une place gagnée
+  ecart: Phaser.GameObjects.Text;          // l'écart avec le fantôme, au contre-la-montre
   reserve: Phaser.GameObjects.Image[];
   turbo: Phaser.GameObjects.Image;
   geante: Phaser.GameObjects.Rectangle;
@@ -65,17 +72,19 @@ export class Tableau extends Phaser.Scene {
     this.iconeTactile = undefined;
     this.pause = undefined;
 
+    // Tout se place d'après la largeur du jeu : au doigt, la course prend celle du téléphone (Piste.create)
+    const largeur = this.scale.width;
     const deux = this.course.joueurs.length === 2;
-    const vues = deux ? [{ x: 0, w: LARGEUR / 2 - 2 }, { x: LARGEUR / 2 + 2, w: LARGEUR / 2 - 2 }] : [{ x: 0, w: LARGEUR }];
+    const vues = deux ? [{ x: 0, w: largeur / 2 - 2 }, { x: largeur / 2 + 2, w: largeur / 2 - 2 }] : [{ x: 0, w: largeur }];
     if (deux) {
-      this.add.rectangle(LARGEUR / 2, 0, 4, HAUTEUR, habillage.couleurs.separation).setOrigin(0.5, 0);
+      this.add.rectangle(largeur / 2, 0, 4, HAUTEUR, habillage.couleurs.separation).setOrigin(0.5, 0);
     }
     this.course.joueurs.forEach((coureur, j) => this.creerCompteurs(coureur, vues[j]));
     this.creerCarte(deux);
 
-    this.compte = ecrire(this, LARGEUR / 2, HAUTEUR / 2, "", 130, "#ffffff", { contour: true }).setVisible(false);
+    this.compte = ecrire(this, largeur / 2, HAUTEUR / 2, "", 130, "#ffffff", { contour: true }).setVisible(false);
     const colonnes = vues.map((v) => ({ x: v.x + v.w / 2, taille: deux ? 38 : 52 }));
-    this.annonces = new Annonces(this, [...colonnes, { x: LARGEUR / 2, taille: 52 }]);
+    this.annonces = new Annonces(this, [...colonnes, { x: largeur / 2, taille: 52 }]);
 
     if (estTactile() && !deux) {
       this.creerCommandes();
@@ -91,9 +100,11 @@ export class Tableau extends Phaser.Scene {
     const evenements = this.course.events;
     evenements.on("compte", this.compter, this);
     evenements.on("annonce", this.annoncer, this);
+    evenements.on("ecart", this.montrerLEcart, this);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       evenements.off("compte", this.compter, this);
       evenements.off("annonce", this.annoncer, this);
+      evenements.off("ecart", this.montrerLEcart, this);
     });
     this.course.tableauPret();
   }
@@ -123,6 +134,8 @@ export class Tableau extends Phaser.Scene {
         ? texte(x + w - 10, y + 56, 17, c.record, [1, 0.5])
         : texte(x + w - 40, y + 56, 26, c.texteDoux, [1, 0.5]),
       sur: texte(x + w - 42, y + 60, 15, c.texteClair),
+      placeAvant: coureur.place,
+      ecart: ecrire(this, x + 20, y + 118, "", 30, ECART.avance, { origine: [0, 0.5], contour: true }).setAlpha(0),
       reserve,
       turbo: this.add.image(x + 20, y + 74, icones.barre).setOrigin(0),
       geante: this.add.rectangle(x + 20, y + 82, w - 34, 5, 0xff4fa8).setOrigin(0).setRounded(2.5),
@@ -136,10 +149,10 @@ export class Tableau extends Phaser.Scene {
     const habillage = themeEnCours().habillage;
     const largeur = 150;
     const hauteur = largeur * c.modele.hauteur / c.modele.largeur;
-    let x = LARGEUR - largeur - 12;
+    let x = this.scale.width - largeur - 12;
     let y = 12;
     if (deux) {
-      x = LARGEUR / 2 - largeur / 2;
+      x = this.scale.width / 2 - largeur / 2;
       y = HAUTEUR - hauteur - 12;
     }
     this.add.graphics().fillStyle(habillage.couleurs.fondPanneau, habillage.couleurs.alphaPanneau * 0.95)
@@ -192,7 +205,8 @@ export class Tableau extends Phaser.Scene {
     this.events.on(Phaser.Scenes.Events.PAUSE, toutLacher);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.events.off(Phaser.Scenes.Events.PAUSE, toutLacher));
     for (const commande of COMMANDES) {
-      const { x, y, rayon } = commande;
+      const { y, rayon } = commande;
+      const x = commande.aDroite ? this.scale.width - commande.x : commande.x;
       const rond = this.add.circle(x, y, rayon, 0xffffff, c.alphaCommande).setStrokeStyle(3, 0xffffff, 0.9);
       doigts.ajouter(rond, commande.action, 1.4);
       this.boutonsTactiles.push({ action: commande.action, rond });
@@ -209,7 +223,7 @@ export class Tableau extends Phaser.Scene {
     const rond = this.add.circle(0, 0, 24, 0xffffff, 0.7);
     const barres = this.add.graphics().fillStyle(enNombre(c.commande === "#ffffff" ? "#1c1a25" : c.commande))
       .fillRect(-8, -10, 5, 20).fillRect(3, -10, 5, 20);
-    this.pause = this.add.container(LARGEUR / 2, 32, [rond, barres]).setSize(60, 60).setInteractive()
+    this.pause = this.add.container(this.scale.width / 2, 32, [rond, barres]).setSize(60, 60).setInteractive()
       .on("pointerup", () => this.course.mettreEnPause());
   }
 
@@ -236,6 +250,30 @@ export class Tableau extends Phaser.Scene {
 
   private annoncer(texte: string, couleur: string, vue: number) {
     this.annonces.annoncer(texte, couleur, vue >= 0 ? vue : undefined);
+  }
+
+  // Une porte passée au contre-la-montre : « −0.42 » en vert (en avance sur le fantôme), « +0.30 » en
+  // rouge. Il arrive en grossissant, reste un peu, puis s'efface ; l'écart suivant le remplace.
+  private montrerLEcart(secondes: number) {
+    const ecart = this.compteurs[0]?.ecart;
+    if (!ecart) {
+      return;
+    }
+    const enAvance = secondes < 0;
+    ecart.setText((enAvance ? "−" : "+") + Math.abs(secondes).toFixed(2)).setColor(enAvance ? ECART.avance : ECART.retard);
+    this.tweens.killTweensOf(ecart);
+    ecart.setAlpha(1).setScale(1.4);
+    this.tweens.add({ targets: ecart, scale: 1, duration: 250, ease: "Back.Out" });
+    this.tweens.add({ targets: ecart, alpha: 0, duration: 400, delay: ECART.duree });
+  }
+
+  // Une place gagnée se voit : le compteur grossit un instant
+  private saluerLaPlace(c: Compteurs, rang: number) {
+    if (rang < c.placeAvant) {
+      this.tweens.killTweensOf(c.droite);
+      this.tweens.add({ targets: c.droite, scale: { from: 1.6, to: 1 }, duration: 380, ease: "Back.Out" });
+    }
+    c.placeAvant = rang;
   }
 
   // Un joueur a passé la ligne : un cartouche « Arrivée ! » dans sa moitié d'écran
@@ -269,6 +307,7 @@ export class Tableau extends Phaser.Scene {
       } else {
         c.temps.setText("⏱ " + chrono(l.fini ? l.tempsFinal : l.tempsTotal));
         const rang = l.fini ? l.rang : l.place;
+        this.saluerLaPlace(c, rang);
         c.droite.setText(rangTexte(rang)).setColor(rang === 1 ? couleurs.accent : couleurs.texteDoux);
         c.sur.setText("/" + course.coureurs.length);
       }

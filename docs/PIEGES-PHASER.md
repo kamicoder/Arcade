@@ -102,6 +102,10 @@ bugs de Phaser : c'est sa façon de faire, logique une fois qu'on la connaît, m
 - Plusieurs caméras (écran partagé, éditeur) : chaque objet doit être ignoré par les caméras qui ne
   doivent pas le montrer (`camera.ignore`), sinon il s'affiche et répond aux clics deux fois. Et
   `fonduPuis` n'assombrit que la caméra principale.
+- `camera.flash()` part d'un écran **tout blanc** (opaque) : il n'a pas d'argument pour l'atténuer. Pour un
+  petit flash, régler `camera.flashEffect.alpha` avant (0.35 pour le turbo de la course) ; Phaser le garde
+  pour les flashs suivants. Un test qui veut voir un effet bref écoute son début (`"cameraflashstart"`,
+  `"camerashakestart"`) plutôt que de lire `isRunning`, déjà retombé quand le poste est chargé.
 - Les effets de caméra (`zoomTo`, `pan`) veulent une fonction d'ease (`Phaser.Math.Easing.Sine.Out`),
   pas son nom en texte comme les tweens.
 - `scale.setGameSize` : seules les caméras placées en (0, 0) et à la taille d'avant suivent la nouvelle

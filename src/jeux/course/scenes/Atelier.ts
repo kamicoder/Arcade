@@ -8,7 +8,7 @@ import {
   themeEnCours, preferences, apparenceDe, nomGarde, changerApparence, remettreApparence,
 } from "../sauvegarde";
 import { jouer } from "../son";
-import { titre, ecrire, bouton, touche, zone, enNombre, textureCadre, couleurDuNom, assombrir } from "../interface";
+import { titre, ecrire, bouton, touche, zone, enNombre, textureCadre, couleurDuNom, assombrir, menuElargi } from "../interface";
 import { surChaqueTouche } from "../../../socle/clavier";
 import { surManette, MANETTE } from "../../../socle/manette";
 import { estTactile } from "../../../socle/tactile";
@@ -57,6 +57,7 @@ export class Atelier extends Phaser.Scene {
     this.rangees = [];
     this.parti = false;
 
+    menuElargi(this);                      // au doigt, toute la largeur du téléphone
     this.cameras.main.fadeIn(250);
     theme.habillage.fond(this);
     titre(this, 38, theme.mots.atelier, 40);

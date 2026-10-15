@@ -9,7 +9,7 @@ import { POINTS_GRAND_PRIX } from "./GrandPrix";
 import { preparerCircuit, type Circuit } from "../circuits";
 import { texturePiste } from "../piste";
 import {
-  Coureur, bousculer, ordreDeCourse, resultatsDeCourse, type Monde, type ObjetEnCourse, type Instant,
+  Coureur, bousculer, ordreDeCourse, resultatsDeCourse, tempsAuxPortes, type Monde, type ObjetEnCourse, type Instant,
 } from "../Coureur";
 import type { DecorDeCourse, Evenement, Moteur, Niveau, Conduite, Theme, VueDuCoureur } from "../theme";
 import {
@@ -20,7 +20,9 @@ import { TouchesPhysiques } from "../../../socle/touchesPhysiques";
 import { surChaqueTouche } from "../../../socle/clavier";
 import { estTactile } from "../../../socle/tactile";
 import { surManette, MANETTE } from "../../../socle/manette";
-import { LARGEUR, HAUTEUR } from "../../../socle/style";
+import { vibrer, type Force } from "../../../socle/vibration";
+import { elargir, retablir } from "../../../socle/largeur";
+import { HAUTEUR } from "../../../socle/style";
 
 export type Mode = "grandprix" | "course" | "duo" | "chrono";
 
@@ -46,6 +48,10 @@ const TURBO_SEUL = ["Space", "ShiftLeft"];           // le turbo de J1 quand il 
 // À la manette : A accélère, B freine (ou les gâchettes), X ou RB le turbo, Start la pause
 const TURBO_MANETTE = [MANETTE.X, MANETTE.RB];
 
+// Ce qui se sent : la caméra qui tremble à un choc fort (de quelques pixels), le petit flash du turbo
+const SECOUSSE = { duree: 180, pixels: 7 };
+const FLASH = { duree: 220, alpha: 0.35 };
+
 export class Piste extends Phaser.Scene implements Monde {
   theme!: Theme;
   donnees!: DonneesDeCourse;
@@ -67,6 +73,8 @@ export class Piste extends Phaser.Scene implements Monde {
   meilleurTour: number | null = null;
   fantome: Instant[] = [];
   fantomeIndex = 0;
+  private tempsDuFantome: number[] = [];   // quand le fantôme a passé chaque porte (voir tempsAuxPortes)
+  private porteSuivante = 1;               // la prochaine porte où comparer le joueur au fantôme
   nouveauRecord = false;
   premierTemps = false;                    // le tout premier tour chronométré du circuit : il n'y avait pas de record
   ombre?: ReturnType<DecorDeCourse["fantome"]>;
@@ -107,9 +115,18 @@ export class Piste extends Phaser.Scene implements Monde {
     const record = this.enChrono ? lireRecord(this.circuit.modele.id) : null;
     this.meilleurTour = record ? record.temps : null;
     this.fantome = record?.fantome ?? [];
+    this.porteSuivante = 1;
+    this.tempsDuFantome = tempsAuxPortes(this.circuit, this.fantome);
   }
 
   create() {
+    // Au doigt, la course prend toute la largeur du téléphone : on voit plus loin devant (socle/largeur.ts).
+    // À deux, l'écran coupé en deux garde ses 960 (on ne joue à deux qu'au clavier).
+    if (this.donnees.mode === "duo") {
+      retablir(this.game);
+    } else {
+      elargir(this);
+    }
     // Le thème habille la course : la piste d'abord (il la peint), puis les objets et les véhicules
     this.add.image(0, 0, texturePiste(this, this.circuit)).setOrigin(0).setDepth(0);
     this.decor = this.theme.decor({
@@ -175,8 +192,9 @@ export class Piste extends Phaser.Scene implements Monde {
     this.zoomDeBase = 1;
     if (this.joueurs.length === 2) {
       this.zoomDeBase = 0.8;               // une moitié d'écran, c'est étroit : on prend un peu de recul
-      principale.setViewport(0, 0, LARGEUR / 2 - 2, HAUTEUR);
-      cameras.push(this.cameras.add(LARGEUR / 2 + 2, 0, LARGEUR / 2 - 2, HAUTEUR));
+      const moitie = this.scale.width / 2;
+      principale.setViewport(0, 0, moitie - 2, HAUTEUR);
+      cameras.push(this.cameras.add(moitie + 2, 0, moitie - 2, HAUTEUR));
     }
     cameras.forEach((camera, j) => {
       const vue = this.vues[j].objet;
@@ -295,6 +313,7 @@ export class Piste extends Phaser.Scene implements Monde {
         c.place = i + 1;
       });
       this.avancerLeFantome();
+      this.comparerAuFantome();
     }
     for (const vue of this.vues) {
       vue.actualiser(horloge, this.enCourse ? duree : 0);
@@ -350,6 +369,10 @@ export class Piste extends Phaser.Scene implements Monde {
 
   private finirUnTour(c: Coureur) {
     const couleurs = this.theme.habillage.couleurs;
+    // La ligne est la dernière porte du tour : l'écart avec le record (le tour du fantôme)
+    if (this.enChrono && this.meilleurTour !== null) {
+      this.events.emit("ecart", c.tempsTour - this.meilleurTour);
+    }
     if (this.enChrono && (this.meilleurTour === null || c.tempsTour < this.meilleurTour)) {
       if (this.meilleurTour !== null) {
         this.nouveauRecord = true;
@@ -360,6 +383,7 @@ export class Piste extends Phaser.Scene implements Monde {
       }
       this.meilleurTour = c.tempsTour;
       this.fantome = c.enregistrement;
+      this.tempsDuFantome = tempsAuxPortes(this.circuit, this.fantome);
       ecrireRecord(this.circuit.modele.id, { temps: this.meilleurTour, fantome: this.fantome });
     }
     if (c.tour === TOURS) {
@@ -371,6 +395,7 @@ export class Piste extends Phaser.Scene implements Monde {
     c.enregistrement = [];
     if (c.humain) {
       this.fantomeIndex = 0;
+      this.porteSuivante = 1;
       jouer(this, "tour");
       if (c.tour === TOURS) {
         this.annoncer(this.joueurs.length === 1 ? "Dernier tour !" : c.nom + " : dernier tour !", this.theme.couleur(c.apparence), c);
@@ -404,6 +429,24 @@ export class Piste extends Phaser.Scene implements Monde {
     }
     this.ombre.objet.setVisible(t < f[f.length - 1].t);
     this.ombre.placer(f[this.fantomeIndex]);
+  }
+
+  // À chaque porte du circuit, le joueur passe plus tôt (−) ou plus tard (+) que son fantôme :
+  // le tableau de bord l'écrit
+  private comparerAuFantome() {
+    const c = this.joueurs[0];
+    if (!this.enChrono || c.fini) {
+      return;
+    }
+    const portes = this.circuit.distancesDesPortes;
+    const dansLeTour = c.progres - (c.tour - 1) * this.circuit.longueur;
+    while (this.porteSuivante < portes.length && dansLeTour >= portes[this.porteSuivante]) {
+      const fantome = this.tempsDuFantome[this.porteSuivante];
+      if (fantome !== undefined) {
+        this.events.emit("ecart", c.tempsTour - fantome);
+      }
+      this.porteSuivante++;
+    }
   }
 
   private terminer() {
@@ -483,5 +526,39 @@ export class Piste extends Phaser.Scene implements Monde {
 
   reagir(c: Coureur, evenement: Evenement) {
     this.decor.reagir(c, evenement);
+    if (c.aide) {
+      this.sentir(c, evenement);
+    }
+  }
+
+  // Ce que le joueur sent dans ses mains et voit sur sa caméra (à deux, seulement la sienne) : un turbo
+  // (la réserve, ou une flèche) fait un petit flash et une vibration légère ; un choc léger vibre un peu,
+  // un choc fort fait trembler la caméra et vibre plus
+  private sentir(c: Coureur, evenement: Evenement) {
+    const j = this.joueurs.indexOf(c);
+    const camera = this.cameras.cameras[j];
+    const turbo = evenement.genre === "turbo" || (evenement.genre === "objet" && evenement.type.effet.genre === "turbo");
+    if (turbo) {
+      camera.flashEffect.alpha = FLASH.alpha;   // un voile léger, pas tout l'écran en blanc
+      camera.flash(FLASH.duree, 255, 255, 255);
+      this.vibrer(j, "leger");
+    } else if (evenement.genre === "barriere" || evenement.genre === "choc") {
+      if (evenement.fort) {
+        camera.shake(SECOUSSE.duree, SECOUSSE.pixels / camera.width);
+      }
+      this.vibrer(j, evenement.fort ? "moyen" : "leger");
+    }
+  }
+
+  // Seul, toutes les manettes branchées (et le téléphone) ; à deux, seulement la manette du joueur concerné
+  private vibrer(joueur: number, force: Force) {
+    if (this.joueurs.length === 1) {
+      vibrer(this, force);
+      return;
+    }
+    const manette = this.input.gamepad?.getPad(joueur);
+    if (manette) {
+      vibrer(this, force, manette);
+    }
   }
 }

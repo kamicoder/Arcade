@@ -9,7 +9,7 @@ import {
   themeEnCours, preferences, listeDesCircuits, lireCircuitChoisi, garderCircuitChoisi, lireRecord, garderLesRivaux,
 } from "../sauvegarde";
 import { jouer } from "../son";
-import { titre, ecrire, bouton, touche, zone, boutonSon, textureCadre, textureApercu } from "../interface";
+import { titre, ecrire, bouton, touche, zone, boutonSon, textureCadre, textureApercu, menuElargi } from "../interface";
 import { LARGEUR } from "../../../socle/style";
 import { surTouche, surChaqueTouche } from "../../../socle/clavier";
 import { surManette, MANETTE, VALIDER } from "../../../socle/manette";
@@ -45,6 +45,7 @@ export class Circuits extends Phaser.Scene {
     this.parti = false;
     this.modifier = undefined;
 
+    menuElargi(this);                      // au doigt, toute la largeur du téléphone
     this.cameras.main.fadeIn(250);
     theme.habillage.fond(this);
     titre(this, 36, TITRES[mode], 40);

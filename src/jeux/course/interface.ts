@@ -10,6 +10,7 @@ import { changerReglageSon, ICONES_REGLAGE_SON, jouer } from "./son";
 import { LARGEUR, HAUTEUR } from "../../socle/style";
 import { estTactile } from "../../socle/tactile";
 import { surTouche } from "../../socle/clavier";
+import { elargir, suivreLaLargeur } from "../../socle/largeur";
 
 const habillage = () => themeEnCours().habillage;
 
@@ -31,6 +32,27 @@ interface OptionsTexte {
   contour?: boolean | string;              // vrai : bordé de la couleur du thème ; une couleur : bordé de celle-ci
   origine?: [number, number];
   gras?: boolean;
+}
+
+// ===== Au doigt, toute la largeur du téléphone =====
+
+// Les menus prennent toute la largeur du téléphone (socle/largeur.ts) sans être redessinés : ils restent
+// pensés en 960 × 540, la caméra regarde ce milieu-là (un défilement négatif), et la largeur en plus se
+// partage des deux côtés, où le fond continue. Les clics et les doigts passent par la caméra : ils
+// tombent juste. Ce qui va contre un bord (« ← Arcade », le son, le niveau) se place d'après bords().
+// À appeler au début du create(), avant de rien dessiner.
+export function menuElargi(scene: Phaser.Scene) {
+  elargir(scene);
+  suivreLaLargeur(scene);
+  scene.cameras.main.setScroll(-(scene.scale.width - LARGEUR) / 2, 0);
+}
+
+// Ce que la caméra principale montre, en x : du bord gauche de l'écran à son bord droit, et le milieu.
+// Dans un menu élargi, le bord gauche est en dessous de 0 ; sur la course et ses écrans, il est à 0.
+export function bords(scene: Phaser.Scene): { gauche: number; droite: number; milieu: number } {
+  const gauche = scene.cameras.main.scrollX;
+  const droite = gauche + scene.scale.width;
+  return { gauche, droite, milieu: (gauche + droite) / 2 };
 }
 
 // Un texte dans la police du thème
@@ -60,7 +82,7 @@ export function degrade(p: CanvasRenderingContext2D, x1: number, x2: number, cou
 }
 
 export function titre(scene: Phaser.Scene, y: number, contenu: string, taille = 40): Phaser.GameObjects.Text {
-  return habillage().titre(ecrire(scene, LARGEUR / 2, y, contenu, taille, habillage().couleurs.accent, { contour: true }));
+  return habillage().titre(ecrire(scene, bords(scene).milieu, y, contenu, taille, habillage().couleurs.accent, { contour: true }));
 }
 
 // Un cadre aux coins ronds : un fond, et une bordure dégradée si on veut.
@@ -216,7 +238,8 @@ export class Annonces {
 // Le petit bouton du son, en bas à droite (et la touche M) : son et musique, son sans musique, son coupé
 export function boutonSon(scene: Phaser.Scene, annonces?: Annonces) {
   const taille = estTactile() ? 22 : 15;
-  const icone = ecrire(scene, LARGEUR - 16, HAUTEUR - 16, "", taille, habillage().couleurs.texteDoux, { origine: [1, 0.5] });
+  const droite = bords(scene).droite;
+  const icone = ecrire(scene, droite - 16, HAUTEUR - 16, "", taille, habillage().couleurs.texteDoux, { origine: [1, 0.5] });
   const montrer = () => icone.setText(ICONES_REGLAGE_SON[preferences.son] + touche(" M"));
   montrer();
   const changer = () => {
@@ -225,6 +248,6 @@ export function boutonSon(scene: Phaser.Scene, annonces?: Annonces) {
     annonces?.annoncer(nom, habillage().couleurs.texteDoux);
     jouer(scene, "menu");
   };
-  zone(scene, LARGEUR - 90, HAUTEUR - 44, 90, 44, changer);
+  zone(scene, droite - 90, HAUTEUR - 44, 90, 44, changer);
   surTouche(scene, "M", changer);
 }

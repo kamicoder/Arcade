@@ -6,7 +6,7 @@ import type { Resultat } from "../Coureur";
 import { chrono } from "../circuits";
 import { themeEnCours } from "../sauvegarde";
 import { ecrire, titre, bouton, touche, portrait, enNombre, rangTexte } from "../interface";
-import { LARGEUR, HAUTEUR } from "../../../socle/style";
+import { HAUTEUR } from "../../../socle/style";
 import { surTouche } from "../../../socle/clavier";
 import { surManette, MANETTE, VALIDER } from "../../../socle/manette";
 import { uneSeuleFois } from "../../../socle/fin";
@@ -17,6 +17,7 @@ export class Arrivee extends Phaser.Scene {
   }
 
   create(donnees: { resultats: Resultat[] }) {
+    const largeur = this.scale.width;     // au doigt, celle du téléphone (voir Piste.create)
     const theme = themeEnCours();
     const { couleurs: c } = theme.habillage;
     const course = this.scene.get("course-piste") as Piste;
@@ -25,9 +26,9 @@ export class Arrivee extends Phaser.Scene {
 
     if (course.joueurs.length === 2) {
       // Le trait de l'écran partagé : il était au tableau de bord, qui vient de s'arrêter
-      this.add.rectangle(LARGEUR / 2, 0, 4, HAUTEUR, c.separation).setOrigin(0.5, 0);
+      this.add.rectangle(largeur / 2, 0, 4, HAUTEUR, c.separation).setOrigin(0.5, 0);
     }
-    this.add.rectangle(0, 0, LARGEUR, HAUTEUR, c.voile, c.alphaVoile).setOrigin(0);
+    this.add.rectangle(0, 0, largeur, HAUTEUR, c.voile, c.alphaVoile).setOrigin(0);
     const fete = theme.habillage.fete(this, 0);
     // La fête salue une victoire ; contre la montre, on est seul (toujours 1er) : elle salue un nouveau record,
     // ou le tout premier temps du circuit
@@ -43,14 +44,14 @@ export class Arrivee extends Phaser.Scene {
     const lignes: Phaser.GameObjects.GameObject[] = [];
     if (course.enChrono) {
       const l = course.joueurs[0];
-      const vehicule = portrait(this, LARGEUR / 2, 160, l.apparence, 1.8);
+      const vehicule = portrait(this, largeur / 2, 160, l.apparence, 1.8);
       // Il saute de joie : un tween qui monte et redescend, sans fin
       this.tweens.add({ targets: vehicule, y: 148, duration: 225, yoyo: true, repeat: -1, ease: "Sine.Out" });
-      lignes.push(theme.habillage.titre(ecrire(this, LARGEUR / 2, 270, "Arrivée !", 64, c.accent, { contour: true })));
-      lignes.push(ecrire(this, LARGEUR / 2, 330, "Course en " + chrono(l.tempsFinal), 28, c.texte, { contour: true }));
-      lignes.push(ecrire(this, LARGEUR / 2, 368, "Record du tour : " + chrono(course.meilleurTour ?? 0), 22, c.record, { contour: true }));
+      lignes.push(theme.habillage.titre(ecrire(this, largeur / 2, 270, "Arrivée !", 64, c.accent, { contour: true })));
+      lignes.push(ecrire(this, largeur / 2, 330, "Course en " + chrono(l.tempsFinal), 28, c.texte, { contour: true }));
+      lignes.push(ecrire(this, largeur / 2, 368, "Record du tour : " + chrono(course.meilleurTour ?? 0), 22, c.record, { contour: true }));
       if (course.nouveauRecord) {
-        lignes.push(ecrire(this, LARGEUR / 2, 405, "✨ Nouveau record ! ✨", 24, c.accent, { contour: true }));
+        lignes.push(ecrire(this, largeur / 2, 405, "✨ Nouveau record ! ✨", 24, c.accent, { contour: true }));
       }
     } else {
       const nom = course.circuit.modele.nom;
@@ -73,10 +74,10 @@ export class Arrivee extends Phaser.Scene {
       const suite = gp ? une(() => this.versLeGrandPrix(course)) : menu;
       const rejouer = une(() => course.rejouer());
       const boutons = gp
-        ? [bouton(this, LARGEUR / 2 - 200, 474, 400, 48, "Le classement du Grand Prix" + touche(" (Entrée)"), suite)]
+        ? [bouton(this, largeur / 2 - 200, 474, 400, 48, "Le classement du Grand Prix" + touche(" (Entrée)"), suite)]
         : [
-          bouton(this, LARGEUR / 2 - 210, 474, 200, 48, "Rejouer" + touche(" (R)"), rejouer),
-          bouton(this, LARGEUR / 2 + 10, 474, 200, 48, "Menu" + touche(" (Entrée)"), menu, true),
+          bouton(this, largeur / 2 - 210, 474, 200, 48, "Rejouer" + touche(" (R)"), rejouer),
+          bouton(this, largeur / 2 + 10, 474, 200, 48, "Menu" + touche(" (Entrée)"), menu, true),
         ];
       for (const b of boutons) {
         b.setAlpha(0);
@@ -115,7 +116,7 @@ export class Arrivee extends Phaser.Scene {
     if (enGrandPrix) {
       enfants.push(ecrire(this, 280, 0, "+" + r.points, 22, c.accent, { origine: [1, 0.5] }));
     }
-    return this.add.container(LARGEUR / 2, y + h / 2, enfants);
+    return this.add.container(this.scale.width / 2, y + h / 2, enfants);
   }
 
   private versLeGrandPrix(course: Piste) {

@@ -9,7 +9,7 @@ import type { DonneesDeCourse } from "./Piste";
 import { melanger } from "../circuits";
 import { themeEnCours, preferences, apparenceDe, listeDesCircuits } from "../sauvegarde";
 import { jouer } from "../son";
-import { titre, ecrire, bouton, touche, enNombre, portrait, rangTexte } from "../interface";
+import { titre, ecrire, bouton, touche, enNombre, portrait, rangTexte, menuElargi } from "../interface";
 import { LARGEUR } from "../../../socle/style";
 import { surTouche } from "../../../socle/clavier";
 import { surManette, MANETTE, VALIDER } from "../../../socle/manette";
@@ -62,6 +62,7 @@ export class Classement extends Phaser.Scene {
     const theme = themeEnCours();
     const c = theme.habillage.couleurs;
     const courses = theme.grandPrix.length;
+    menuElargi(this);                      // au doigt, toute la largeur du téléphone
     this.cameras.main.fadeIn(250);
     theme.habillage.fond(this);
     const finies = gp.etape + 1;
@@ -130,6 +131,7 @@ export class Podium extends Phaser.Scene {
   create({ grandPrix: gp }: { grandPrix: EtatDuGrandPrix }) {
     const theme = themeEnCours();
     const c = theme.habillage.couleurs;
+    menuElargi(this);                      // au doigt, toute la largeur du téléphone
     this.cameras.main.fadeIn(250);
     theme.habillage.fond(this);
     const fete = theme.habillage.fete(this, 55);   // la fête : beaucoup plus de confettis

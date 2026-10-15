@@ -112,7 +112,8 @@ export interface Niveau {
 // Ce qui arrive en course : le thème y répond par des sons, des gerbes, des messages
 export type Evenement =
   | { genre: "pas"; aigu: boolean }        // une foulée (le galop fait « clop »)
-  | { genre: "barriere"; x: number; y: number }
+  | { genre: "barriere"; x: number; y: number; fort: boolean }   // fort : de face, et vite (voir CHOC_FORT)
+  | { genre: "choc"; x: number; y: number; fort: boolean; gerbe: boolean }   // contre un autre véhicule (gerbe : les étincelles, une fois par contact)
   | { genre: "repeche"; avantX: number; avantY: number }
   | { genre: "etourdi" }
   | { genre: "turbo" }
