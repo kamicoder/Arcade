@@ -12,6 +12,7 @@ qui ne va pas suffit, on ajuste.
 **Casse-briques**
 - Au doigt, la raquette remonte de 70 px au-dessus d'une bande pour le pouce : la balle a un peu moins de chemin
   avant elle. La remonter moins (50 px), ou plus (90 px) ?
+- La balle, ralentie pour les enfants : départ 320 px/s, +2 par brique, au plus 520 (avant : 380, +3, 620).
 
 **Tir spatial**
 - Coup reçu : ralenti à 30 % pendant 220 ms et flash rouge. Plus marqué (20 % / 300 ms), ou un arrêt net de 80 ms ?
