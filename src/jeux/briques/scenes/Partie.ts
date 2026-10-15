@@ -18,6 +18,7 @@ import {
 } from "../reglages";
 import { LARGEUR, HAUTEUR } from "../../../socle/style";
 import { elargir } from "../../../socle/largeur";
+import { estTactile } from "../../../socle/tactile";
 import { vibrer } from "../../../socle/vibration";
 import { surTouche } from "../../../socle/clavier";
 import { toucheDuSon } from "../../../socle/son";
@@ -37,7 +38,10 @@ const HAUT_DU_MONDE = 44;                  // sous le tableau de bord
 const HAUT_DES_BRIQUES = 78;
 const PAS = { x: BRIQUE.largeur + 4, y: BRIQUE.hauteur + 4 };
 const GAUCHE_DES_BRIQUES = (LARGEUR - COLONNES * PAS.x) / 2;   // sur 960 de large ; plus large, le mur reste au milieu
-const Y_RAQUETTE = HAUTEUR - 40;
+// La hauteur de la raquette. Au doigt, elle remonte : le pouce glisse dans la bande du dessous (le doigt
+// pilote à distance, commandes.ts) et ne cache ni la raquette ni la balle qui arrive.
+const Y_RAQUETTE = { souris: HAUTEUR - 40, doigt: HAUTEUR - 110 };
+const BANDE_DU_POUCE = 80;
 const POINTS: Record<GenreDeBrique, number> = { simple: 10, argent: 20, or: 30, explosive: 15, metal: 0 };
 const DUREES: Partial<Record<GenreDeBonus, number>> = { large: DUREE_LARGE, feu: DUREE_FEU, lente: DUREE_LENTE };
 
@@ -72,6 +76,7 @@ export class Partie extends Phaser.Scene {
   private commandes!: Commandes;
   private quitte = false;
   private decalage = 0;                    // au doigt, le jeu élargi : le mur reste au milieu
+  yRaquette = Y_RAQUETTE.souris;           // au doigt, plus haut (voir Y_RAQUETTE)
   ouvrirLaPause!: () => void;              // pour le ⏸ du tableau de bord
   private eclats!: Phaser.GameObjects.Particles.ParticleEmitter;
   private trainee!: Phaser.GameObjects.Particles.ParticleEmitter;
@@ -109,15 +114,23 @@ export class Partie extends Phaser.Scene {
     elargir(this);
     const largeur = this.scale.width;
     this.decalage = (largeur - LARGEUR) / 2;
+    this.yRaquette = estTactile() ? Y_RAQUETTE.doigt : Y_RAQUETTE.souris;
     this.cameras.main.fadeIn(300);
     this.add.tileSprite(0, 0, largeur, HAUTEUR, "briques-fond").setOrigin(0).setDepth(-10);
+    if (estTactile()) {
+      // La bande du pouce, en bas : on y glisse le doigt, la raquette suit au-dessus
+      this.add.rectangle(0, HAUTEUR - BANDE_DU_POUCE, largeur, BANDE_DU_POUCE, 0xffffff, 0.05).setOrigin(0).setDepth(-9);
+      this.add.text(largeur / 2, HAUTEUR - BANDE_DU_POUCE / 2 - 8, "◀   glisse ici   ▶", {
+        fontFamily: "system-ui, sans-serif", fontSize: "18px", color: "#ffffff",
+      }).setOrigin(0.5).setAlpha(0.3).setDepth(-9);
+    }
 
     // Le monde : ses bords renvoient la balle, sauf en bas, où elle tombe
     this.physics.world.setBounds(0, HAUT_DU_MONDE, largeur, HAUTEUR - HAUT_DU_MONDE + 200);
     this.physics.world.setBoundsCollision(true, true, true, false);
     this.physics.world.on(Phaser.Physics.Arcade.Events.WORLD_BOUNDS, () => this.sound.play("briques-mur", { volume: 0.25 }));
 
-    this.raquette = this.physics.add.image(largeur / 2, Y_RAQUETTE, "briques-raquette").setDepth(5) as Mobile;
+    this.raquette = this.physics.add.image(largeur / 2, this.yRaquette, "briques-raquette").setDepth(5) as Mobile;
     this.raquette.setImmovable(true).setCollideWorldBounds(true);
 
     // Un groupe de physique règle lui-même chaque balle qu'il crée : rebond parfait, bords du monde
@@ -212,7 +225,7 @@ export class Partie extends Phaser.Scene {
   // Une seule balle, posée sur la raquette
   private tenirLaBalle() {
     this.balles.clear(true, true);
-    this.creerUneBalle(this.raquette.x, Y_RAQUETTE - 20);
+    this.creerUneBalle(this.raquette.x, this.yRaquette - 20);
     this.etat = "tenue";
     this.combo = 0;
   }
@@ -238,7 +251,7 @@ export class Partie extends Phaser.Scene {
     const balles = this.balles.getMatching("active", true) as Mobile[];
     if (this.etat === "tenue") {
       // La balle suit la raquette. On part de body.center : la place de l'image a un pas de physique de retard.
-      balles[0]?.body.reset(this.raquette.body.center.x, Y_RAQUETTE - 20);
+      balles[0]?.body.reset(this.raquette.body.center.x, this.yRaquette - 20);
     } else if (this.etat === "jeu") {
       for (const balle of balles) {
         const v = redresser(balle.body.velocity, this.vitesseVoulue());

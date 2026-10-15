@@ -354,14 +354,17 @@ test.describe("au doigt", () => {
     });
     expect(placees.gauche + placees.droite).toBeCloseTo(largeur, 0);
     expect(placees.raquette).toBeCloseTo(largeur / 2, 0);
+    // Au doigt, la raquette est au-dessus de la bande du pouce : le doigt qui glisse en bas ne la cache pas
+    const { hauteur } = await tailleDuJeu(page);
+    expect(await page.evaluate(() => (window as any).jeu.scene.getScene("briques-partie").raquette.y)).toBeLessThan(hauteur - 100);
 
     // Le doigt glisse de 200 pixels vers la gauche : la raquette fait de même, et la balle ne part pas
     const depart = await partie(page);
     const cdp = await page.context().newCDPSession(page);
-    const de = await versLaPage(page, 700, 300);
+    const de = await versLaPage(page, 700, 500);
     await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x: de.x, y: de.y, id: 1 }] });
     for (let pas = 1; pas <= 10; pas++) {
-      const a = await versLaPage(page, 700 - 20 * pas, 300);
+      const a = await versLaPage(page, 700 - 20 * pas, 500);
       await cdp.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ x: a.x, y: a.y, id: 1 }] });
       await page.waitForTimeout(30);
     }
