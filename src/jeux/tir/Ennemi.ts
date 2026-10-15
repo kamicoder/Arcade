@@ -15,6 +15,9 @@ export interface Terrain {
   cible(): Phaser.Math.Vector2;            // où viser : le vaisseau
   tirer(x: number, y: number, angle: number, vitesse?: number): void;   // angle en degrés, 90 = vers le bas
   parti(ennemi: Ennemi | Boss): void;      // sorti de l'écran sans être abattu
+  // L'heure de la partie, en ms : elle s'arrête pendant la pause et ralentit avec le ralenti. Pas
+  // scene.time.now, qui est l'heure du jeu entier : après une pause, tous les ennemis tiraient d'un coup.
+  maintenant(): number;
 }
 
 export class Ennemi extends Phaser.GameObjects.PathFollower {
@@ -37,7 +40,7 @@ export class Ennemi extends Phaser.GameObjects.PathFollower {
     const fiche = ENNEMIS[this.genre];
     this.vie = fiche.vie + (this.genre === "lourd" ? 4 * serie : 0);
     this.cadence = fiche.tir / allure(serie);
-    this.prochainTir = scene.time.now + 600 + Math.random() * this.cadence;
+    this.prochainTir = terrain.maintenant() + 600 + Math.random() * this.cadence;
 
     scene.add.existing(this);
     scene.physics.add.existing(this);
@@ -89,8 +92,9 @@ export class Ennemi extends Phaser.GameObjects.PathFollower {
   preUpdate(temps: number, delta: number) {
     super.preUpdate(temps, delta);
     // Il ne tire que bien visible, et pas quand il est déjà sous le joueur
-    if (this.cadence > 0 && temps >= this.prochainTir && this.y > 20 && this.y < 380) {
-      this.prochainTir = temps + this.cadence;
+    const maintenant = this.terrain.maintenant();
+    if (this.cadence > 0 && maintenant >= this.prochainTir && this.y > 20 && this.y < 380) {
+      this.prochainTir = maintenant + this.cadence;
       const cible = this.terrain.cible();
       const visee = Phaser.Math.RadToDeg(Math.atan2(cible.y - this.y, cible.x - this.x));
       if (this.genre === "lourd") {

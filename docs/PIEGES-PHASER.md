@@ -22,7 +22,9 @@ bugs de Phaser : c'est sa façon de faire, logique une fois qu'on la connaît, m
   net. Un test qui appelle la fonction du choc à la main ne voit pas ce défaut.
 - Avec plusieurs pas de physique par image, un `overlap` peut revenir au pas suivant même après
   `body.enable = false` : protéger ce qui ne doit compter qu'une fois (une pièce, un ennemi écrasé).
-- Pour le ralenti, `world.timeScale` est à l'envers : `world.timeScale = 3` ralentit.
+- Pour le ralenti, `world.timeScale` est à l'envers : `world.timeScale = 3` ralentit. Ceux des tweens et
+  des minuteries (`tweens.timeScale`, `time.timeScale`) sont à l'endroit : 0.3 ralentit. Une minuterie qui
+  doit finir le ralenti est ralentie elle aussi : pour 200 ms à l'écran, `delayedCall(200 * 0.3)` (le tir).
 - `body.reset` efface `blocked` et `touching` : un corps remis pile sur une plateforme n'y est « posé »
   qu'au pas suivant, et son rectangle la touche bord contre bord sans la chevaucher. Le téléporteur du
   platformer y perdait le héros qu'il venait de poser : celui-ci se croyait déjà sorti de l'arrivée, et
@@ -57,7 +59,10 @@ bugs de Phaser : c'est sa façon de faire, logique une fois qu'on la connaît, m
   la pause reste « tenu ». `TouchesPhysiques` se lâche toute seule à la reprise (l'événement `RESUME` de la
   scène) ; les `BoutonsAuDoigt`, c'est au jeu de les lâcher (`toutLacher`, à la reprise comme `socle/pause.ts`, ou à
   l'événement `PAUSE` de la scène, comme le tableau de bord de la course).
-- `this.time.now` continue pendant la pause : c'est l'heure du jeu entier, pas celle de la scène. Un chrono
+- `this.time.now` continue pendant la pause : c'est l'heure du jeu entier, pas celle de la scène (comme le
+  `time` reçu par `update` et `preUpdate`). Une invincibilité qui s'en sert finit pendant la pause, et des
+  ennemis qui comptent leur prochain tir dessus tirent tous à la reprise : le tir compte sur son horloge à
+  lui, avancée dans `update` (`delta`, qui ne vient pas pendant la pause). Un chrono
   qui s'en sert compte le temps de la pause. Une minuterie de la scène (`this.time.addEvent`, puis
   `getElapsed()`), elle, s'arrête avec la scène : c'est le chrono du démineur.
 - Par `this.scene` (le ScenePlugin), tout attend l'image suivante : `start`, `launch`, `stop`, `restart`,

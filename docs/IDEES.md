@@ -7,8 +7,8 @@ l'équilibrage en jouant. Taille : **S** petit, **M** moyen, **L** gros. Une id�
 ## Les défauts repérés (à vérifier, puis corriger)
 
 ### Communs à plusieurs jeux
-- **Ce qui suit `time.now` continue pendant la pause** : l'invincibilité du tir peut finir pendant la pause
-  (le clignotement, lui, attend), les ennemis du tir tirent tous dès la reprise, le boss du platformer aussi.
+- **Ce qui suit `time.now` continue pendant la pause** : le boss du platformer tire dès la reprise (le tir est
+  corrigé : voir `docs/PIEGES-PHASER.md`).
 - **La pause n'a pas été essayée avec une vraie manette** (les tests simulent l'appui).
 
 ### Baston
@@ -102,19 +102,10 @@ Le Tamago est une ébauche : on le laisse de côté pour l'instant, ces notes at
 
 ## Tir spatial
 
-**Finition**
-- Le choc qui se sent : ralenti, flash rouge (S).
-- Dire ce qu'on perd et ce qu'on gagne (« −1 tir ») (S).
-- Des explosions plus riches : onde de choc, sons variés (S).
-
 **Contenu**
 - Un deuxième boss, ou des phases (M).
 - De nouveaux ennemis et formations : kamikaze, mine, cercle (M).
 - De nouveaux bonus : bombe, aimant, drones (M).
-
-**Au doigt et à la manette**
-- Vibrations (S).
-- Mieux remplir le téléphone (M, à essayer).
 
 **Modes**
 - Le multiplicateur, qui retombe au premier coup (S).
@@ -192,5 +183,5 @@ Le Tamago est une ébauche : on le laisse de côté pour l'instant, ces notes at
 ## Plusieurs jeux à la fois
 
 Des idées revenues d'un jeu à l'autre, qui iraient au socle :
-- **Les vibrations** (manette et téléphone) : baston, tir, course, catapulte.
-- **`elargir` là où il manque** : platformer, tir, catapulte, course, démineur, Tamago.
+- **Les vibrations** (manette et téléphone) : baston, course, catapulte.
+- **`elargir` là où il manque** : platformer, catapulte, course, démineur, Tamago.

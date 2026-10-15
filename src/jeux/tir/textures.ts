@@ -79,6 +79,10 @@ export function fabriquerTextures(scene: Phaser.Scene) {
   g.fillStyle(0x7fd8ff, 0.18).fillCircle(36, 36, 33);
   fin("tir-bouclier", 72, 72);
 
+  // L'onde de choc d'une explosion : un anneau blanc (teinté à l'usage), qui grandit et s'efface
+  g.lineStyle(4, 0xffffff).strokeCircle(32, 32, 29);
+  fin("tir-onde", 64, 64);
+
   // Les étoiles, en trois couches : petites et lointaines, puis plus grosses et plus proches.
   // Pas d'étoile au bord de la tuile : une TileSprite répète sa texture, et un point coupé au bord
   // réapparaîtrait de l'autre côté.

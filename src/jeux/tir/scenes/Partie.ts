@@ -1,6 +1,10 @@
 // Une partie : le vaisseau, les vagues d'ennemis, les balles, les bonus, le boss toutes les 5 vagues.
 // Le tableau de bord (score, vies, vague, vie du boss) est une autre scène, lancée par-dessus.
 //
+// L'aire de jeu fait toujours 960 × 540 (les vagues sont écrites pour elle). Au doigt, le jeu s'élargit à la
+// proportion du téléphone (socle/largeur.ts) : la caméra de la partie ne montre que l'aire, au milieu, et le
+// fond étoilé (Fond.ts, dessous) et le tableau de bord (dessus) vont jusqu'aux bords.
+//
 // La physique Arcade ne sert ici qu'à deux choses : faire avancer les balles et les bonus (une vitesse,
 // et Phaser fait le reste), et dire qui touche qui (les « overlap »). Les balles ne sont jamais créées
 // en pleine partie : un groupe en garde une réserve, et les réutilise (group.get) quand elles sortent.
@@ -11,13 +15,20 @@ import { Ennemi, Boss, type Terrain } from "../Ennemi";
 import { vague, type Vague } from "../vagues";
 import {
   VITESSE, CADENCE, VITESSE_BALLE, ARME_MAX, INVINCIBLE, VIES, HAUT_DU_VAISSEAU, ENNEMIS, BOSS,
-  VITESSE_BALLE_ENNEMIE, CHANCE_DE_BONUS, VITESSE_BONUS, FOND, SAUVEGARDE, CHOC_DU_LOURD,
+  VITESSE_BALLE_ENNEMIE, CHANCE_DE_BONUS, VITESSE_BONUS, SAUVEGARDE, CHOC_DU_LOURD,
 } from "../reglages";
 import { LARGEUR, HAUTEUR } from "../../../socle/style";
 import { lire, ecrire } from "../../../socle/sauvegarde";
 import { fonduPuis } from "../../../socle/retour";
 import { toucheDuSon } from "../../../socle/son";
 import { mettreEnPause } from "../../../socle/pause";
+import { elargir } from "../../../socle/largeur";
+import { vibrer } from "../../../socle/vibration";
+
+// Les ralentis : la vitesse du jeu (1 : normale) et leur durée à l'écran (ms). Brefs : ils ne changent
+// pas le jeu, seulement la sensation du choc.
+const RALENTI_DU_COUP = { allure: 0.3, duree: 220 };
+const RALENTI_DU_BOSS = { allure: 0.25, duree: 900 };
 
 export type GenreDeBonus = "arme" | "bouclier" | "vie";
 
@@ -53,12 +64,15 @@ export class Partie extends Phaser.Scene implements Terrain {
   ballesEnnemies!: Phaser.Physics.Arcade.Group;
   bonus!: Phaser.Physics.Arcade.Group;
   private restants = 0;                    // les ennemis de la vague pas encore abattus ni partis
-  private invincibleJusqua = 0;
+  // L'heure de la partie (ms) : elle avance dans update, qui s'arrête pendant la pause, et ralentit avec le
+  // ralenti. this.time.now, lui, continue pendant la pause : l'invincibilité finissait pendant la pause.
+  private horloge = 0;
+  private invincibleJusqua = 0;            // sur l'horloge de la partie
+  private finDuRalenti: Phaser.Time.TimerEvent | null = null;
   private quitte = false;
   private fini = false;                    // la fin est affichée : elle a ses boutons, la pause n'a plus de sens
   private collisionsDuBoss: Phaser.Physics.Arcade.Collider[] = [];
   private halo!: Phaser.GameObjects.Image;
-  private etoiles: Phaser.GameObjects.TileSprite[] = [];
   private explosions!: Phaser.GameObjects.Particles.ParticleEmitter;
   private reacteur!: Phaser.GameObjects.Particles.ParticleEmitter;
 
@@ -67,9 +81,12 @@ export class Partie extends Phaser.Scene implements Terrain {
   }
 
   create(donnees: DonneesDePartie = {}) {
-    // scene.restart garde la pause de la physique et des tweens : on remet tout en marche
+    // scene.restart garde la pause et le ralenti de la physique, de l'horloge et des tweens : on remet tout en marche
     this.physics.resume();
     this.tweens.resumeAll();
+    this.vitesse(1);
+    this.finDuRalenti = null;
+    this.horloge = 0;
     this.score = 0;
     this.record = lireLeRecord();
     this.vies = VIES;
@@ -82,12 +99,11 @@ export class Partie extends Phaser.Scene implements Terrain {
     this.invincibleJusqua = 0;
     this.enJeu = true;
 
-    this.cameras.main.setBackgroundColor(FOND).fadeIn(300);
-    this.etoiles = [
-      this.add.tileSprite(0, 0, LARGEUR, HAUTEUR, "tir-etoiles-loin").setOrigin(0).setDepth(-10).setData("vitesse", 30),
-      this.add.tileSprite(0, 0, LARGEUR, HAUTEUR, "tir-etoiles-milieu").setOrigin(0).setDepth(-9).setData("vitesse", 70),
-      this.add.tileSprite(0, 0, LARGEUR, HAUTEUR, "tir-etoiles-pres").setOrigin(0).setDepth(-8).setData("vitesse", 160),
-    ];
+    // Au doigt, le jeu prend la largeur du téléphone ; la caméra de la partie (sans fond : le ciel est
+    // dessous) ne montre que l'aire de 960, au milieu. Le fond et le tableau de bord se placent ensuite.
+    elargir(this);
+    this.cameras.main.setViewport((this.scale.width - LARGEUR) / 2, 0, LARGEUR, HAUTEUR).fadeIn(300);
+    this.scene.launch("tir-fond");
 
     // Le vaisseau : un petit corps rond au centre de l'image. Un shoot'em up est juste quand seul le
     // cœur du vaisseau compte : une balle qui frôle une aile ne fait rien.
@@ -147,7 +163,7 @@ export class Partie extends Phaser.Scene implements Terrain {
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.input.setDefaultCursor("default"));
     // Échap, P, Start, le ⏸ du tableau de bord, ou le jeu qui perd la main : la pause (socle/pause.ts)
     this.ouvrirLaPause = mettreEnPause(this, {
-      autres: ["tir-tableau"],
+      autres: ["tir-fond", "tir-tableau"],
       quitter: () => this.quitter(),
       possible: () => !this.fini && !this.quitte,
       apresReprise: () => this.input.setDefaultCursor(this.enJeu ? "none" : "default"),
@@ -168,10 +184,7 @@ export class Partie extends Phaser.Scene implements Terrain {
   }
 
   update(_temps: number, delta: number) {
-    const secondes = delta / 1000;
-    for (const couche of this.etoiles) {
-      couche.tilePositionY -= couche.getData("vitesse") * secondes;
-    }
+    this.horloge += delta * this.time.timeScale;
     // Ce qui sort de l'écran : une balle retourne dans sa réserve, un bonus manqué s'en va pour de bon
     const dehors = (objet: Phaser.GameObjects.Image) =>
       objet.y < -30 || objet.y > HAUTEUR + 30 || objet.x < -30 || objet.x > LARGEUR + 30;
@@ -279,6 +292,10 @@ export class Partie extends Phaser.Scene implements Terrain {
     this.unDeMoins();
   }
 
+  maintenant(): number {
+    return this.horloge;
+  }
+
   // —— Les balles ——
 
   private sortir(balle: Mobile, x: number, y: number) {
@@ -331,8 +348,12 @@ export class Partie extends Phaser.Scene implements Terrain {
     ennemi.destroy();
     this.unDeMoins();
     const lourd = genre === "lourd";
-    this.explosions.explode(lourd ? 50 : 22, x, y);
-    this.sound.play("tir-explosion", { volume: lourd ? 0.9 : 0.5, rate: lourd ? 0.7 : 1.2 });
+    this.exploser(x, y, lourd ? 50 : 22, lourd ? 2.4 : 1.1);
+    // Un peu plus grave ou plus aigu à chaque fois : les explosions ne sonnent pas toutes pareil
+    this.sound.play("tir-explosion", { volume: lourd ? 0.9 : 0.5, rate: lourd ? 0.7 : 1.2, detune: Phaser.Math.Between(-250, 250) });
+    if (lourd) {
+      this.cameras.main.shake(180, 0.006);
+    }
     if (!parLeJoueur) {
       return;
     }
@@ -361,15 +382,17 @@ export class Partie extends Phaser.Scene implements Terrain {
     this.ballesEnnemies.getMatching("active", true).forEach((b) => this.ranger(b as Mobile));
     this.marquer(BOSS.points * (this.vague.serie + 1), boss.x, boss.y);
     this.cameras.main.shake(900, 0.01);
+    this.ralentir(RALENTI_DU_BOSS);
+    vibrer(this, "fort");
     this.time.addEvent({
       delay: 150, repeat: 6, callback: () => {
-        this.explosions.explode(30, boss.x + Phaser.Math.Between(-90, 90), boss.y + Phaser.Math.Between(-30, 30));
-        this.sound.play("tir-explosion", { rate: 0.6 });
+        this.exploser(boss.x + Phaser.Math.Between(-90, 90), boss.y + Phaser.Math.Between(-30, 30), 30, 1.6);
+        this.sound.play("tir-explosion", { rate: 0.6, detune: Phaser.Math.Between(-300, 300) });
       },
     });
     this.time.delayedCall(1100, () => {
       this.cameras.main.flash(300);
-      this.explosions.explode(120, boss.x, boss.y);
+      this.exploser(boss.x, boss.y, 120, 5);
       boss.destroy();
       this.sound.play("tir-victoire");
       this.lacherUnBonus(boss.x, boss.y, "vie");
@@ -380,10 +403,50 @@ export class Partie extends Phaser.Scene implements Terrain {
   // Des points, et le nombre qui s'envole là où l'ennemi a explosé
   private marquer(points: number, x: number, y: number) {
     this.score += points;
-    const texte = this.add.text(x, y, String(points), {
-      fontFamily: "system-ui, sans-serif", fontSize: points >= 1000 ? "28px" : "16px", fontStyle: "bold", color: "#ffd23f",
+    this.envoler(String(points), x, y, "#ffd23f", points >= 1000 ? 28 : 16);
+  }
+
+  // Un petit texte qui monte et s'efface : des points, ce qu'on gagne ou ce qu'on perd
+  private envoler(message: string, x: number, y: number, couleur: string, taille = 18) {
+    const texte = this.add.text(x, y, message, {
+      fontFamily: "system-ui, sans-serif", fontSize: taille + "px", fontStyle: "bold", color: couleur,
     }).setOrigin(0.5).setDepth(8);
     this.tweens.add({ targets: texte, y: y - 40, alpha: 0, duration: 700, onComplete: () => texte.destroy() });
+  }
+
+  // Une explosion : des étincelles, et une onde de choc, un anneau qui grandit et s'efface (taille : sa
+  // largeur à la fin, 1 pour 64 pixels)
+  private exploser(x: number, y: number, etincelles: number, taille: number) {
+    this.explosions.explode(etincelles, x, y);
+    const onde = this.add.image(x, y, "tir-onde").setDepth(7).setScale(0.2).setTint(0xffc46b).setBlendMode("ADD");
+    this.tweens.add({
+      targets: onde, scale: taille, alpha: 0, duration: 250 + 80 * taille, ease: "Cubic.Out", onComplete: () => onde.destroy(),
+    });
+  }
+
+  // —— Le ralenti ——
+
+  // Tout ralentit un instant : la physique, les tweens (et les chemins des ennemis), les minuteries,
+  // l'horloge de la partie, les étincelles. Sa fin est une minuterie de la partie, qui attend pendant la
+  // pause ; ralentie comme le reste, elle compte duree × allure pour durer « duree » à l'écran.
+  private ralentir({ allure, duree }: { allure: number; duree: number }) {
+    this.vitesse(allure);
+    this.finDuRalenti?.remove();
+    this.finDuRalenti = this.time.delayedCall(duree * allure, () => {
+      this.finDuRalenti = null;
+      this.vitesse(1);
+    });
+  }
+
+  private vitesse(allure: number) {
+    this.physics.world.timeScale = 1 / allure;   // à l'envers : 2 ralentit de moitié
+    this.tweens.timeScale = allure;
+    this.time.timeScale = allure;
+    // Au début de create, les étincelles ne sont pas encore là (ce sont celles de la partie d'avant, ou rien)
+    if (this.explosions) {
+      this.explosions.timeScale = allure;
+      this.reacteur.timeScale = allure;
+    }
   }
 
   // —— Les bonus ——
@@ -406,16 +469,21 @@ export class Partie extends Phaser.Scene implements Terrain {
     const genre = bonus.getData("genre") as GenreDeBonus;
     this.oublierLeBonus(bonus);
     this.sound.play("tir-bonus");
+    // Ce qu'on gagne s'envole au-dessus du vaisseau
+    const { x, y } = this.vaisseau;
     if (genre === "arme") {
       if (this.arme < ARME_MAX) {
         this.arme++;
+        this.envoler("Tirs " + "▲".repeat(this.arme) + " !", x, y - 34, "#ff9a3c");
       } else {
-        this.marquer(500, this.vaisseau.x, this.vaisseau.y - 30);   // l'arme est déjà au plus fort
+        this.marquer(500, x, y - 30);   // l'arme est déjà au plus fort
       }
     } else if (genre === "bouclier") {
       this.bouclier = true;
+      this.envoler("Bouclier !", x, y - 34, "#7fd8ff");
     } else {
       this.vies++;
+      this.envoler("+1 vie", x, y - 34, "#ff7a8a");
     }
     this.halo.setVisible(this.bouclier);
   }
@@ -430,28 +498,38 @@ export class Partie extends Phaser.Scene implements Terrain {
 
   // Renvoie vrai si le coup a compté (pas pendant le clignotement d'après un coup)
   toucherLeVaisseau(): boolean {
-    if (!this.enJeu || this.time.now < this.invincibleJusqua) {
+    if (!this.enJeu || this.horloge < this.invincibleJusqua) {
       return false;
     }
+    const { x, y } = this.vaisseau;
     if (this.bouclier) {
       // Le bouclier prend le coup à notre place, et disparaît
       this.bouclier = false;
       this.halo.setVisible(false);
-      this.invincibleJusqua = this.time.now + 800;
+      this.invincibleJusqua = this.horloge + 800;
       this.sound.play("tir-choc");
-      this.explosions.explode(12, this.vaisseau.x, this.vaisseau.y);
+      this.explosions.explode(12, x, y);
+      vibrer(this, "leger");
       return true;
     }
     this.vies--;
+    const armeAvant = this.arme;
     this.arme = Math.max(1, this.arme - 1);
     this.sound.play("tir-touche");
-    this.cameras.main.shake(300, 0.012);
-    this.explosions.explode(40, this.vaisseau.x, this.vaisseau.y);
+    // Le choc qui se sent : la caméra tremble et rougit, tout ralentit un instant
+    this.cameras.main.shake(300, 0.012).flash(250, 255, 40, 40);
+    this.ralentir(RALENTI_DU_COUP);
+    this.explosions.explode(40, x, y);
+    if (this.arme < armeAvant) {
+      this.envoler("−1 tir", x, y - 34, "#ff6b6b", 20);
+    }
     if (this.vies <= 0) {
+      vibrer(this, "fort");
       this.perdre();
       return true;
     }
-    this.invincibleJusqua = this.time.now + INVINCIBLE;
+    vibrer(this, "moyen");
+    this.invincibleJusqua = this.horloge + INVINCIBLE;
     this.tweens.add({ targets: this.vaisseau, alpha: 0.25, duration: 100, yoyo: true, repeat: INVINCIBLE / 200 - 1 });
     return true;
   }
@@ -491,7 +569,10 @@ export class Partie extends Phaser.Scene implements Terrain {
       return;                              // déjà en route (la fin et la pause n'ont pas la même garde)
     }
     this.quitte = true;
+    // Le ciel, dessous, s'éteint avec la partie (fonduPuis n'assombrit que la caméra de la partie)
+    this.scene.get("tir-fond").cameras.main.fade(200, 0, 0, 0, true);
     fonduPuis(this, () => {
+      this.scene.stop("tir-fond");
       this.scene.stop("tir-tableau");
       this.scene.stop("tir-fin");
       this.scene.start("tir-menu");

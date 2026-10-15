@@ -1,7 +1,7 @@
 import { test, expect, type Page } from "@playwright/test";
 import {
   ouvrir, appuyer, attendreScene, scenesActives, versLaPage, toucher, ouvrirLaCarte, manette, manetteAToutes, quitterParLaPause,
-  attendreLaPause,
+  attendreLaPause, tailleDuJeu,
 } from "./outils";
 
 // Du Hub jusqu'au menu du jeu de tir
@@ -50,7 +50,7 @@ test("le Hub lance le tir spatial : le vaisseau se pilote, tire tout seul et aba
   const { sansErreur } = await menuDuTir(page);
   await appuyer(page, "Enter");
   await attendreScene(page, "tir-partie");
-  expect(await scenesActives(page)).toEqual(["tir-partie", "tir-tableau"]);
+  expect(await scenesActives(page)).toEqual(["tir-fond", "tir-partie", "tir-tableau"]);
   expect(await partie(page)).toMatchObject({ enJeu: true, score: 0, vies: 3, arme: 1, vague: 1 });
 
   // Il tire sans qu'on appuie sur rien
@@ -177,7 +177,7 @@ test("trois coups : la partie est perdue, le record reste, et Entrée rejoue", a
     return !jeu.scene.isActive("tir-fin") && jeu.scene.getScene("tir-partie").enJeu;
   });
   expect(await partie(page)).toMatchObject({ score: 0, vies: 3, vague: 1 });
-  expect(await scenesActives(page)).toEqual(["tir-partie", "tir-tableau"]);
+  expect(await scenesActives(page)).toEqual(["tir-fond", "tir-partie", "tir-tableau"]);
 
   // La pause, puis « Le menu »
   await quitterParLaPause(page);
@@ -260,6 +260,82 @@ test("la pause : tout s'arrête, une touche lâchée pendant la pause l'est auss
   sansErreur();
 });
 
+// L'invincibilité se comptait sur this.time.now, l'heure du jeu entier, qui continue pendant la pause : elle
+// finissait pendant la pause. Elle se compte maintenant sur l'horloge de la partie, arrêtée avec elle.
+test("une pause pendant le clignotement d'après un coup : à la reprise, il ne craint rien le temps qui lui restait", async ({ page }) => {
+  const { sansErreur } = await menuDuTir(page);
+  await appuyer(page, "Enter");
+  await attendreScene(page, "tir-partie");
+  await page.waitForTimeout(300);
+
+  // Une balle ennemie, presque immobile, posée sur le vaisseau : le vrai choc de la physique. Une balle qui
+  // compte s'en va ; une autre reste sur lui tant qu'elle ne compte pas.
+  const balleSurLeVaisseau = () => page.evaluate(() => {
+    const p = (window as any).jeu.scene.getScene("tir-partie");
+    p.tirer(p.vaisseau.x, p.vaisseau.y, 90, 1);
+  });
+  await balleSurLeVaisseau();
+  await page.waitForFunction(() => (window as any).jeu.scene.getScene("tir-partie").vies === 2);
+  await appuyer(page, "Escape");
+  await attendreLaPause(page);
+  const reste = () => page.evaluate(() => {
+    const p = (window as any).jeu.scene.getScene("tir-partie");
+    return p.invincibleJusqua - p.horloge as number;
+  });
+  const avant = await reste();
+  expect(avant).toBeGreaterThan(1000);
+
+  // Plus longtemps que toute l'invincibilité (2 s)
+  await page.waitForTimeout(2500);
+  expect(await reste()).toBe(avant);
+  await appuyer(page, "Escape");
+  await page.waitForFunction(() => (window as any).jeu.scene.isActive("tir-partie"));
+
+  // Une autre balle sur lui ne compte pas : il lui restait plus d'une seconde
+  await balleSurLeVaisseau();
+  await page.waitForTimeout(400);
+  expect((await partie(page)).vies).toBe(2);
+  // Le clignotement fini, elle compte
+  await page.waitForFunction(() => (window as any).jeu.scene.getScene("tir-partie").vies < 2, undefined, { timeout: 5_000 });
+  sansErreur();
+});
+
+// Ce qui se voit et se sent, sans rien changer au jeu : le ralenti est bref, et tout revient à la normale.
+// Les vibrations n'ont ni manette ni vibreur ici : elles ne doivent simplement rien casser.
+test("le choc se sent : un bonus dit ce qu'il donne, un coup reçu dit « −1 tir », ralentit un instant, puis tout repart", async ({ page }) => {
+  const { sansErreur } = await menuDuTir(page);
+  await appuyer(page, "Enter");
+  await attendreScene(page, "tir-partie");
+  const textes = () => page.evaluate(() => (window as any).jeu.scene.getScene("tir-partie").children.list
+    .filter((o: any) => typeof o.text === "string").map((o: any) => o.text as string));
+
+  await page.evaluate(() => {
+    const p = (window as any).jeu.scene.getScene("tir-partie");
+    p.lacherUnBonus(p.vaisseau.x, p.vaisseau.y, "arme");
+  });
+  await page.waitForFunction(() => (window as any).jeu.scene.getScene("tir-partie").arme === 2);
+  expect(await textes()).toContain("Tirs ▲▲ !");
+
+  // On relève le ralenti le plus fort vu à chaque image
+  await page.evaluate(() => {
+    const p = (window as any).jeu.scene.getScene("tir-partie");
+    (window as any).__ralenti = 1;
+    p.events.on("update", () => {
+      (window as any).__ralenti = Math.max((window as any).__ralenti, p.physics.world.timeScale);
+    });
+    p.tirer(p.vaisseau.x, p.vaisseau.y, 90, 1);
+  });
+  await page.waitForFunction(() => (window as any).jeu.scene.getScene("tir-partie").vies === 2);
+  expect(await textes()).toContain("−1 tir");
+  expect((await partie(page)).arme).toBe(1);
+  await page.waitForFunction(() => {
+    const p = (window as any).jeu.scene.getScene("tir-partie");
+    return p.physics.world.timeScale === 1 && p.tweens.timeScale === 1 && p.time.timeScale === 1;
+  }, undefined, { timeout: 2_000 });
+  expect(await page.evaluate(() => (window as any).__ralenti)).toBeGreaterThan(1);   // à l'envers : plus que 1 ralentit
+  sansErreur();
+});
+
 // La fin et la partie lisent toutes les deux la manette : Start valide « Rejouer » sur la fin, et la partie,
 // derrière, ne doit rien en faire (avant, elle quittait en même temps)
 test("Start sur l'écran de fin rejoue, sans que la partie derrière s'en aille ni se mette en pause", async ({ page }) => {
@@ -276,7 +352,7 @@ test("Start sur l'écran de fin rejoue, sans que la partie derrière s'en aille 
   await manetteAToutes(page, ["tir-fin", "tir-partie"], 9);
   await page.waitForFunction(() => (window as any).jeu.scene.getScene("tir-partie").enJeu);
   await page.waitForTimeout(400);          // le temps d'un fondu vers le menu, s'il était parti
-  expect(await scenesActives(page)).toEqual(["tir-partie", "tir-tableau"]);
+  expect(await scenesActives(page)).toEqual(["tir-fond", "tir-partie", "tir-tableau"]);
   sansErreur();
 });
 
@@ -497,7 +573,7 @@ test.describe("au doigt", () => {
 
   test("on touche « Jouer », puis le vaisseau suit le doigt qui glisse", async ({ page }) => {
     const { sansErreur } = await menuDuTir(page);
-    await toucher(page, 480, 400);
+    await toucher(page, (await tailleDuJeu(page)).largeur / 2, 400);
     await attendreScene(page, "tir-partie");
     await page.waitForTimeout(500);
 
@@ -516,6 +592,54 @@ test.describe("au doigt", () => {
     expect(Math.abs(apres.x - (depart.x - 200))).toBeLessThan(12);
     expect(Math.abs(apres.y - (depart.y - 80))).toBeLessThan(12);
     await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+    sansErreur();
+  });
+
+  // Un écran 20/9 : plus de bandes noires. L'aire de jeu garde ses 960 (les vagues sont écrites pour elle),
+  // au milieu ; le ciel et le tableau de bord vont jusqu'aux bords.
+  test("le tir prend toute la largeur du téléphone : l'aire de 960 au milieu, le ciel et le tableau de bord jusqu'aux bords", async ({ page }) => {
+    const { sansErreur } = await menuDuTir(page);
+    const { largeur } = await tailleDuJeu(page);
+    expect(largeur).toBe(Math.round(540 * 844 / 390));
+    const marge = (largeur - 960) / 2;
+    await toucher(page, largeur / 2, 400);   // « Jouer », au milieu
+    await attendreScene(page, "tir-partie");
+    await attendreScene(page, "tir-tableau");
+    expect(await page.evaluate(() => {
+      const jeu = (window as any).jeu;
+      const camera = jeu.scene.getScene("tir-partie").cameras.main;
+      return {
+        aire: { x: camera.x, largeur: camera.width },
+        ciel: jeu.scene.getScene("tir-fond").children.list.find((o: any) => o.type === "TileSprite").width,
+        tableau: jeu.scene.getScene("tir-tableau").cameras.main.width,
+      };
+    })).toEqual({ aire: { x: marge, largeur: 960 }, ciel: largeur, tableau: largeur });
+
+    // Le doigt glisse loin vers la droite, jusque dans la marge : le vaisseau s'arrête au bord de l'aire
+    await page.waitForTimeout(400);
+    const cdp = await page.context().newCDPSession(page);
+    const de = await versLaPage(page, largeur / 2, 300);
+    await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x: de.x, y: de.y, id: 1 }] });
+    for (let pas = 1; pas <= 10; pas++) {
+      const a = await versLaPage(page, largeur / 2 + 55 * pas, 300);
+      await cdp.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ x: a.x, y: a.y, id: 1 }] });
+      await page.waitForTimeout(30);
+    }
+    await page.waitForFunction(() => (window as any).jeu.scene.getScene("tir-partie").vaisseau.body.center.x > 900);
+    await page.waitForTimeout(200);
+    expect((await partie(page)).x).toBeLessThanOrEqual(945);
+    await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+
+    // Le ⏸, en haut à droite de l'écran (pas de l'aire), ouvre la pause ; au Hub, l'Arcade reprend ses 960
+    await toucher(page, largeur - 44, 80);
+    await attendreLaPause(page);
+    await appuyer(page, "ArrowDown");
+    await appuyer(page, "Enter");
+    await attendreScene(page, "tir-menu");
+    expect(await scenesActives(page)).toEqual(["tir-menu"]);
+    await appuyer(page, "Escape");
+    await attendreScene(page, "Hub");
+    expect(await tailleDuJeu(page)).toEqual({ largeur: 960, hauteur: 540 });
     sansErreur();
   });
 });
