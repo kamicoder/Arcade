@@ -154,7 +154,7 @@ export class Partie extends Phaser.Scene {
     this.surUnDe(this.raquette, this.balles, (balle: Mobile) => this.renvoyer(balle));
     this.surUnDe(this.raquette, this.bonus, (bonus: Mobile) => this.ramasser(bonus));
 
-    this.commandes = new Commandes(this, () => this.raquette.body.center.x, () => this.lancer());
+    this.commandes = new Commandes(this, () => this.raquette.body.center.x, () => this.lancer(), () => this.ouvrirLaPause());
     surTouche(this, "SPACE", () => this.lancer());
     surTouche(this, "UP", () => this.lancer());
     toucheDuSon(this, SAUVEGARDE);
@@ -511,6 +511,7 @@ export class Partie extends Phaser.Scene {
   private finir(gagne: boolean) {
     this.etat = "fini";
     this.input.setDefaultCursor("default");
+    this.commandes.rendreLaSouris();
     let record: boolean;
     let nombreDEtoiles = 0;
     if (this.donnees.mode === "niveau") {

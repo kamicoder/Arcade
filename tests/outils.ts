@@ -10,6 +10,14 @@ export async function ouvrir(page: Page) {
       erreurs.push(m.text());
     }
   });
+  // Les jeux qui suivent le curseur prennent la souris (socle/souris.ts). Dans un test, jamais la vraie : le
+  // navigateur des tests l'accorderait (les touches du test comptent comme des gestes), et la souris du poste
+  // ne répondrait plus. Un test qui veut voir la capture la remplace par la sienne.
+  await page.addInitScript(() => {
+    HTMLCanvasElement.prototype.requestPointerLock = function () {
+      return Promise.resolve();
+    } as typeof HTMLCanvasElement.prototype.requestPointerLock;
+  });
   await page.goto("/");
   await attendreScene(page, "Hub");
   return {

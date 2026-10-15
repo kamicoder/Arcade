@@ -1,6 +1,7 @@
 // Qui pilote la raquette : la souris, le clavier, la manette et le doigt. La raquette ne va que de gauche à
 // droite ; il n'y a qu'un geste de plus, lancer la balle qui attend sur la raquette.
-//   - la souris : la raquette suit le curseur, sans cliquer ; un clic lance ;
+//   - la souris : la raquette suit le curseur, sans cliquer ; un clic lance, et capture la souris
+//     (socle/souris.ts : elle ne peut plus sortir du jeu et perdre la raquette) ;
 //   - le clavier : les flèches, ou Q D reconnues à leur PLACE (KeyA, KeyD : voir socle/touchesPhysiques.ts) ;
 //     Espace ou ↑ lance (la scène les écoute avec surTouche) ;
 //   - la manette : la croix ou le stick gauche ; A lance ;
@@ -10,6 +11,7 @@
 
 import Phaser from "phaser";
 import { TouchesPhysiques } from "../../socle/touchesPhysiques";
+import { SourisCapturee } from "../../socle/souris";
 
 export interface Pilotage {
   dx: number;                              // de -1 (gauche) à 1 (droite)
@@ -25,12 +27,14 @@ const TAPE = { duree: 300, distance: 14 };   // un doigt posé et levé vite, sa
 export class Commandes {
   private readonly tenues: TouchesPhysiques;
   private doigt: Phaser.Input.Pointer | null = null;
-  private souris: number | null = null;    // là où est le curseur, tant que la souris pilote
+  private readonly souris: SourisCapturee;
   private depart = { doigt: 0, raquette: 0 };
 
-  // ouEstLaRaquette : sa place quand un doigt se pose ; lancer : une tape ou un clic
-  constructor(private scene: Phaser.Scene, private ouEstLaRaquette: () => number, lancer: () => void) {
+  // ouEstLaRaquette : sa place quand un doigt se pose ; lancer : une tape ou un clic ; sourisRendue : la
+  // souris capturée rendue en pleine partie (Échap) : la pause
+  constructor(private scene: Phaser.Scene, private ouEstLaRaquette: () => number, lancer: () => void, sourisRendue: () => void) {
     this.tenues = new TouchesPhysiques(scene);
+    this.souris = new SourisCapturee(scene, () => new Phaser.Math.Vector2(this.ouEstLaRaquette(), 0), sourisRendue);
     // Les flèches sont pour le jeu : le navigateur ne fait pas défiler la page avec
     scene.input.keyboard!.addCapture("UP,LEFT,RIGHT,SPACE");
     scene.input.on(Phaser.Input.Events.POINTER_DOWN, (pointeur: Phaser.Input.Pointer, dessus: Phaser.GameObjects.GameObject[]) => {
@@ -47,11 +51,6 @@ export class Commandes {
         this.depart.raquette = this.ouEstLaRaquette();
       }
     });
-    scene.input.on(Phaser.Input.Events.POINTER_MOVE, (pointeur: Phaser.Input.Pointer) => {
-      if (!pointeur.wasTouch) {
-        this.souris = pointeur.worldX;
-      }
-    });
     scene.input.on(Phaser.Input.Events.POINTER_UP, (pointeur: Phaser.Input.Pointer) => {
       if (pointeur !== this.doigt) {
         return;
@@ -62,6 +61,11 @@ export class Commandes {
         lancer();
       }
     });
+  }
+
+  // La fin de la partie : la souris est rendue (la fin a ses boutons)
+  rendreLaSouris() {
+    this.souris.rendre();
   }
 
   // Après une pause : le doigt levé pendant la pause n'a pas été entendu
@@ -78,9 +82,9 @@ export class Commandes {
       dx = manette.left ? -1 : manette.right ? 1 : Math.abs(stick) > 0.2 ? stick : 0;
     }
     if (dx !== 0) {
-      this.souris = null;                  // le clavier ou la manette reprend la main
+      this.souris.oublier();               // le clavier ou la manette reprend la main
     }
-    let cible = this.souris;
+    let cible = this.souris.ici()?.x ?? null;
     if (this.doigt?.isDown) {
       cible = this.depart.raquette + (this.doigt.x - this.depart.doigt);
     }

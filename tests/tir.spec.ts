@@ -143,7 +143,9 @@ test("à la souris, le vaisseau suit le curseur sans cliquer ; une touche repren
   const apres = await partie(page);
   expect(apres.x).toBeGreaterThan(650);
   await page.waitForTimeout(300);
-  expect((await partie(page)).x).toBeCloseTo(apres.x, 0);
+  // Au plus une image de mouvement (7 pixels) : la touche lâchée, la physique fait encore un pas avec la vitesse
+  // d'avant. Un vaisseau qui repartirait vers le curseur, lui, ferait des centaines de pixels.
+  expect(Math.abs((await partie(page)).x - apres.x)).toBeLessThanOrEqual(8);
   sansErreur();
 });
 
@@ -467,7 +469,7 @@ test("les bonus : plus de tirs, un bouclier qui prend un coup, une vie de plus",
   });
   expect(await page.evaluate(() => {
     const p = (window as any).jeu.scene.getScene("tir-partie");
-    return p.tweens.getTweens().filter((t: any) => t.targets.some((c: any) => c.texture?.key?.startsWith("tir-bonus"))).length;
+    return p.tweens.getTweens().filter((t: any) => (t.targets ?? []).some((c: any) => c?.texture?.key?.startsWith("tir-bonus"))).length;
   })).toBe(0);
   sansErreur();
 });
@@ -478,6 +480,8 @@ test("le boss arrive à la vague 5 ; battu, la vague 6 commence", async ({ page 
   await attendreScene(page, "tir-partie");
   await commencerALaVague(page, 5);
   const chocs = () => page.evaluate(() => (window as any).jeu.scene.getScene("tir-partie").physics.world.colliders.length as number);
+  // La partie redémarrée a posé ses collisions (on compte après : juste après le redémarrage, on pouvait lire 0)
+  await page.waitForFunction(() => (window as any).jeu.scene.getScene("tir-partie").physics.world.colliders.length > 0);
   const avantLeBoss = await chocs();
 
   // Pendant son arrivée, il ne craint rien ; ensuite, sa vie s'affiche au tableau de bord

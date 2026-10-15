@@ -307,6 +307,54 @@ test("le mode sans fin s'ouvre avec le dernier niveau ; un mur cassé, le suivan
   sansErreur();
 });
 
+// La souris capturée (socle/souris.ts), vue ici une fois pour tous les jeux qui s'en servent. Le navigateur des
+// tests n'accorde pas la capture : on fait comme lui (locked, l'événement du jeu), et les mouvements arrivent par
+// de vrais mousemove avec leur déplacement (movementX).
+test("la souris capturée : un clic la prend, ses mouvements guident la raquette, la rendre met en pause", async ({ page }) => {
+  const { sansErreur } = await menuDesBriques(page);
+  await appuyer(page, "Enter");
+  await attendreScene(page, "briques-partie");
+  await page.waitForTimeout(300);
+  await page.evaluate(() => {
+    const w = window as any;
+    const souris = w.jeu.scene.getScene("briques-partie").input.mouse;
+    w.demandes = 0;
+    // Comme le navigateur : la souris est prise, et Phaser l'apprend par son gestionnaire (qui marque aussi
+    // son pointeur, sans quoi il ne lit pas les déplacements)
+    w.jeu.canvas.requestPointerLock = () => {
+      w.demandes++;
+      souris.locked = true;
+      w.jeu.input.onPointerLockChange(new Event("pointerlockchange"));
+      return Promise.resolve();
+    };
+  });
+  // Un clic dans le jeu : la balle part, et la souris est demandée
+  const milieu = await versLaPage(page, 480, 300);
+  await page.mouse.click(milieu.x, milieu.y);
+  expect(await page.evaluate(() => (window as any).demandes)).toBe(1);
+  // Capturée, la souris glisse de 150 pixels d'écran vers la gauche : la raquette suit, même si le vrai
+  // curseur ne bouge plus (il n'a plus de place)
+  const depart = (await partie(page)).raquette;
+  await page.evaluate(() => {
+    const canvas = (window as any).jeu.canvas as HTMLCanvasElement;
+    for (let i = 0; i < 5; i++) {
+      canvas.dispatchEvent(new MouseEvent("mousemove", { movementX: -30, movementY: 0, clientX: 10, clientY: 10, bubbles: true }));
+    }
+  });
+  const echelle = await page.evaluate(() => (window as any).jeu.scale.displayScale.x as number);
+  await page.waitForFunction(([depart, ecart]) =>
+    Math.abs((window as any).jeu.scene.getScene("briques-partie").raquette.body.center.x - (depart - ecart)) < 6,
+  [depart, 150 * echelle] as const);
+  // Rendue en pleine partie (Échap, pour le navigateur) : la pause s'ouvre
+  await page.evaluate(() => {
+    const jeu = (window as any).jeu;
+    jeu.scene.getScene("briques-partie").input.mouse.locked = false;
+    jeu.input.onPointerLockChange(new Event("pointerlockchange"));
+  });
+  await attendreLaPause(page);
+  sansErreur();
+});
+
 test("à la manette : A lance la partie puis la balle, Start met en pause, et de là aux niveaux ; B à l'Arcade", async ({ page }) => {
   const { sansErreur } = await menuDesBriques(page);
   await manette(page, "briques-menu", 0);

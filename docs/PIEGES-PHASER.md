@@ -94,6 +94,11 @@ bugs de Phaser : c'est sa façon de faire, logique une fois qu'on la connaît, m
 
 **Le clavier et le doigt**
 
+- La souris capturée (`input.mouse.requestPointerLock`) : `pointer.movementX/Y` ne sont lus que si le **pointeur**
+  est marqué capturé (`pointer.locked`), ce que fait le gestionnaire du jeu (`onPointerLockChange`) quand le
+  navigateur l'annonce. Un test qui imite la capture passe par lui, pas par `mouse.locked` seul. Et le navigateur
+  rend la souris sur Échap : c'est son geste, le jeu n'y peut rien (`socle/souris.ts` met alors en pause).
+
 - Un appui bref (enfoncé et relâché dans la même image, ou une tape au doigt) n'est jamais vu « tenu » :
   pour un coup ou un saut, retenir l'appui jusqu'à l'image suivante (voir `baston/commandes.ts`).
 

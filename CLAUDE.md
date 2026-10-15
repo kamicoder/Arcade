@@ -82,6 +82,8 @@ Chaque fichier dit en tête pourquoi il existe.
   clavier) ; `annoncer(scene, texte, ...)` pour une annonce en grand ; `boutonFermer` pour un ✕.
 - `lire` / `ecrire` / `oublier` / `oublierTout` (sauvegardes), `estTactile()`, `boutonArcade(scene)` (le
   « ← Arcade » de chaque menu), `quandNouvelleVersion` (mise à jour au Hub seulement, jamais en pleine partie).
+- `SourisCapturee` (`souris.ts`) : quand un objet suit le curseur (la raquette, le vaisseau), un clic capture la
+  souris (elle ne sort plus du jeu) ; Échap la rend et met en pause.
 - `vibrer(scene, "leger" | "moyen" | "fort", manette?)` (`vibration.ts`) : la manette et le téléphone vibrent (un
   choc, un coup reçu, un K.O.) ; ce que le navigateur ne sait pas faire ne fait rien.
 - `correctifs.ts` : les défauts de Phaser réparés en attendant une version qui les corrige.

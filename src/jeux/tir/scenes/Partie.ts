@@ -155,7 +155,7 @@ export class Partie extends Phaser.Scene implements Terrain {
     // Le vaisseau tire tout seul, tant qu'il est là
     this.time.addEvent({ delay: CADENCE, loop: true, callback: () => this.tirerDuVaisseau() });
 
-    this.commandes = new Commandes(this, () => this.vaisseau.body.center.clone());
+    this.commandes = new Commandes(this, () => this.vaisseau.body.center.clone(), () => this.ouvrirLaPause());
     toucheDuSon(this, "tir");
     // À la souris, le vaisseau est le curseur : la flèche se cache pendant la partie, et revient à la fin
     // (et pendant la pause)
@@ -537,6 +537,7 @@ export class Partie extends Phaser.Scene implements Terrain {
   private perdre() {
     this.enJeu = false;
     this.input.setDefaultCursor("default");
+    this.commandes.rendreLaSouris();
     this.vaisseau.setVisible(false);
     this.vaisseau.body.setVelocity(0, 0).enable = false;
     this.reacteur.stop();
