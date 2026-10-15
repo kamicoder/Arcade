@@ -4,9 +4,10 @@
 // vitesses en pixels par PAS de physique (60 pas par seconde). Une vitesse de 10, c'est 600 pixels par
 // seconde.
 
-// Le monde : 1280 × 720, montré en entier (la caméra le réduit à 0,75 pour les 960 × 540 de l'Arcade)
+// Le monde : 1280 × 720, montré en entier (la caméra le réduit d'après la hauteur : 0,75 pour les 540 de l'Arcade).
+// Au doigt, le jeu s'élargit à la proportion du téléphone (socle/largeur.ts) : le zoom reste le même, on
+// voit un peu de paysage de chaque côté du monde.
 export const MONDE = { largeur: 1280, hauteur: 720 };
-export const ZOOM = 0.75;
 export const SOL = 640;                    // le haut de l'herbe
 
 // La fronde, et le point de repos du boulet entre ses deux branches
@@ -72,6 +73,19 @@ export const TIR_MAX = 20000;
 
 // Les points
 export const POINTS_PAR_BOULET_RESTANT = 1000;
+
+// Les sensations (rien qui change le jeu : ce qu'on voit et ce qu'on sent)
+// Un gros écroulement : tant de blocs cassés en si peu de temps (ms). L'écran tremble, la manette aussi.
+export const ECROULEMENT = { blocs: 4, duree: 1000 };
+export const SECOUSSE = { duree: 350, force: 0.008 };
+// Le dernier slime éclate : la physique ralentit (à ce rythme), le temps de le voir, puis repart
+export const RALENTI = { rythme: 0.25, tenu: 450, retour: 550 };
+// Les slimes clignent des yeux (une chance sur tant, pour chacun, tous les quarts de seconde) et ricanent
+// quand un tir n'a touché personne (ms)
+export const CLIGNEMENT = { chance: 0.04, duree: 140 };
+export const RICANEMENT = 1300;
+// La trace du tir d'avant : un point tous les tant de ms, tant que le boulet file assez vite
+export const TRACE = { tousLes: 45, vitesseMin: 2, max: 150 };
 
 // Les couleurs
 export const BRUN = 0x8a5a33;

@@ -102,18 +102,12 @@ Le Tamago est une ébauche : on le laisse de côté pour l'instant, ces notes at
 
 ## Catapulte
 
-**Finition**
-- Une traînée en vol, et la trace du tir d'avant (S).
-- Le poids des chocs : secousse, ralenti sur le dernier slime (S).
-- Des slimes vivants : ils clignent, ils ricanent (S).
-
 **Contenu**
 - La caisse de TNT, puis le boulet bombe (M).
 - Du relief (rochers, plateaux) et plus de niveaux, avec des pages au menu (M).
 - Le slime casqué (S).
 
 **Au doigt et à la manette**
-- Remplir l'écran du téléphone (M).
 - Le stick analogique, et l'aide de la manette (S).
 
 **Modes**

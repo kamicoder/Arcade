@@ -8,7 +8,8 @@ const MATIERES = ["bois", "pierre", "glace"];
 const FORMES = ["carre", "court", "long"];
 const IMAGES = [
   ...MATIERES.flatMap((m) => FORMES.flatMap((f) => [`${m}-${f}`, `${m}-${f}-abime`])),
-  "slime", "slime-aie", "chef", "chef-aie", "boulet", "boulet-lourd", "boulet-triple", "boulet-petit",
+  "slime", "slime-aie", "slime-cligne", "slime-ricane", "chef", "chef-aie", "chef-cligne", "chef-ricane", "fumee",
+  "boulet", "boulet-lourd", "boulet-triple", "boulet-petit",
   "fronde", "ciel", "nuage", "collines", "sol", "eclat-bois", "eclat-pierre", "eclat-glace", "goutte",
   "etoile", "etoile-vide",
 ];

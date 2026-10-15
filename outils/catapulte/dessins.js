@@ -160,7 +160,8 @@
 
   // —— Les slimes ——
 
-  // Un slime : une goutte de gelée verte, avec des yeux. « humeur » : content, aie
+  // Un slime : une goutte de gelée verte, avec des yeux. « humeur » : content, aie, cligne (les yeux
+  // fermés, un instant), ricane (il se moque : les yeux plissés, la bouche grande ouverte)
   function slime(c, l, h, humeur, couleurs) {
     const [clair, fonce, contour] = couleurs;
     const degrade = c.createRadialGradient(l * 0.4, h * 0.35, 2, l * 0.5, h * 0.6, l * 0.7);
@@ -197,6 +198,25 @@
         c.moveTo(x + r * 0.7, yY - r * 0.7);
         c.lineTo(x - r * 0.7, yY + r * 0.7);
         c.stroke();
+      } else if (humeur === "cligne") {
+        // Les paupières fermées : un trait courbé vers le bas
+        c.strokeStyle = "#1c1a25";
+        c.lineWidth = 2.2;
+        c.lineCap = "round";
+        c.beginPath();
+        c.arc(x, yY - r * 0.3, r * 0.8, 0.2 * Math.PI, 0.8 * Math.PI);
+        c.stroke();
+      } else if (humeur === "ricane") {
+        // Les yeux plissés de rire : un petit chapeau pointu
+        c.strokeStyle = "#1c1a25";
+        c.lineWidth = 2.4;
+        c.lineCap = "round";
+        c.lineJoin = "round";
+        c.beginPath();
+        c.moveTo(x - r * 0.8, yY + r * 0.3);
+        c.lineTo(x, yY - r * 0.5);
+        c.lineTo(x + r * 0.8, yY + r * 0.3);
+        c.stroke();
       } else {
         c.fillStyle = "#ffffff";
         c.beginPath();
@@ -208,7 +228,31 @@
         c.fill();
       }
     }
-    // La bouche : un sourire narquois, ou un « o » de surprise
+    // La bouche : un sourire narquois, un « o » de surprise, ou un grand rire moqueur
+    if (humeur === "ricane") {
+      const rb = l * 0.17;
+      c.beginPath();
+      c.moveTo(l * 0.5 - rb, h * 0.64);
+      c.arc(l * 0.5, h * 0.64, rb, 0, Math.PI);
+      c.closePath();
+      c.fillStyle = "#4a1420";
+      c.fill();
+      // Les dents du haut, et la langue
+      c.fillStyle = "#ffffff";
+      c.fillRect(l * 0.5 - rb * 0.8, h * 0.64, rb * 1.6, rb * 0.3);
+      c.fillStyle = "#e86a7a";
+      c.beginPath();
+      c.ellipse(l * 0.5, h * 0.64 + rb * 0.75, rb * 0.5, rb * 0.22, 0, 0, Math.PI * 2);
+      c.fill();
+      c.strokeStyle = "#1c1a25";
+      c.lineWidth = 2;
+      c.beginPath();
+      c.moveTo(l * 0.5 - rb, h * 0.64);
+      c.arc(l * 0.5, h * 0.64, rb, 0, Math.PI);
+      c.closePath();
+      c.stroke();
+      return;
+    }
     c.strokeStyle = "#1c1a25";
     c.lineWidth = 2;
     c.beginPath();
@@ -224,6 +268,8 @@
   const VIOLET = ["#d9a6ff", "#8a3fd1", "#4f1f80"];
   ajouter("slime", 44, 40, (c) => slime(c, 44, 40, "content", VERT));
   ajouter("slime-aie", 44, 40, (c) => slime(c, 44, 40, "aie", VERT));
+  ajouter("slime-cligne", 44, 40, (c) => slime(c, 44, 40, "cligne", VERT));
+  ajouter("slime-ricane", 44, 40, (c) => slime(c, 44, 40, "ricane", VERT));
   // Le chef : plus gros, violet, avec une couronne (dessinée au-dessus du corps)
   const chef = (humeur) => (c) => {
     c.save();
@@ -247,6 +293,8 @@
   };
   ajouter("chef", 64, 70, chef("content"));
   ajouter("chef-aie", 64, 70, chef("aie"));
+  ajouter("chef-cligne", 64, 70, chef("cligne"));
+  ajouter("chef-ricane", 64, 70, chef("ricane"));
 
   // —— Les boulets ——
 
@@ -412,6 +460,15 @@
     c.lineTo(0, 9);
     c.closePath();
     c.fill();
+  });
+  // Une bouffée de fumée, douce sur les bords : la traînée du boulet en vol
+  ajouter("fumee", 16, 16, (c) => {
+    const degrade = c.createRadialGradient(8, 8, 0, 8, 8, 8);
+    degrade.addColorStop(0, "rgba(255, 255, 255, 0.95)");
+    degrade.addColorStop(0.5, "rgba(240, 240, 245, 0.6)");
+    degrade.addColorStop(1, "rgba(230, 230, 240, 0)");
+    c.fillStyle = degrade;
+    c.fillRect(0, 0, 16, 16);
   });
   ajouter("goutte", 10, 10, (c) => {
     c.fillStyle = "#62c94f";

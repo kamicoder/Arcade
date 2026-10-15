@@ -47,6 +47,13 @@ bugs de Phaser : c'est sa façon de faire, logique une fois qu'on la connaît, m
   Un test qui tire tout de suite ne le voit pas : attendre comme un joueur.
 - Un corps **retiré** du monde ne réveille pas ceux qui reposaient sur lui : endormis, ils restent en l'air
   (une poutre dont les piliers ont éclaté). Réveiller les corps (`setAwake()`) quand on en retire un.
+- Le ralenti de Matter n'est pas celui d'Arcade : pas de `world.timeScale` (l'écrire ne fait rien, sans
+  erreur), mais `matter.world.engine.timing.timeScale`, et dans le bon sens (0,25 = quatre fois plus lent).
+  Les particules ont leur propre `timeScale`, à régler en même temps. Et au ralenti, pendant
+  `collisionstart`, `body.velocity` est encore le déplacement **du pas** (quatre fois plus petit) : Matter ne
+  la ramène à un pas normal qu'après cet événement. Des dégâts calculés d'après elle baisseraient
+  au ralenti ; la catapulte la ramène elle-même (`vitesse()` dans `catapulte/scenes/Niveau.ts`, d'après
+  `body.deltaTime`).
 
 **Les scènes**
 

@@ -1,5 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
-import { ouvrir, appuyer, attendreScene, versLaPage, ouvrirLaCarte } from "./outils";
+import { ouvrir, appuyer, attendreScene, versLaPage, ouvrirLaCarte, tailleDuJeu } from "./outils";
 
 // Du Hub jusqu'au menu de la catapulte (un navigateur neuf : seul le premier niveau est ouvert)
 async function menuCatapulte(page: Page) {
@@ -43,9 +43,13 @@ function niveau(page: Page) {
   });
 }
 
-// Un point du monde (1280 × 720, réduit à 0,75 et centré) en pixels de la page
-function duMonde(page: Page, x: number, y: number) {
-  return versLaPage(page, (x - 640) * 0.75 + 480, (y - 360) * 0.75 + 270);
+// Un point du monde (1280 × 720, réduit et centré par la caméra du niveau) en pixels de la page
+async function duMonde(page: Page, x: number, y: number) {
+  const vue = await page.evaluate(() => {
+    const camera = (window as any).jeu.scene.getScene("catapulte-niveau").cameras.main;
+    return { gauche: camera.worldView.x as number, haut: camera.worldView.y as number, zoom: camera.zoom as number };
+  });
+  return versLaPage(page, (x - vue.gauche) * vue.zoom, (y - vue.haut) * vue.zoom);
 }
 
 test("le Hub ouvre la catapulte : seul le premier niveau est ouvert, et Entrée le lance", async ({ page }) => {
@@ -188,6 +192,26 @@ test("gagner : plus de slime, des étoiles selon les boulets restants, et le niv
   sansErreur();
 });
 
+// Le dernier slime tombé hors d'un tir (un bloc qui glissait encore) : le niveau est gagné tout de suite, et
+// le boulet de la fronde, qui n'a pas servi, compte avec les autres
+test("le dernier slime mort hors d'un tir : gagné tout de suite, le boulet de la fronde compte", async ({ page }) => {
+  const { sansErreur } = await menuCatapulte(page);
+  await jouerLeNiveau(page, 0);
+  const avant = await niveau(page);
+  await page.evaluate(() => {
+    const n = (window as any).jeu.scene.getScene("catapulte-niveau");
+    for (const slime of [...n.slimes]) {
+      n.blesser(slime, 1000);
+    }
+  });
+  await attendreScene(page, "catapulte-fin");
+  expect(await page.evaluate(() => (window as any).jeu.scene.getScene("catapulte-fin").sys.settings.data.gagne)).toBe(true);
+  // Tous les boulets comptent : ceux de la file, et celui de la fronde
+  const garde = await page.evaluate(() => JSON.parse(localStorage.getItem("catapulte/niveaux")!));
+  expect(garde[0].score).toBeGreaterThanOrEqual((avant.file + 1) * 1000);
+  sansErreur();
+});
+
 test("perdre : plus de boulet, des slimes encore là, et Rejouer recommence le niveau", async ({ page }) => {
   const { sansErreur } = await menuCatapulte(page);
   await jouerLeNiveau(page, 0);
@@ -197,6 +221,9 @@ test("perdre : plus de boulet, des slimes encore là, et Rejouer recommence le n
     n.force = 0.3;                         // un tir trop faible
   });
   await appuyer(page, "Space");
+  // Le tir n'a touché personne : le slime ricane
+  await page.waitForFunction(() => (window as any).jeu.scene.getScene("catapulte-niveau").slimes[0].humeur === "ricane",
+    undefined, { timeout: 20_000 });
   await attendreScene(page, "catapulte-fin");
   expect((await niveau(page)).etat).toBe("fini");
   expect(await page.evaluate(() => localStorage.getItem("catapulte/niveaux"))).toBeNull();
@@ -298,13 +325,80 @@ test("les boulets spéciaux montrent leur pouvoir, et le triple se divise en tro
   sansErreur();
 });
 
+test("la trace du tir d'avant : posée pendant le vol, gardée jusqu'au tir suivant", async ({ page }) => {
+  const { sansErreur } = await menuCatapulte(page);
+  await jouerLeNiveau(page, 0);
+  await page.evaluate(() => {
+    (window as any).jeu.scene.getScene("catapulte-niveau").force = 0.4;   // un tir court, loin du slime
+  });
+  await appuyer(page, "Space");
+  await attendreLEtat(page, "pret");       // le boulet suivant est dans la fronde
+  const trace = () => page.evaluate(() => {
+    const n = (window as any).jeu.scene.getScene("catapulte-niveau");
+    return { points: n.trace as { x: number; y: number }[], dessin: n.traceDessinee.commandBuffer.length as number };
+  });
+  const avant = await trace();
+  expect(avant.points.length).toBeGreaterThan(5);
+  expect(avant.dessin).toBeGreaterThan(5);
+  // Elle part de la fronde et suit le boulet jusque loin d'elle
+  expect(avant.points[0].x).toBeLessThan(300);
+  expect(avant.points.at(-1)!.x).toBeGreaterThan(400);
+  // Elle reste tant qu'on vise...
+  await appuyer(page, "ArrowUp");
+  await page.waitForTimeout(300);
+  expect((await trace()).points).toEqual(avant.points);
+  // ... et le tir suivant l'efface pour poser la sienne
+  await appuyer(page, "Space");
+  expect((await trace()).points.length).toBeLessThan(avant.points.length);
+  await page.waitForFunction(() => (window as any).jeu.scene.getScene("catapulte-niveau").trace.length > 0);
+  expect((await trace()).points[0].x).toBeLessThan(300);
+  sansErreur();
+});
+
+// Les vibrations passent aussi par là (un écroulement, un slime qui éclate) : sans manette ni vibreur, rien ne casse
+test("le poids des chocs : un gros écroulement secoue l'écran, le dernier slime ralentit tout un instant", async ({ page }) => {
+  const { sansErreur } = await menuCatapulte(page);
+  await jouerLeNiveau(page, 7);            // « La forteresse » : beaucoup de blocs, quatre slimes
+  // Les slimes éclatent un à un (d'un coup, avant que rien ne bouge) : le ralenti n'arrive qu'au dernier
+  const rythmes = await page.evaluate(() => {
+    const n = (window as any).jeu.scene.getScene("catapulte-niveau");
+    const temps = n.matter.world.engine.timing;
+    for (const slime of n.slimes.slice(1)) {
+      n.blesser(slime, 1000);
+    }
+    const avantLeDernier = temps.timeScale as number;
+    n.blesser(n.slimes[0], 1000);
+    return { avantLeDernier, auDernier: temps.timeScale as number };
+  });
+  expect(rythmes.avantLeDernier).toBe(1);
+  expect(rythmes.auDernier).toBeLessThan(0.5);
+  // Quatre blocs cassés d'un coup : l'écran tremble
+  expect(await page.evaluate(() => {
+    const n = (window as any).jeu.scene.getScene("catapulte-niveau");
+    for (const bloc of n.blocs.slice(0, 4)) {
+      n.blesser(bloc, 1000);
+    }
+    return n.cameras.main.shakeEffect.isRunning as boolean;
+  })).toBe(true);
+  // Puis tout reprend son rythme, la physique comme les éclats
+  await page.waitForFunction(() => (window as any).jeu.scene.getScene("catapulte-niveau").matter.world.engine.timing.timeScale === 1,
+    undefined, { timeout: 5000 });
+  expect(await page.evaluate(() => [...(window as any).jeu.scene.getScene("catapulte-niveau").gerbes.values()]
+    .every((g: any) => g.timeScale === 1))).toBe(true);
+  sansErreur();
+});
+
 test.describe("au doigt", () => {
   test.use({ viewport: { width: 844, height: 390 }, hasTouch: true, isMobile: true });
 
-  test("on touche le niveau, puis on tire l'élastique du doigt", async ({ page }) => {
+  test("le jeu prend la largeur du téléphone ; on touche le niveau, puis on tire l'élastique du doigt", async ({ page }) => {
     const { sansErreur } = await ouvrir(page);
     await ouvrirLaCarte(page, "catapulte");
     await attendreScene(page, "catapulte-menu");
+    // Plus de bandes noires : le jeu a la proportion de l'écran (20/9), la hauteur reste 540
+    const largeur = Math.round(540 * 844 / 390);
+    expect(await tailleDuJeu(page)).toEqual({ largeur, hauteur: 540 });
+    expect((await page.locator("canvas").boundingBox())!.width).toBeCloseTo(844, 0);
     await page.evaluate(() => {
       const carte = (window as any).jeu.scene.getScene("catapulte-menu").cartes[0].boite;
       (window as any).__carte = { x: carte.x, y: carte.y };
@@ -313,6 +407,15 @@ test.describe("au doigt", () => {
     const p = await versLaPage(page, carte.x, carte.y);
     await page.touchscreen.tap(p.x, p.y);
     await attendreLEtat(page, "pret");
+    // Le niveau aussi : le monde entier, à la même hauteur, au milieu ; le tableau de bord suit la largeur
+    expect(await page.evaluate(() => {
+      const camera = (window as any).jeu.scene.getScene("catapulte-niveau").cameras.main;
+      const tableau = (window as any).jeu.scene.getScene("catapulte-tableau");
+      return {
+        zoom: camera.zoom, x: Math.round(camera.midPoint.x), y: Math.round(camera.midPoint.y),
+        largeurDeLaCamera: camera.width, score: tableau.score.x,
+      };
+    })).toEqual({ zoom: 0.75, x: 640, y: 360, largeurDeLaCamera: largeur, score: largeur / 2 });
 
     // Une tape à gauche (pour chasser l'annonce, par exemple) ne tire pas
     const tape = await duMonde(page, 300, 300);

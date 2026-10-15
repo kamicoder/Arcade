@@ -5,7 +5,7 @@
 import Phaser from "phaser";
 import type { Niveau } from "./Niveau";
 import { BOULETS, type GenreDeBoulet } from "../reglages";
-import { LARGEUR, HAUTEUR, POLICE } from "../../../socle/style";
+import { HAUTEUR, POLICE } from "../../../socle/style";
 import { estTactile } from "../../../socle/tactile";
 import { boutonFermer } from "../../../socle/boutonArcade";
 import { annoncer } from "../../../socle/annonce";
@@ -26,11 +26,12 @@ export class Tableau extends Phaser.Scene {
   create() {
     this.niveau = this.scene.get("catapulte-niveau") as Niveau;
     this.dernierBoulet = null;
-    const style = { fontFamily: POLICE, fontSize: "20px", fontStyle: "bold", color: "#ffffff", stroke: "#3a2410", strokeThickness: 5 };
+    const largeur = this.scale.width;      // au doigt, plus large que 960 (le niveau s'élargit)
+  const style = { fontFamily: POLICE, fontSize: "20px", fontStyle: "bold", color: "#ffffff", stroke: "#3a2410", strokeThickness: 5 };
     this.add.text(16, 16, `Niveau ${this.niveau.numero + 1} : ${this.niveau.niveau.nom}`, style);
-    this.score = this.add.text(LARGEUR / 2, 16, "", style).setOrigin(0.5, 0);
-    boutonFermer(this, LARGEUR - 26, 26, () => this.niveau.quitter());
-    this.aide = this.add.text(LARGEUR / 2, HAUTEUR - 26, "", {
+    this.score = this.add.text(largeur / 2, 16, "", style).setOrigin(0.5, 0);
+    boutonFermer(this, largeur - 26, 26, () => this.niveau.quitter());
+    this.aide = this.add.text(largeur / 2, HAUTEUR - 26, "", {
       fontFamily: POLICE, fontSize: "17px", color: "#ffffff", stroke: "#3a2410", strokeThickness: 4,
     }).setOrigin(0.5);
 
