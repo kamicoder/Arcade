@@ -38,6 +38,11 @@ qui ne va pas suffit, on ajuste.
 - La trace du tir d'avant : points blancs pâles, jusqu'au sol. Jaune, ou arrêtée au premier choc ?
 - Le ricanement « hi hi ! » est écrit, sans son : un petit son ?
 - Les slimes clignent toutes les 6 s environ : plus rare, plus long ?
+- La visée à la manette : 1° et 0,02 de force par appui sur la croix ; tenue, elle avance d'elle-même après
+  300 ms, à 40° et 0,5 de force par seconde (le stick aussi, poussé à fond). Plus lent tenu (25°/s), une attente
+  plus courte (200 ms) ?
+- Un tir s'arrête quand tout est calme, ou au bout de 20 s (un bloc qui glisserait sans fin sur la glace) :
+  15 s, ou 30 s ?
 
 **Platformer**
 - Saut court : la vitesse ramenée à 40 % (un bond de 35 px contre 130 px tenu). Plus franc, ou plus doux (50 à 60 %) ?
@@ -64,13 +69,6 @@ qui ne va pas suffit, on ajuste.
 - Le rythme : 1 an pour 3 min 45 (quatre fois plus vite qu'avant), un adulte à 16 min, une vie de 45 min à 1 h 15. Encore plus vite, ou les stades plus courts que la vie ?
 - Avec ce rythme, une surprise arrive toutes les 30 s à 1 min 15 (les appels, eux, attendent toujours 1 min avant l'oubli). Des surprises plus rares ?
 - Sans jouer souvent, la maladie « trop de friandises » est presque inévitable (à rejuger avec le nouveau rythme).
-
-## Les défauts repérés (à vérifier, puis corriger)
-
-### Catapulte
-- Le menu ne tient pas plus de 8 niveaux : des pages, quand un 9e arrivera.
-- Un tir s'arrête au calme, ou au bout de 20 s (un bloc qui glisserait sans fin sur la glace) : à juger.
-
 
 ## Course (voitures et licornes)
 
@@ -133,11 +131,11 @@ qui ne va pas suffit, on ajuste.
 
 **Contenu**
 - La caisse de TNT, puis le boulet bombe (M).
-- Du relief (rochers, plateaux) et plus de niveaux, avec des pages au menu (M).
+- Du relief (rochers, plateaux) et plus de niveaux, avec des pages au menu : il n'en tient que 8 (M).
 - Le slime casqué (S).
 
 **Au doigt et à la manette**
-- Le stick analogique, et l'aide de la manette (S).
+- L'aide de la manette à l'écran (S).
 
 **Modes**
 - Le château du jour (M/L).

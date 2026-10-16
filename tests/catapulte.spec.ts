@@ -1,5 +1,7 @@
 import { test, expect, type Page } from "@playwright/test";
-import { ouvrir, appuyer, attendreScene, versLaPage, ouvrirLaCarte, tailleDuJeu } from "./outils";
+import {
+  ouvrir, appuyer, attendreScene, versLaPage, ouvrirLaCarte, tailleDuJeu, brancherUneManette, pousserLeStick, tenirUnBouton,
+} from "./outils";
 
 // Du Hub jusqu'au menu de la catapulte (un navigateur neuf : seul le premier niveau est ouvert)
 async function menuCatapulte(page: Page) {
@@ -105,20 +107,76 @@ test("à la souris : on attrape le boulet, on tire l'élastique, on lâche, il p
   sansErreur();
 });
 
-test("au clavier : ← → l'angle, ↑ ↓ la force, Espace tire", async ({ page }) => {
+test("au clavier : ↑ ↓ l'angle, ← → la force, Espace tire", async ({ page }) => {
   const { sansErreur } = await menuCatapulte(page);
   await jouerLeNiveau(page, 0);
-  await appuyer(page, "ArrowLeft");        // 35° + 5°
-  await appuyer(page, "ArrowUp");          // 0,8 + 0,1
+  await appuyer(page, "ArrowUp");          // 35° + 5°
+  await appuyer(page, "ArrowRight");       // 0,8 + 0,1
   expect(await page.evaluate(() => {
     const n = (window as any).jeu.scene.getScene("catapulte-niveau");
     return [n.angle, n.force, n.etat];
   })).toEqual([40, 0.9, "vise"]);
+  // La vitesse du boulet à la première image de son vol : lue plus tard (un poste chargé), il retombe déjà
+  await page.evaluate(() => {
+    const n = (window as any).jeu.scene.getScene("catapulte-niveau");
+    const relever = () => {
+      const corps = n.enVol[0]?.image.body;
+      if (corps) {
+        (window as any).auDepart = { x: corps.velocity.x, y: corps.velocity.y };
+        n.events.off("postupdate", relever);
+      }
+    };
+    n.events.on("postupdate", relever);
+  });
   await appuyer(page, "Space");
-  const vol = await niveau(page);
-  expect(vol.etat).toBe("vol");
+  expect((await niveau(page)).etat).toBe("vol");
+  const depart = await page.evaluate(() => (window as any).auDepart as { x: number; y: number });
   // La direction du tir : 40° au-dessus de l'horizontale
-  expect(Math.atan2(-vol.vitesse!.y, vol.vitesse!.x) * 180 / Math.PI).toBeCloseTo(40, -1);
+  expect(Math.atan2(-depart.y, depart.x) * 180 / Math.PI).toBeCloseTo(40, -1);
+  sansErreur();
+});
+
+test("à la manette, on vise finement : la croix un degré par appui, puis d'elle-même ; le stick, doux à peine poussé", async ({ page }) => {
+  await brancherUneManette(page);
+  const { sansErreur } = await menuCatapulte(page);
+  await jouerLeNiveau(page, 0);
+  const visee = () => page.evaluate(() => {
+    const n = (window as any).jeu.scene.getScene("catapulte-niveau");
+    return { angle: n.angle as number, force: n.force as number };
+  });
+  const depart = await visee();
+  // ↑ appuyé : un degré de plus, pas cinq (lu dès que l'angle bouge, avant qu'il avance de lui-même)
+  await tenirUnBouton(page, 12, true);
+  await page.waitForFunction((a) => (window as any).jeu.scene.getScene("catapulte-niveau").angle !== a, depart.angle);
+  expect((await visee()).angle).toBeCloseTo(depart.angle + 1, 5);
+  await tenirUnBouton(page, 12, false);
+  // ← tenu : la force descend d'elle-même
+  await tenirUnBouton(page, 14, true);
+  await page.waitForFunction((f) => (window as any).jeu.scene.getScene("catapulte-niveau").force < f - 0.1, depart.force);
+  await tenirUnBouton(page, 14, false);
+  // Le stick à peine poussé (0,3) bouge à peine ; à fond, bien plus vite. En degrés par seconde du jeu : un
+  // poste chargé peut étirer les attentes
+  const vitesse = async (poussee: number) => {
+    const avant = await page.evaluate(() => {
+      const n = (window as any).jeu.scene.getScene("catapulte-niveau");
+      return { angle: n.angle as number, temps: n.time.now as number };
+    });
+    await pousserLeStick(page, 0, poussee);
+    await page.waitForTimeout(500);
+    const apres = await page.evaluate(() => {
+      const n = (window as any).jeu.scene.getScene("catapulte-niveau");
+      return { angle: n.angle as number, temps: n.time.now as number };
+    });
+    await pousserLeStick(page, 0, 0);
+    return (avant.angle - apres.angle) / (apres.temps - avant.temps) * 1000;   // le stick vers le bas baisse le tir
+  };
+  const doux = await vitesse(0.3);
+  expect(doux).toBeGreaterThan(0);
+  expect(doux).toBeLessThan(3);
+  expect(await vitesse(1)).toBeGreaterThan(25);
+  // A tire
+  await tenirUnBouton(page, 0, true);
+  await attendreLEtat(page, "vol");
   sansErreur();
 });
 

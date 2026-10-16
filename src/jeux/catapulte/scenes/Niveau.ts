@@ -14,7 +14,7 @@ import { paysage } from "../decor";
 import {
   MONDE, SOL, FRONDE, REPOS, ZONE_DE_PRISE, BOULETS, FROTTEMENT_DE_L_AIR, ECART_DU_TRIPLE, MATIERES, FORMES,
   SLIMES, SEUIL_DE_CHOC, CALME_AU_DEBUT, VITESSE_CALME, TIR_MAX, POINTS_PAR_BOULET_RESTANT, SAUVEGARDE, PAS,
-  ECROULEMENT, SECOUSSE, RALENTI, CLIGNEMENT, RICANEMENT, TRACE,
+  ECROULEMENT, SECOUSSE, RALENTI, CLIGNEMENT, RICANEMENT, TRACE, VISEE_MANETTE,
   type GenreDeBoulet, type Matiere, type GenreDeSlime,
 } from "../reglages";
 import { surTouche } from "../../../socle/clavier";
@@ -61,6 +61,13 @@ export interface DonneesDeNiveau {
 }
 
 // Les débris et les gouttes, une gerbe par matière
+// Le stick à peine poussé bouge à peine : le milieu ne compte pas (un stick au repos n'est jamais tout à fait
+// à zéro), puis la vitesse croît comme le carré de la poussée
+function doux(poussee: number): number {
+  const reste = Math.max(0, Math.abs(poussee) - 0.15) / 0.85;
+  return Math.sign(poussee) * reste * reste;
+}
+
 const ECLATS = ["eclat-bois", "eclat-pierre", "eclat-glace", "goutte"];
 
 // Le corps d'un boulet, le même pour tous : celui de la fronde comme les trois petits du triple
@@ -82,8 +89,9 @@ export class Niveau extends Phaser.Scene {
   enVol: Piece[] = [];                     // ceux qui volent (trois, après la division du triple)
   slimes: Piece[] = [];
   blocs: Piece[] = [];
-  angle = 35;                              // la visée au clavier : l'angle (degrés) et la force (0 à 1)
+  angle = 35;                              // la visée au clavier et à la manette : l'angle (degrés) et la force (0 à 1)
   force = 0.8;
+  private croix = { sens: "0,0", depuis: 0 };   // la direction tenue sur la croix de la manette, depuis tant de ms
   private pieces = new Map<Phaser.GameObjects.GameObject, Piece>();
   private elastique!: Phaser.GameObjects.Graphics;
   private elastiqueDevant!: Phaser.GameObjects.Graphics;
@@ -384,15 +392,9 @@ export class Niveau extends Phaser.Scene {
       this.lacher();
     });
 
-    // Le clavier et la manette : l'angle et la force, puis on tire ; en vol, le pouvoir du boulet
-    const regler = (dAngle: number, dForce: number) => {
-      if (this.etat !== "pret" && this.etat !== "vise") {
-        return;
-      }
-      this.angle = Phaser.Math.Clamp(this.angle + dAngle, -10, 80);
-      this.force = Phaser.Math.Clamp(Math.round((this.force + dForce) * 10) / 10, 0.3, 1);
-      this.viser(tirParAngle(this.angle, this.force));
-    };
+    // Le clavier et la manette : l'angle et la force, puis on tire ; en vol, le pouvoir du boulet. La croix et
+    // le stick de la manette se lisent à chaque image (viserALaManette).
+    const regler = (dAngle: number, dForce: number) => this.regler(dAngle, dForce, true);
     const espace = () => {
       if (this.etat === "vol") {
         this.pouvoir();
@@ -403,20 +405,66 @@ export class Niveau extends Phaser.Scene {
         this.lacher();
       }
     };
-    surTouche(this, "LEFT", () => regler(5, 0));
-    surTouche(this, "RIGHT", () => regler(-5, 0));
-    surTouche(this, "UP", () => regler(0, 0.1));
-    surTouche(this, "DOWN", () => regler(0, -0.1));
+    // ↑ ↓ lèvent ou baissent le tir, → ← l'envoient plus ou moins loin
+    surTouche(this, "UP", () => regler(5, 0));
+    surTouche(this, "DOWN", () => regler(-5, 0));
+    surTouche(this, "RIGHT", () => regler(0, 0.1));
+    surTouche(this, "LEFT", () => regler(0, -0.1));
     surTouche(this, "SPACE", espace);
     surTouche(this, "ENTER", espace);
     surTouche(this, "ESC", () => this.quitter());
     toucheDuSon(this, SAUVEGARDE);
-    surManette(this, MANETTE.GAUCHE, () => regler(5, 0));
-    surManette(this, MANETTE.DROITE, () => regler(-5, 0));
-    surManette(this, MANETTE.HAUT, () => regler(0, 0.1));
-    surManette(this, MANETTE.BAS, () => regler(0, -0.1));
     surManette(this, MANETTE.A, espace);
     surManette(this, [MANETTE.START, MANETTE.SELECT], () => this.quitter());   // en partie, Start : on s'en va
+  }
+
+  // L'angle et la force changent, la trajectoire prévue suit. Le clavier arrondit la force au dixième (ses pas de
+  // 0,1 tombent juste) ; la manette, plus fine, non.
+  private regler(dAngle: number, dForce: number, auDixieme = false) {
+    if (this.etat !== "pret" && this.etat !== "vise") {
+      return;
+    }
+    const force = this.force + dForce;
+    this.angle = Phaser.Math.Clamp(this.angle + dAngle, -10, 80);
+    this.force = Phaser.Math.Clamp(auDixieme ? Math.round(force * 10) / 10 : force, 0.3, 1);
+    this.viser(tirParAngle(this.angle, this.force));
+  }
+
+  // La manette vise finement (voir VISEE_MANETTE) : un appui sur la croix, un petit pas ; tenue, elle avance
+  // d'elle-même ; le stick est analogique. Comme au clavier, ↑ lève le tir et → l'envoie plus loin.
+  private viserALaManette(delta: number) {
+    let croixHaut = 0;
+    let croixLoin = 0;
+    let stickHaut = 0;
+    let stickLoin = 0;
+    for (const manette of this.input.gamepad?.getAll() ?? []) {
+      croixHaut += Number(manette.up) - Number(manette.down);
+      croixLoin += Number(manette.right) - Number(manette.left);
+      stickHaut -= doux(manette.leftStick.y);   // le stick vers le haut, c'est y négatif
+      stickLoin += doux(manette.leftStick.x);
+    }
+    const v = VISEE_MANETTE;
+    const secondes = delta / 1000;
+    let dAngle = stickHaut * v.angleParSeconde * secondes;
+    let dForce = stickLoin * v.forceParSeconde * secondes;
+    const sens = `${Math.sign(croixHaut)},${Math.sign(croixLoin)}`;
+    if (sens !== "0,0") {
+      if (sens !== this.croix.sens) {
+        this.croix.depuis = 0;
+        dAngle += Math.sign(croixHaut) * v.pasAngle;
+        dForce += Math.sign(croixLoin) * v.pasForce;
+      } else {
+        this.croix.depuis += delta;
+        if (this.croix.depuis > v.attente) {
+          dAngle += Math.sign(croixHaut) * v.angleParSeconde * secondes;
+          dForce += Math.sign(croixLoin) * v.forceParSeconde * secondes;
+        }
+      }
+    }
+    this.croix.sens = sens;
+    if (dAngle !== 0 || dForce !== 0) {
+      this.regler(dAngle, dForce);
+    }
   }
 
   // —— Les chocs ——
@@ -629,6 +677,7 @@ export class Niveau extends Phaser.Scene {
   // —— Le temps : la fin d'un tir, ce qui tombe du monde ——
 
   update(temps: number, delta: number) {
+    this.viserALaManette(delta);
     for (const piece of [...this.pieces.values()]) {
       const { x, y } = piece.image;
       if (y > MONDE.hauteur + 200 || x < -300 || x > MONDE.largeur + 300) {

@@ -50,7 +50,7 @@ export class Tableau extends Phaser.Scene {
     this.aide.setText(n.etat === "pret" || n.etat === "vise"
       ? estTactile()
         ? "Tire l'élastique vers l'arrière, et lâche !"
-        : "Tire l'élastique à la souris, ou : ← → l'angle, ↑ ↓ la force, Espace pour tirer"
+        : "Tire l'élastique à la souris, ou : ↑ ↓ l'angle, ← → la force, Espace pour tirer"
       : "");
 
     // Le boulet spécial dans la fronde ; et le triple, encore en vol, tant qu'il ne s'est pas divisé

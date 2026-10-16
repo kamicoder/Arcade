@@ -149,3 +149,12 @@ export async function pousserLeStick(page: Page, x: number, y: number) {
   }, [x, y] as const);
   await page.waitForTimeout(150);
 }
+
+// Un bouton de cette manette, tenu ou lâché (0 = A, 14 = ← de la croix... : voir socle/manette.ts)
+export async function tenirUnBouton(page: Page, bouton: number, tenu: boolean) {
+  await page.evaluate(([bouton, tenu]) => {
+    const manette = (window as any).manetteDesTests;
+    manette.buttons[bouton] = { pressed: tenu, touched: tenu, value: tenu ? 1 : 0 };
+    manette.timestamp = performance.now();
+  }, [bouton, tenu] as const);
+}

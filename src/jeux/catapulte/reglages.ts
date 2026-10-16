@@ -17,6 +17,15 @@ export const TIRE_MAX = 110;               // l'élastique ne s'étire pas plus 
 export const PUISSANCE = 0.2;              // la vitesse au départ, pour chaque pixel d'élastique tiré
 export const ZONE_DE_PRISE = 120;          // on attrape le boulet à moins de ça de lui
 
+// La visée à la manette, plus fine que celle du clavier (5° et 0,1 par touche) : la croix, un petit pas par
+// appui, puis elle avance d'elle-même quand on la tient ; le stick, d'autant plus vite qu'il est poussé loin
+// (à peine poussé, tout doux). L'angle va de -10° à 80°, la force de 0,3 à 1.
+export const VISEE_MANETTE = {
+  pasAngle: 1, pasForce: 0.02,             // un appui sur la croix
+  attente: 300,                            // ms : la croix tenue avance d'elle-même après ça
+  angleParSeconde: 40, forceParSeconde: 0.5,   // la croix tenue, ou le stick poussé à fond
+};
+
 // La gravité de Matter : 1 × 0,001, sur un pas de 1000/60 ms. Le calcul de la trajectoire prévue
 // (tir.ts) refait exactement le même calcul que Matter.
 export const GRAVITE = { y: 1, echelle: 0.001 };
