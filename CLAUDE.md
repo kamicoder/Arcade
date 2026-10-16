@@ -60,7 +60,8 @@ Chaque fichier dit en tête pourquoi il existe.
   `surChaqueTouche(scene, action)` pour toutes les touches, avec l'événement du navigateur.
 - `fonduPuis(scene, action)` au lieu de `camera.fadeOut()` ; `retourAuHub(scene)` pour quitter un jeu.
 - `surManette(scene, MANETTE.B, action)` (`manette.ts`) au lieu de `gamepad.on("down")` et ses numéros : dans les
-  menus, listes et fins, A ou Start valide (`VALIDER`), B revient ; en partie, chaque jeu décide.
+  menus, listes et fins, A ou Start valide (`VALIDER`), B revient ; en partie, chaque jeu décide. Le stick gauche
+  fait comme la croix (un coup, un pas) partout où l'on écoute ses directions.
 - `uneSeuleFois()` (`fin.ts`) : une garde contre un double départ (rejouer OU revenir) ; `ecranDeFin(scene, ...)` :
   l'écran « GAME OVER » à deux boutons (tir, platformer).
 - `mettreEnPause(scene, { quitter, autres, possible, ... })` (`pause.ts`) : la pause par-dessus la partie, « Reprendre »

@@ -67,9 +67,6 @@ qui ne va pas suffit, on ajuste.
 
 ## Les défauts repérés (à vérifier, puis corriger)
 
-### Communs à plusieurs jeux
-- **La pause n'a pas été essayée avec une vraie manette** (les tests simulent l'appui).
-
 ### Catapulte
 - Le menu ne tient pas plus de 8 niveaux : des pages, quand un 9e arrivera.
 - Un tir s'arrête au calme, ou au bout de 20 s (un bloc qui glisserait sans fin sur la glace) : à juger.
@@ -156,7 +153,7 @@ qui ne va pas suffit, on ajuste.
 **Au doigt et à la manette**
 - Plus de « ? » au doigt (S).
 - Un vrai bouton de retour dans la barre (S).
-- La croix tenue qui avance toute seule, et le stick (S).
+- La croix tenue qui avance toute seule (S).
 - Revoir l'aide (un « ? ») (S).
 
 **Modes**

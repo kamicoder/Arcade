@@ -126,3 +126,26 @@ export async function quitterParLaPause(page: Page) {
   await appuyer(page, "ArrowUp");
   await appuyer(page, "Enter");
 }
+
+// Une vraie manette, vue par le navigateur (navigator.getGamepads), et non un événement de Phaser : pour le
+// stick, que Phaser ne raconte pas, il relit la manette à chaque image. À brancher avant ouvrir().
+export async function brancherUneManette(page: Page) {
+  await page.addInitScript(() => {
+    const manette = {
+      id: "Manette des tests", index: 0, connected: true, mapping: "standard", timestamp: 0,
+      buttons: Array.from({ length: 17 }, () => ({ pressed: false, touched: false, value: 0 })),
+      axes: [0, 0, 0, 0],
+    };
+    (window as any).manetteDesTests = manette;
+    navigator.getGamepads = () => [manette as unknown as Gamepad];
+  });
+}
+
+// Le stick gauche de cette manette : x de -1 (gauche) à 1, y de -1 (haut) à 1
+export async function pousserLeStick(page: Page, x: number, y: number) {
+  await page.evaluate(([x, y]) => {
+    // L'heure du dernier changement, comme une vraie : Phaser ignore une manette plus vieille que la scène
+    Object.assign((window as any).manetteDesTests, { axes: [x, y, 0, 0], timestamp: performance.now() });
+  }, [x, y] as const);
+  await page.waitForTimeout(150);
+}

@@ -77,6 +77,10 @@ bugs de Phaser : c'est sa façon de faire, logique une fois qu'on la connaît, m
   fait lire un appui aux scènes l'une après l'autre, de la plus haute à la plus basse, dans la même image :
   une fin arrêtée par Start est encore active quand la partie, dessous, lit ce même Start. C'est ce qui
   permet à la partie de se taire (le `possible` de `socle/pause.ts`).
+- Phaser n'a d'événement que pour les boutons d'une manette, pas pour le stick : il se relit à chaque image
+  (`leftStick`, comme `surManette` le fait pour les menus). Et il ignore une manette dont l'heure (`timestamp`,
+  celle de son dernier changement) est plus vieille que la scène : une manette simulée dans un test doit la tenir à
+  jour (`pousserLeStick`, dans `tests/outils.ts`).
 - Chaque scène lit la manette avec sa **propre copie** des boutons (son `GamepadPlugin`), qui ne bouge pas
   quand la scène est arrêtée ou en pause. Une scène qui arrive, ou qui sort d'une pause, prend un bouton
   encore tenu pour un nouvel appui : le Start qui ouvre la pause validerait aussitôt « Reprendre », celui

@@ -41,7 +41,6 @@ export class Choix extends Phaser.Scene {
   private choix: Record<Cote, number> = { gauche: 0, droite: 0 };
   private prets: Record<Cote, boolean> = { gauche: false, droite: false };
   private panneaux = {} as Record<Cote, Panneau>;
-  private sticks: Record<Cote, number> = { gauche: 0, droite: 0 };   // le sens où chaque stick était poussé
   private parti = false;
 
   constructor() {
@@ -52,7 +51,6 @@ export class Choix extends Phaser.Scene {
     this.solo = donnees.solo;
     this.choix = lireLeChoix();
     this.prets = { gauche: false, droite: false };
-    this.sticks = { gauche: 0, droite: 0 };
     this.parti = false;
   }
 
@@ -93,7 +91,7 @@ export class Choix extends Phaser.Scene {
     }
     surTouche(this, "ESC", () => this.retour());
 
-    // Les manettes : la première pour le bleu, la deuxième pour l'orange. La croix change de modèle,
+    // Les manettes : la première pour le bleu, la deuxième pour l'orange. La croix (ou le stick) change de modèle,
     // A ou X valide, B revient au titre.
     // Chaque manette commande son côté
     const pourSonCote = (action: (cote: Cote) => void) => (manette: Phaser.Input.Gamepad.Gamepad) => {
@@ -110,21 +108,6 @@ export class Choix extends Phaser.Scene {
     const retour = this.add.text(20, 16, "← Retour", { fontFamily: POLICE, fontSize: "18px", color: "#a49cb4" })
       .setInteractive({ useHandCursor: true });
     retour.on("pointerup", () => this.retour());
-  }
-
-  // Le stick gauche aussi change de modèle : un coup de stick, un modèle (on attend qu'il revienne au milieu)
-  update() {
-    for (const manette of manettes(this)) {
-      const cote = this.coteDeLaManette(manette);
-      if (!cote) {
-        continue;
-      }
-      const sens = manette.leftStick.x < -0.5 ? -1 : manette.leftStick.x > 0.5 ? 1 : 0;
-      if (sens !== 0 && this.sticks[cote] === 0) {
-        this.changer(cote, sens);
-      }
-      this.sticks[cote] = sens;
-    }
   }
 
   private coteDeLaManette(manette: Phaser.Input.Gamepad.Gamepad): Cote | null {
