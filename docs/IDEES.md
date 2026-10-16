@@ -68,13 +68,7 @@ qui ne va pas suffit, on ajuste.
 ## Les défauts repérés (à vérifier, puis corriger)
 
 ### Communs à plusieurs jeux
-- **Ce qui suit `time.now` continue pendant la pause** : le boss du platformer tire dès la reprise (le tir est
-  corrigé : voir `docs/PIEGES-PHASER.md`).
 - **La pause n'a pas été essayée avec une vraie manette** (les tests simulent l'appui).
-
-### Platformer
-- Le duo, après une vie perdue loin du départ, peut effacer les plateformes de départ qu'il vient de poser (la caméra
-  n'a pas encore suivi) : le héros retombe aussitôt. Déduit du code, pas vu en jeu.
 
 ### Catapulte
 - Le menu ne tient pas plus de 8 niveaux : des pages, quand un 9e arrivera.

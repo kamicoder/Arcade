@@ -72,7 +72,6 @@ export class Duo extends Phaser.Scene {
         rebond: () => this.vibrer(coureur, "leger"),
       });
       cameras[i].setBackgroundColor(FOND).setZoom(ZOOM).setBounds(0, dy, INFINI, HAUTEUR_MONDE);
-      coureur.regard.suivre();
       cameras[i].fadeIn(300);
       this.coureurs.push(coureur);
       this.preparer(coureur);
@@ -97,6 +96,7 @@ export class Duo extends Phaser.Scene {
     c.monde.ajouter(c.generateur.depart());
     c.monde.ajouter(c.generateur.suite(600));
     c.heros.poserA(55, 400 + c.monde.dy);
+    c.regard.suivre();                     // la caméra revient sur lui d'un coup, sans glisser depuis là-bas
     c.score = 0;
     c.aRefaire = false;
   }
@@ -140,7 +140,10 @@ export class Duo extends Phaser.Scene {
     const duree = Math.min(delta / 1000, 0.05);
     for (const c of this.coureurs) {
       if (c.aRefaire) {
+        // Ce qu'elle voit (worldView), la caméra ne le calcule qu'en dessinant : à cette image, c'est encore
+        // la vue de là où il est tombé, et tout le départ serait « derrière » elle, donc oublié
         this.preparer(c);
+        continue;
       }
       const vue = c.camera.worldView;
       c.monde.ajouter(c.generateur.suite(vue.right + 300));

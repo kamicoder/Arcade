@@ -120,6 +120,9 @@ bugs de Phaser : c'est sa façon de faire, logique une fois qu'on la connaît, m
 - `scale.setGameSize` : seules les caméras placées en (0, 0) et à la taille d'avant suivent la nouvelle
   taille (celles des scènes arrêtées aussi). Son événement `RESIZE` est le même que celui d'une fenêtre
   qui change de forme : pour les distinguer, comparer `gameSize.width` à la largeur d'avant (4e argument).
+- `camera.worldView` (ce que la caméra voit) n'est calculé qu'en dessinant. Après avoir déplacé la caméra
+  (`startFollow` la pose d'un coup, `centerOn`, `scrollX`), il donne encore la vue d'avant jusqu'à l'image
+  suivante : le duo du platformer, qui oublie ce qui est derrière la vue, effaçait le départ qu'il venait de poser.
 
 **Les images**
 

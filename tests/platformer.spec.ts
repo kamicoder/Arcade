@@ -394,6 +394,45 @@ test("à deux : Q D Z d'un AZERTY à leur place, les flèches pour le joueur 2, 
   sansErreur();
 });
 
+test("à deux : tombé loin du départ, on repart sur les plateformes du début, qui restent", async ({ page }) => {
+  const { sansErreur } = await menuPlatformer(page);
+  await choisirLeMode(page, 3, "platformer-duo");
+  // Le joueur 1, tenu en l'air loin devant (sans gravité) : sa caméra le rejoint
+  await page.evaluate(() => {
+    const duo = (window as any).jeu.scene.getScene("platformer-duo");
+    duo.chutes = 0;
+    const repartir = duo.repartir;
+    duo.repartir = function (c: any) {
+      if (c === duo.coureurs[0] && !c.aRefaire) {
+        duo.chutes++;
+      }
+      repartir.call(this, c);
+    };
+    const corps = duo.coureurs[0].heros.body;
+    corps.setAllowGravity(false);
+    corps.reset(2500, 100);
+  });
+  await page.waitForFunction(() => (window as any).jeu.scene.getScene("platformer-duo").coureurs[0].camera.worldView.left > 2000);
+  // Il tombe sous le monde : retour au début
+  await page.evaluate(() => {
+    const corps = (window as any).jeu.scene.getScene("platformer-duo").coureurs[0].heros.body;
+    corps.setAllowGravity(true);
+    corps.reset(2500, 600);
+  });
+  await page.waitForFunction(() => (window as any).jeu.scene.getScene("platformer-duo").chutes >= 1);
+  // Il se pose sur le départ et y reste : une seule chute
+  await page.waitForFunction(() => (window as any).jeu.scene.getScene("platformer-duo").coureurs[0].heros.body.blocked.down);
+  await page.waitForTimeout(500);
+  const etat = await page.evaluate(() => {
+    const duo = (window as any).jeu.scene.getScene("platformer-duo");
+    const corps = duo.coureurs[0].heros.body;
+    return { chutes: duo.chutes, x: corps.x, auSol: corps.blocked.down };
+  });
+  expect(etat).toEqual({ chutes: 1, x: expect.any(Number), auSol: true });
+  expect(etat.x).toBeLessThan(100);
+  sansErreur();
+});
+
 // ================================================================ L'éditeur et Mon aventure
 
 // L'état de l'éditeur, lu dans la scène Phaser ; « fenetre » : le titre de la fenêtre du dessus
