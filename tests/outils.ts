@@ -1,8 +1,10 @@
 // Ce que les tests partagent : attendre une scène, lire l'état du jeu, appuyer sur une touche, toucher l'écran.
 import { expect, type Page } from "@playwright/test";
 
-// Ouvre l'Arcade et relève les erreurs de la page : un test les vérifie à la fin avec sansErreur()
-export async function ouvrir(page: Page) {
+// Ouvre l'Arcade et relève les erreurs de la page : un test les vérifie à la fin avec sansErreur().
+// Toujours en WebGL, comme sur un appareil ordinaire : le navigateur des tests le fait peut-être au
+// processeur, et l'Arcade passerait d'elle-même en canvas 2D (socle/rendu.ts).
+export async function ouvrir(page: Page, rendu: "webgl" | "canvas" = "webgl") {
   const erreurs: string[] = [];
   page.on("pageerror", (e) => erreurs.push(e.message));
   page.on("console", (m) => {
@@ -18,7 +20,7 @@ export async function ouvrir(page: Page) {
       return Promise.resolve();
     } as typeof HTMLCanvasElement.prototype.requestPointerLock;
   });
-  await page.goto("/");
+  await page.goto("/?rendu=" + rendu);
   await attendreScene(page, "Hub");
   return {
     sansErreur: () => expect(erreurs).toEqual([]),

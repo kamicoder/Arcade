@@ -7,12 +7,13 @@ import { Hub } from "./scenes/Hub";
 import { LARGEUR, HAUTEUR, COULEURS } from "./socle/style";
 import { demarrerMiseAJour } from "./socle/miseAJour";
 import { corrigerLesSegmentsNuls, corrigerLesEmojisCoupes } from "./socle/correctifs";
+import { choisirLeRendu, teindreEnCanvas } from "./socle/rendu";
 
 // Avant de créer le moindre texte
 corrigerLesEmojisCoupes();
 
 const jeu = new Phaser.Game({
-  type: Phaser.AUTO,                       // WebGL si possible, sinon canvas 2D
+  type: choisirLeRendu(),                  // WebGL si la carte graphique suit, sinon canvas 2D (socle/rendu.ts)
   parent: "jeu",                           // la <div id="jeu"> de index.html
   width: LARGEUR,                          // la taille « logique » : tout le jeu se dessine dans 960 × 540...
   height: HAUTEUR,
@@ -30,7 +31,10 @@ const jeu = new Phaser.Game({
 });
 
 // Le moteur de rendu n'existe qu'une fois le jeu prêt, avant sa première image
-jeu.events.once(Phaser.Core.Events.READY, () => corrigerLesSegmentsNuls(jeu));
+jeu.events.once(Phaser.Core.Events.READY, () => {
+  corrigerLesSegmentsNuls(jeu);
+  teindreEnCanvas(jeu);
+});
 
 demarrerMiseAJour();
 

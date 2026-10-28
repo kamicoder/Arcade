@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { ouvrir, brancherUneManette, pousserLeStick } from "./outils";
+import { ouvrir, brancherUneManette, pousserLeStick, ouvrirLaCarte, attendreScene, appuyer } from "./outils";
 
 // Phaser 4.2.1 : un segment de longueur nulle dans un contour donnait des sommets NaN, que certains
 // téléphones dessinent comme des traits partis du coin haut gauche (voir socle/correctifs.ts)
@@ -73,5 +73,49 @@ test("le stick de la manette choisit un jeu : un coup de stick, une carte", asyn
   await pousserLeStick(page, 0, 0);
   await pousserLeStick(page, -1, 0);
   expect(await choisie()).toBe(depart);
+  sansErreur();
+});
+
+// Sur un vieil ordinateur, l'Arcade dessine en canvas 2D (socle/rendu.ts), où Phaser ignore les teintes :
+// elle les refait avec des copies colorées des images
+test("en canvas 2D, les images et les particules gardent leurs teintes", async ({ page }) => {
+  const { sansErreur } = await ouvrir(page, "canvas");
+  expect(await page.evaluate(() => (window as any).jeu.renderer.type)).toBe(1);   // Phaser.CANVAS
+  await page.evaluate(() => {
+    const hub = (window as any).jeu.scene.getScene("Hub");
+    const blanc = hub.textures.createCanvas("essai-blanc", 20, 20);
+    blanc.context.fillStyle = "#ffffff";
+    blanc.context.fillRect(0, 0, 20, 20);
+    blanc.refresh();
+    hub.add.image(100, 100, "essai-blanc").setDepth(1000).setTint(0xff0000);                  // multipliée
+    hub.add.image(200, 100, "essai-blanc").setDepth(1000).setTint(0x0000ff).setTintMode(1);   // FILL
+    hub.add.particles(300, 100, "essai-blanc", { speed: 0, lifespan: 60_000, tint: 0x00ff00, emitting: false })
+      .setDepth(1000).explode(1);
+  });
+  const couleur = (x: number, y: number) => page.evaluate(([x, y]) => {
+    const [r, g, b] = (window as any).jeu.canvas.getContext("2d").getImageData(x, y, 1, 1).data;
+    return [r, g, b];
+  }, [x, y]);
+  // Le Hub pose un léger voile sur tout : on regarde la couleur qui domine
+  const dominante = async (x: number, y: number) => {
+    const [r, g, b] = await couleur(x, y);
+    return r > 150 && g < 60 && b < 60 ? "rouge" : g > 150 && r < 60 && b < 60 ? "vert" : b > 150 && r < 60 && g < 60 ? "bleu" : [r, g, b];
+  };
+  await page.waitForFunction(() => {
+    const [r] = (window as any).jeu.canvas.getContext("2d").getImageData(100, 100, 1, 1).data;
+    return r > 150;
+  });
+  expect(await dominante(100, 100)).toBe("rouge");
+  expect(await dominante(200, 100)).toBe("bleu");
+  expect(await dominante(300, 100)).toBe("vert");
+  sansErreur();
+});
+
+test("en canvas 2D, un jeu se lance", async ({ page }) => {
+  const { sansErreur } = await ouvrir(page, "canvas");
+  await ouvrirLaCarte(page, "briques");
+  await attendreScene(page, "briques-menu");
+  await appuyer(page, "Enter");
+  await attendreScene(page, "briques-partie");
   sansErreur();
 });

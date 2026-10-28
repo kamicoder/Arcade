@@ -87,6 +87,9 @@ Chaque fichier dit en tête pourquoi il existe.
   souris (elle ne sort plus du jeu) ; Échap la rend et met en pause.
 - `vibrer(scene, "leger" | "moyen" | "fort", manette?)` (`vibration.ts`) : la manette et le téléphone vibrent (un
   choc, un coup reçu, un K.O.) ; ce que le navigateur ne sait pas faire ne fait rien.
+- `rendu.ts` : WebGL, ou canvas 2D quand le WebGL de l'appareil tourne au processeur (`?rendu=canvas` ou
+  `?rendu=webgl` dans l'adresse l'impose ; les tests ouvrent en WebGL). En canvas, il refait les teintes que
+  Phaser ignore.
 - `correctifs.ts` : les défauts de Phaser réparés en attendant une version qui les corrige.
 
 ## Ajouter un jeu

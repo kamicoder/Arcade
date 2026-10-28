@@ -134,6 +134,9 @@ bugs de Phaser : c'est sa façon de faire, logique une fois qu'on la connaît, m
 - Une `TileSprite` répète sa texture : ce qui touche un bord « bave » sur le bord d'en face. Une marge
   transparente règle le problème.
 - Un `Rectangle` arrondi ne se redessine que par `setSize` (changer `.width` casse les coins).
+- Les teintes (`setTint`, `setTintMode`, le `tint` des particules) n'existent qu'en WebGL : en canvas 2D,
+  Phaser les ignore sans rien dire. L'Arcade passe en canvas sur les vieux ordinateurs, et `socle/rendu.ts`
+  les y refait, pour les images fixes seulement (pas une `RenderTexture` ni un texte qui change).
 
 ## Ce qui a changé depuis Phaser 3
 
